@@ -25,4 +25,4 @@ __pycache__/
 */runs/
 */mlruns/
 *.pt
-*.png
+figures/*.png

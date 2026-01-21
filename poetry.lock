@@ -3084,6 +3084,18 @@ dev = ["pre-commit", "tox"]
 testing = ["coverage", "pytest", "pytest-benchmark"]
 
 [[package]]
+name = "ply"
+version = "3.11"
+description = "Python Lex & Yacc"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "ply-3.11-py2.py3-none-any.whl", hash = "sha256:096f9b8350b65ebd2fd1346b12452efe5b9607f7482813ffca50c22722a807ce"},
+    {file = "ply-3.11.tar.gz", hash = "sha256:00c7c1aaa88358b9c765b6d3000c6eec0ba42abca5351b095321aef446081da3"},
+]
+
+[[package]]
 name = "prometheus-client"
 version = "0.24.0"
 description = "Python client for the Prometheus monitoring system."
@@ -3421,6 +3433,27 @@ files = [
 
 [package.extras]
 diagrams = ["jinja2", "railroad-diagrams"]
+
+[[package]]
+name = "pyspice"
+version = "1.5"
+description = "Simulate electronic circuit using Python and the Ngspice / Xyce simulators"
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "PySpice-1.5-py2.py3-none-any.whl", hash = "sha256:a7512163136a6af5911ba280dc97f70224ed5acfcd5647edbafca9e2053d229c"},
+    {file = "PySpice-1.5.tar.gz", hash = "sha256:d28448accad98959e0f5932af8736e90a1f3f9ff965121c6881d24cdfca23d22"},
+]
+
+[package.dependencies]
+cffi = ">=1.14"
+matplotlib = ">=3.2"
+numpy = ">=1.18"
+ply = ">=3.11"
+PyYAML = ">=5.3"
+requests = ">=2.23"
+scipy = ">=1.4"
 
 [[package]]
 name = "pytest"
@@ -4704,4 +4737,4 @@ doc = ["pytest", "pytest-mock"]
 [metadata]
 lock-version = "2.1"
 python-versions = "~3.11"
-content-hash = "ea203e5fb011ae0caab923f53b4059760b57d37e86ea4fdb75b444f41649132d"
+content-hash = "d81484bb41e4ebf05bbe836c3a9a76c6d096a3d11d59b70b82c0288fd89ea98f"

@@ -13,12 +13,16 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     graphviz \
     wget \
+    ngspice \
+    libngspice0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
 ENV POETRY_HOME="/opt/poetry"
 RUN curl -sSL https://install.python-poetry.org | python3 -
 ENV PATH="$POETRY_HOME/bin:$PATH"
+ENV NGSPICE_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libngspice.so.0
+
 
 RUN poetry config virtualenvs.create false
 WORKDIR /app
