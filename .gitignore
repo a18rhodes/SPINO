@@ -1,0 +1,25 @@
+# --- Python Standard ---
+__pycache__/
+*.py[cod]
+*.so
+.ipynb_checkpoints/
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# --- Virtual Env (Poetry) ---
+.venv/
+.env
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+
+# --- Project Artifacts (Crucial) ---
+# Do not commit large binary models or logs
+*/models/
+*/figures/
+*/runs/
+*/mlruns/
+*.pt
+*.png
