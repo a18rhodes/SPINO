@@ -24,6 +24,8 @@
         "ms-toolsai.jupyter",
         "quarto.quarto",
         "ms-toolsai.tensorboard",
+        "tamasfe.even-better-toml",
+        "ms-python.pylint"
       ]
     }
   }
