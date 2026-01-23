@@ -4,11 +4,8 @@
 
 import base64
 import json
-import os
-import tarfile
 from pathlib import Path
 
-import matplotlib.cm as cm
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,58 +15,11 @@ from neuralop.models import FNO
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 
+from spino.data import backup_artifacts
+from spino.loss import GenericDimensionlessPhysicsLoss, rc_physics_residual
+from spino.solvers import solve_rc_ode
+
 plt.style.use("dark_background")
-
-# %% [markdown]
-### 2. Dimensionless Physics Loss
-# This loss solves the scaled ODE: Lambda * dV/dt + V = I
-# All variables (V, I, t) are dimensionless and order O(1).
-# No more 1e-12 or 1e9 coefficients!
-
-
-# %%
-class DimensionlessPhysicsLoss(nn.Module):
-    def __init__(self, sobolev_weight=1.0, physics_weight=1e-4):
-        super().__init__()
-        self.sobolev_weight = sobolev_weight
-        self.physics_weight = physics_weight
-        self.mse = nn.MSELoss()
-
-    def forward(self, pred_v, target_v, inputs):
-        # inputs: [Batch, 2, Time] (I_hat, Lambda)
-
-        # 1. Base Data Loss
-        loss_data = self.mse(pred_v, target_v)
-
-        # 2. Initialize Aux Losses to 0.0
-        loss_sobolev = torch.tensor(0.0, device=pred_v.device)
-        loss_physics = torch.tensor(0.0, device=pred_v.device)
-
-        # 3. Calculate Physics/Sobolev if needed
-        if self.sobolev_weight > 0 or self.physics_weight > 0:
-            dt_hat = 1.0 / 2048.0
-            pred_delta = pred_v[:, :, 1:] - pred_v[:, :, :-1]
-            dV_dt = pred_delta / dt_hat
-
-            # A. Sobolev (Derivative Matching)
-            if self.sobolev_weight > 0:
-                target_delta = target_v[:, :, 1:] - target_v[:, :, :-1]
-                target_dV_dt = target_delta / dt_hat
-                loss_sobolev = self.mse(dV_dt, target_dV_dt)
-
-            # B. Physics (ODE Residual)
-            if self.physics_weight > 0:
-                I_hat = inputs[:, 0:1, :-1]
-                Lambda = inputs[:, 1:2, :-1]
-                V_mid = (pred_v[:, :, :-1] + pred_v[:, :, 1:]) / 2.0
-                residual = (Lambda * dV_dt) + V_mid - I_hat
-                loss_physics = torch.mean(torch.abs(residual))
-
-        # 4. Total Loss
-        total_loss = loss_data + (self.sobolev_weight * loss_sobolev) + (self.physics_weight * loss_physics)
-
-        # 5. Return TUPLE (Fixes the TypeError)
-        return total_loss, loss_data, loss_sobolev, loss_physics
 
 
 # %%
@@ -77,61 +27,13 @@ def get_model():
     return FNO(
         n_modes=(256,),
         hidden_channels=64,
-        in_channels=2,  # <--- Just I and Lambda!
+        in_channels=2,
         out_channels=1,
         preactivation=True,
         fno_skip="linear",
         non_linearity=nn.functional.silu,
         domain_padding=0.1,
     ).cuda()
-
-
-# %%
-def backup_artifacts(unique_run_name: str):
-    """
-    Safely copies results from the Container to the Mounted Backup Drive.
-    """
-    backup_root = os.environ.get("SPINO_BACKUP_DIR")
-    unique_run_path = Path(unique_run_name)
-    unique_run_name_safe = unique_run_path.name
-    run_parent = unique_run_path.parent
-    if not backup_root or not Path(backup_root).exists():
-        print(f"Skipping backup: SPINO_BACKUP_DIR not set or {backup_root} not found.")
-        return
-    backup_path = Path(backup_root)
-    backup_path.mkdir(parents=True, exist_ok=True)
-    tar_filename = backup_path / f"{unique_run_name_safe}.tar.gz"
-    print(f"Backing up artifacts to: {tar_filename}")
-    try:
-        with tarfile.open(tar_filename, "w:gz") as tar:
-            src_model = Path("models", unique_run_path).with_suffix(".pt")
-            if src_model.exists():
-                tar.add(src_model, arcname=str(Path(unique_run_name_safe, "model.pt")))
-            src_figs = Path("figures", run_parent)
-            for fig in src_figs.rglob(f"{unique_run_name_safe}.png"):
-                relative_path = fig.relative_to(src_figs)
-                tar.add(fig, arcname=str(Path(unique_run_name_safe, "figures") / relative_path))
-            src_runs = Path("runs", unique_run_path)
-            if src_runs.exists():
-                tar.add(src_runs, arcname=str(Path(unique_run_name_safe, "runs")))
-    except Exception as e:
-        print(f"Backup Warning: Failed to copy some files: {e}")
-
-
-# %%
-@torch.jit.script
-def solve_rc_ode(I, R, C, dt):
-    """Solve the RC ODE using the analytical solution."""
-    tau = R * C
-    decay = torch.exp(-dt / tau)
-    gain = R * (1.0 - decay)
-    V = torch.zeros_like(I)
-    v_curr = torch.zeros(I.shape[0], 1, device=I.device)
-    for t in range(I.shape[1]):
-        v_next = v_curr * decay + I[:, t : t + 1] * gain
-        V[:, t] = v_next.squeeze(1)
-        v_curr = v_next
-    return V
 
 
 # %% [markdown]
@@ -366,7 +268,6 @@ def generate_dimensionless_data_with_white_noise_and_chirp(n_samples=2000, t_ste
 # 2. Gaussian Noise (25%)
 # 3. Super-Dense Switching (25%) - Pushes frequency to the grid limit.
 # CHANGED: Reverted Tau sampling to Log-Uniform (Bathtub is redundant with spectral aug).
-# FIXED: Explicit .view() reshaping to prevent [N, N] broadcasting bugs.
 
 
 # %%
@@ -381,7 +282,7 @@ def generate_dimensionless_data_with_white_noise_and_chirp_log_uniform(n_samples
     log_min = np.log(min_tau)
     log_max = np.log(max_tau)
 
-    # FIX: Explicitly view as [N, 1] to guarantee correct broadcasting
+    # Explicitly view as [N, 1] to guarantee correct broadcasting
     log_tau = torch.rand(n_samples, 1, device=device) * (log_max - log_min) + log_min
     tau_vals = torch.exp(log_tau)  # Shape: [n_samples, 1]
 
@@ -451,34 +352,6 @@ def generate_dimensionless_data_with_white_noise_and_chirp_log_uniform(n_samples
 # %% [markdown]
 ### 5. Data Visualization
 # Verify that identical Lambda produces identical shapes, regardless of Time Scale.
-
-
-# %%
-def visualize_data(model, display=False):
-    train_x, train_y = generate_dimensionless_data(n_samples=5)
-    print(f"Input Shape: {train_x.shape} (Batch, 2, Time)")  # [Batch, 2, 2048]
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-    t_axis = np.linspace(0, 1, 2048)  # Normalized Time
-
-    for i in range(len(train_x)):
-        I_trace = train_x[i, 0, :].cpu().numpy()
-        Lambda = train_x[i, 1, 0].item()
-        V_trace = train_y[i, 0, :].cpu().numpy()
-
-        color = cm.viridis(i / 5)
-        label = f"Sample {i}: $\lambda$={Lambda:.4f}"
-
-        ax1.step(t_axis, I_trace, where="post", color=color, alpha=0.7)
-        ax2.plot(t_axis, V_trace, color=color, label=label)
-
-    ax1.set_title("Normalized Inputs ($I_{hat}$)")
-    ax2.set_title("Normalized Responses ($V_{hat}$)")
-    ax2.set_xlabel("Normalized Time ($\hat{t} = t / T_{end}$)")
-    ax2.legend()
-    plt.tight_layout()
-    if display:
-        plt.show()
 
 
 # %% [markdown]
@@ -877,8 +750,8 @@ def run_experiment(
     # Generate Unique ID
     unique_id = base64.b64encode(json.dumps(params, sort_keys=True).encode("utf-8")).decode("utf-8")[:8]
     run_name = f"{experiment_name}_{unique_id}"
-    writer = SummaryWriter(log_dir=f"runs/{run_name}")
-    writer.add_text("hyperparameters", json.dumps(params, indent=2))
+    # writer = SummaryWriter(log_dir=f"runs/{run_name}")
+    # writer.add_text("hyperparameters", json.dumps(params, indent=2))
 
     print(f"Starting Experiment: {run_name}")
 
@@ -891,10 +764,10 @@ def run_experiment(
     # 3. Model & Optimization
     model = get_model()
     optimizer = torch.optim.AdamW(model.parameters(), lr=starting_lr, weight_decay=adam_weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6)
+    loss_fn = GenericDimensionlessPhysicsLoss(
+        sobolev_weight=target_sobolev_weight, physics_weight=target_physics_weight, physics_residual_fn=rc_physics_residual
     )
-    loss_fn = DimensionlessPhysicsLoss(sobolev_weight=target_sobolev_weight, physics_weight=target_physics_weight)
 
     # 4. Training Loop
     print(f"Starting Training...")
@@ -944,38 +817,38 @@ def run_experiment(
             avg_data = total_data.item() / len(train_loader)
             avg_sob = total_sobolev.item() / len(train_loader)
             avg_phys = total_physics.item() / len(train_loader)
-            writer.add_scalar("Loss/train", avg_loss, epoch)
-            writer.add_scalar("DataLoss/train", avg_data, epoch)
-            writer.add_scalar("PhysicsLoss/train", avg_phys, epoch)
-            writer.add_scalar("Sobolev/train", avg_sob, epoch)
-            writer.add_scalar("Params/alpha", alpha, epoch)
-            writer.add_scalar("Params/lr", optimizer.param_groups[0]["lr"], epoch)
+            # writer.add_scalar("Loss/train", avg_loss, epoch)
+            # writer.add_scalar("DataLoss/train", avg_data, epoch)
+            # writer.add_scalar("PhysicsLoss/train", avg_phys, epoch)
+            # writer.add_scalar("Sobolev/train", avg_sob, epoch)
+            # writer.add_scalar("Params/alpha", alpha, epoch)
+            # writer.add_scalar("Params/lr", optimizer.param_groups[0]["lr"], epoch)
 
     # 5. Save & Evaluate
-    Path("models").mkdir(exist_ok=True)
-    torch.save(model.state_dict(), f"models/{run_name}.pt")
+    # Path("models").mkdir(exist_ok=True)
+    # torch.save(model.state_dict(), f"models/{run_name}.pt")
 
-    all_metrics = {"hparam/loss": avg_loss}  # Start with final loss
+    # all_metrics = {"hparam/loss": avg_loss}  # Start with final loss
 
-    evaluations = [
-        ("Spectrum", evaluate_ic_spectrum),
-        ("Adversarial", evaluate_adversarial_spectrum),
-        ("OOD", evaluate_ood_physics),
-    ]
+    # evaluations = [
+    #     ("Spectrum", evaluate_ic_spectrum),
+    #     ("Adversarial", evaluate_adversarial_spectrum),
+    #     ("OOD", evaluate_ood_physics),
+    # ]
 
-    for evaluation_name, evaluation_fn in evaluations:
-        print(f"Running Eval: {evaluation_name}...")
-        Path(f"figures/{evaluation_name}").mkdir(parents=True, exist_ok=True)
-        figure, r2_dict = evaluation_fn(model)
-        figure.savefig(f"figures/{evaluation_name}/{run_name}.png")
-        writer.add_figure(f"Evaluation/{evaluation_name}", figure)
-        plt.close(figure)
-        for k, v in r2_dict.items():
-            clean_key = k.replace(" ", "_").replace(":", "").replace("=", "")
-            all_metrics[f"hparam/r2_{evaluation_name}_{clean_key}"] = v
-    writer.add_hparams(hparam_dict=params, metric_dict=all_metrics)
-    writer.close()
-    backup_artifacts(run_name)
+    # for evaluation_name, evaluation_fn in evaluations:
+    #     print(f"Running Eval: {evaluation_name}...")
+    #     Path(f"figures/{evaluation_name}").mkdir(parents=True, exist_ok=True)
+    #     figure, r2_dict = evaluation_fn(model)
+    #     figure.savefig(f"figures/{evaluation_name}/{run_name}.png")
+    #     writer.add_figure(f"Evaluation/{evaluation_name}", figure)
+    #     plt.close(figure)
+    #     for k, v in r2_dict.items():
+    #         clean_key = k.replace(" ", "_").replace(":", "").replace("=", "")
+    #         all_metrics[f"hparam/r2_{evaluation_name}_{clean_key}"] = v
+    # writer.add_hparams(hparam_dict=params, metric_dict=all_metrics)
+    # writer.close()
+    # backup_artifacts(run_name)
     print("Run complete.")
     return model
 
