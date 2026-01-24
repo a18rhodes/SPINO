@@ -1,6 +1,12 @@
+# %% [markdown]
+### 4. RC ODE Solver
+# This module provides a function to solve the RC circuit ODE analytically.
+
+# %%
+
 import torch
 
-
+# %%
 @torch.jit.script
 def solve_rc_ode(I, R, C, dt):
     """Solve the RC ODE using the analytical solution."""
