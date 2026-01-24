@@ -26,7 +26,12 @@
         "ms-toolsai.tensorboard",
         "tamasfe.even-better-toml",
         "ms-python.pylint"
-      ]
+      ],
+      "settings": {
+        "extensions.autoUpdate": false,
+        "extensions.ignoreRecommendations": true
+      }
     }
-  }
+  },
+  "postCreateCommand": "code-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter --install-extension quarto.quarto --install-extension ms-toolsai.tensorboard --install-extension tamasfe.even-better-toml --install-extension ms-python.pylint || true"
 }
