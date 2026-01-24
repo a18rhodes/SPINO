@@ -4,7 +4,6 @@
 # %%
 import base64
 import json
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import torch
@@ -57,7 +56,7 @@ def run_experiment(
     # Generate Unique ID
     unique_id = base64.b64encode(json.dumps(params, sort_keys=True).encode("utf-8")).decode("utf-8")[:8]
     run_name = f"{experiment_name}_{unique_id}"
-    writer = SummaryWriter(log_dir=f"runs/{run_name}")
+    writer = SummaryWriter(log_dir=path_config.run_dir / run_name)
     writer.add_text("hyperparameters", json.dumps(params, indent=2))
 
     print(f"Starting Experiment: {run_name}")
