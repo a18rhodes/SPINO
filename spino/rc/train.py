@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
 
 from spino.archive import backup_artifacts
-from spino.constants import MODELS_ROOT, FIGURES_ROOT
+from spino.config import PathConfig
 from spino.loss import GenericDimensionlessPhysicsLoss, rc_physics_residual
 from spino.rc.evaluate import (
     evaluate_adversarial_spectrum,
@@ -30,9 +30,10 @@ from spino.rc.model import get_model
 plt.style.use("dark_background")
 
 
-#%% [markdown]
+# %% [markdown]
 ### Experiment runner
 # This function encapsulates the entire experiment lifecycle: data generation, model training, evaluation, and
+
 
 # %%
 def run_experiment(
@@ -52,6 +53,7 @@ def run_experiment(
 ):
     params = locals().copy()
     params["data_generator"] = data_generator.__name__
+    path_config = PathConfig("simple_rc")
     # Generate Unique ID
     unique_id = base64.b64encode(json.dumps(params, sort_keys=True).encode("utf-8")).decode("utf-8")[:8]
     run_name = f"{experiment_name}_{unique_id}"
@@ -69,9 +71,13 @@ def run_experiment(
     # 3. Model & Optimization
     model = get_model()
     optimizer = torch.optim.AdamW(model.parameters(), lr=starting_lr, weight_decay=adam_weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6
+    )
     loss_fn = GenericDimensionlessPhysicsLoss(
-        sobolev_weight=target_sobolev_weight, physics_weight=target_physics_weight, physics_residual_fn=rc_physics_residual
+        sobolev_weight=target_sobolev_weight,
+        physics_weight=target_physics_weight,
+        physics_residual_fn=rc_physics_residual,
     )
 
     # 4. Training Loop
@@ -131,8 +137,7 @@ def run_experiment(
             writer.add_scalar("Params/lr", optimizer.param_groups[0]["lr"], epoch)
 
     # 5. Save & Evaluate
-    Path("models").mkdir(exist_ok=True)
-    torch.save(model.state_dict(), (MODELS_ROOT / run_name).with_suffix(".pt"))
+    torch.save(model.state_dict(), path_config.model_dir / f"{run_name}.pt")
     all_metrics = {"hparam/loss": avg_loss}  # Start with final loss
     evaluations = [
         ("Spectrum", evaluate_ic_spectrum),
@@ -141,7 +146,7 @@ def run_experiment(
     ]
     for evaluation_name, evaluation_fn in evaluations:
         print(f"Running Eval: {evaluation_name}...")
-        figures_dir = FIGURES_ROOT / evaluation_name
+        figures_dir = path_config.figure_dir / evaluation_name
         figures_dir.mkdir(parents=True, exist_ok=True)
         figure, r2_dict = evaluation_fn(model)
         figure.savefig(figures_dir / f"{run_name}.png")
@@ -168,7 +173,10 @@ if __name__ == "__main__":
     for experiment in [
         ("simple_rc/Dimensionless", generate_dimensionless_data),
         ("simple_rc/Dimensionless_With_Gaussian_Noise", generate_dimensionless_data_with_white_noise),
-        ("simple_rc/Dimensionless_With_Gaussian_Noise_And_Chirp", generate_dimensionless_data_with_white_noise_and_chirp),
+        (
+            "simple_rc/Dimensionless_With_Gaussian_Noise_And_Chirp",
+            generate_dimensionless_data_with_white_noise_and_chirp,
+        ),
         (
             "simple_rc/Dimensionless_With_Gaussian_Noise_And_Chirp_Log_Uniform",
             generate_dimensionless_data_with_white_noise_and_chirp_log_uniform,
