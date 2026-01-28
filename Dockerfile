@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     wget \
     ngspice \
     libngspice0-dev \
+    tree \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
