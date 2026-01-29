@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     ngspice \
     libngspice0-dev \
     tree \
+    bat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
@@ -30,5 +31,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry lock
 RUN poetry install --no-root --no-interaction
+COPY scripts ./
+RUN chmod +x scripts/setup_pdk.sh && scripts/setup_pdk.sh
 COPY . .
 RUN poetry install --only-root --no-interaction
