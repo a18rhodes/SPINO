@@ -48,3 +48,6 @@ pdk_root/
 
 # Local libraries
 libs/
+
+# Local large datasets
+datasets/
