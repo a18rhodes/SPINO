@@ -1,5 +1,5 @@
 # Start from lightweight Python 3.11 image with CUDA support
-FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+FROM pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
 
 # Keep Python from generating .pyc files in the container
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     ngspice \
     libngspice0-dev \
     tree \
+    bat \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
@@ -30,5 +31,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry lock
 RUN poetry install --no-root --no-interaction
+COPY scripts ./
+RUN chmod +x scripts/setup_pdk.sh && scripts/setup_pdk.sh
 COPY . .
 RUN poetry install --only-root --no-interaction

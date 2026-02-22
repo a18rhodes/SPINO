@@ -18,6 +18,8 @@ jupyter = "^1.1.1 "
 ipykernel = "^7.1.0"
 tensorboard = "^2.20.0"
 pyspice = "^1.5"
+volare = "^0.20.6"
+click = "^8.3.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0"

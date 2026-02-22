@@ -6,10 +6,16 @@ __pycache__/
 .coverage
 .pytest_cache/
 .mypy_cache/
+.Python
+*.egg-info/
+dist/
+build/
 
 # --- Virtual Env (Poetry) ---
 .venv/
 .env
+env/
+venv/
 
 # --- IDE Settings ---
 .vscode/
@@ -26,3 +32,22 @@ __pycache__/
 */mlruns/
 *.pt
 figures/*.png
+
+# --- SPINO / PDK Specific (Merged) ---
+# Volare / PDK (Crucial to ignore - Do not commit gigabytes of model data)
+sky130_volare/
+sky130_pdk/
+pdk_root/
+
+# Temporary Simulation Files
+# We often create debug decks like 'debug_volare.spice' or 'extract.spice'
+*.spice
+*.raw
+*.log
+*.out
+
+# Local libraries
+libs/
+
+# Local large datasets
+datasets/
