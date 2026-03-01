@@ -1,3 +1,7 @@
+# Journals
+**/CURRENT_STATUS.md
+**/NEXT_STEPS.md
+
 # --- Python Standard ---
 __pycache__/
 *.py[cod]
@@ -51,8 +55,9 @@ libs/
 
 # Local large datasets
 datasets/
-spino/mosfet/CURRENT_STATUS.md
-spino/mosfet/NEXT_STEPS.md
+
+# Future work
 spino/benchmarking/
-spino/benchmarking/
+
+# Offline helper
 spino/mosfet/grid_search.py
