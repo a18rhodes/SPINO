@@ -13,14 +13,13 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from spino.constants import ARCSINH_SCALE_MA
-
 __all__ = [
     "ArcSinhMSELoss",
     "GenericDimensionlessPhysicsLoss",
     "LpLoss",
     "LpLossWithFloor",
     "Log10Loss",
+    "QuarticWeightedLoss",
     "RegionAdaptiveLoss",
     "SubthresholdWeightedLoss",
     "rc_physics_residual",
@@ -130,8 +129,8 @@ class SubthresholdWeightedLoss(nn.Module):
         :param target_arcsinh: Target current in arcsinh-transformed space [Batch, 1, Time].
         :return: Weighted MSE loss in physical space (mA).
         """
-        pred_ma = ARCSINH_SCALE_MA * torch.sinh(pred_arcsinh)
-        target_ma = ARCSINH_SCALE_MA * torch.sinh(target_arcsinh)
+        pred_ma = torch.sinh(pred_arcsinh)
+        target_ma = torch.sinh(target_arcsinh)
         weights = self.scale_mA / (torch.abs(target_ma) + self.scale_mA)
         weights = torch.pow(weights, self.exponent)
         mse_physical = (pred_ma - target_ma) ** 2
@@ -258,8 +257,8 @@ class Log10Loss(nn.Module):
         self.register_buffer("epsilon", torch.tensor(epsilon, dtype=torch.float32))
 
     def forward(self, pred_arcsinh, target_arcsinh):
-        pred_ma = ARCSINH_SCALE_MA * torch.sinh(pred_arcsinh)
-        target_ma = ARCSINH_SCALE_MA * torch.sinh(target_arcsinh)
+        pred_ma = torch.sinh(pred_arcsinh)
+        target_ma = torch.sinh(target_arcsinh)
         pred_abs = pred_ma.abs()
         target_abs = target_ma.abs()
         pred_log = torch.log10(pred_abs.add(self.epsilon))
