@@ -23,10 +23,11 @@ from rich.console import Console
 from rich.table import Table
 
 from spino.constants import ARCSINH_SCALE_MA
-from spino.mosfet.gen_data import GEOMETRY_BINS, InfiniteSpiceMosfetDataset, ParameterSchema, PreGeneratedMosfetDataset
+from spino.mosfet.gen_data import GEOMETRY_BINS, InfiniteSpiceMosfetDataset, ParameterSchema
 
 # Default number of initial timesteps to discard from evaluation.
 # Removes the SPICE .op-to-transient solver artifact (not physical device behavior).
+# Purely heurstic based on visual inspection of SPICE vs FNO curves.
 DEFAULT_TRIM_EVAL = 41
 
 logging.basicConfig(
@@ -179,6 +180,96 @@ def _plot_error_dual(ax, x, y_true, y_pred, xlabel, title_prefix):
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.4)
 
 
+def _infer_and_denormalize_sample(
+    model,
+    dataset,
+    sample_idx: int,
+    device: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Runs model inference on a dataset sample and denormalizes all outputs.
+
+    :param model: Trained MosfetFNO model.
+    :param dataset: PreGeneratedMosfetDataset instance.
+    :param sample_idx: Index of the sample to evaluate.
+    :param device: Torch device for inference.
+    :return: (current_true_ma, current_pred_ma, vg, vd, vs, physics_raw)
+    """
+    (voltages_norm, physics_norm), current_log = dataset[sample_idx]
+    v_in = voltages_norm.unsqueeze(0).to(device)
+    p_in = physics_norm.to(device)
+    with torch.no_grad():
+        pred_log = model(v_in, p_in).cpu().numpy().flatten()
+    current_true_ma = ARCSINH_SCALE_MA * np.sinh(current_log.cpu().numpy().flatten())
+    current_pred_ma = ARCSINH_SCALE_MA * np.sinh(pred_log)
+    voltages_raw = v_in.cpu().numpy()[0]
+    if dataset.normalize:
+        voltages_raw = voltages_raw * dataset.voltages_std.numpy() + dataset.voltages_mean.numpy()
+    physics_raw = p_in.cpu().numpy()[0]
+    if dataset.normalize:
+        physics_raw = physics_raw * dataset.physics_std.numpy() + dataset.physics_mean.numpy()
+    return current_true_ma, current_pred_ma, voltages_raw[0], voltages_raw[1], voltages_raw[2], physics_raw
+
+
+def _extract_geometry_label(physics_raw: np.ndarray) -> tuple[float, float, float]:
+    """
+    Extracts device geometry parameters (W, L, Vth0) from a denormalized physics vector.
+
+    :param physics_raw: Denormalized physics parameter array.
+    :return: (w_um, l_um, vth0) tuple.
+    """
+    try:
+        w = physics_raw[ParameterSchema.TRAINING_KEYS.index("w")]
+        l = physics_raw[ParameterSchema.TRAINING_KEYS.index("l")]
+        vth0 = physics_raw[ParameterSchema.TRAINING_KEYS.index("vth0")]
+    except (ValueError, IndexError):
+        w, l, vth0 = 0.0, 0.0, 0.0
+    return w, l, vth0
+
+
+def _draw_transient_panel(ax, time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2):
+    """Draws the time-domain transient response panel."""
+    _style_plot(
+        ax,
+        f"MOSFET Transient Response\nW={w:.2f}\u00b5m, L={l:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}",
+        "Normalized Time",
+        "Current (mA)",
+    )
+    ax.plot(time_us, current_true_ma, color="#ffffff", linewidth=2, alpha=0.7, label="Ground Truth")
+    ax.plot(time_us, current_pred_ma, color="#00ffff", linestyle=":", linewidth=2, label="FNO Prediction")
+    ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
+    ax.legend(loc="upper right", fontsize=9)
+
+
+def _draw_voltage_panel(ax, time_us, vg, vd, vs):
+    """Draws the terminal voltages panel."""
+    _style_plot(ax, "Terminal Voltages", "Normalized Time", "Voltage (V)")
+    ax.plot(time_us, vg, color="#00ff00", label="Vg (Gate)", linewidth=1.5)
+    ax.plot(time_us, vd, color="#ff00ff", label="Vd (Drain)", linewidth=1.5)
+    ax.plot(time_us, vs, color="#ffff00", label="Vs (Source)", linewidth=1.5, linestyle="--")
+    ax.legend(loc="upper right", fontsize=9)
+
+
+def _draw_parity_panel(ax, current_true_ma, current_pred_ma, r2):
+    """Draws the true-vs-predicted parity scatter panel."""
+    _style_plot(ax, f"Parity Plot: Current Prediction | R\u00b2={r2:.4f}", "True Id (mA)", "Predicted Id (mA)")
+    ax.scatter(current_true_ma, current_pred_ma, c="#00ffff", s=15, alpha=0.6, edgecolors="white", linewidth=0.5)
+    lim_min = min(current_true_ma.min(), current_pred_ma.min())
+    lim_max = max(current_true_ma.max(), current_pred_ma.max())
+    ax.plot([lim_min, lim_max], [lim_min, lim_max], "r--", linewidth=1.5, alpha=0.7, label="Perfect (y=x)")
+    ax.set_xlim(lim_min, lim_max)
+    ax.set_ylim(lim_min, lim_max)
+    ax.legend(loc="upper left", fontsize=9)
+
+
+def _draw_snapshot_panel(ax, vd, current_true_ma, current_pred_ma):
+    """Draws the Id-vs-Vd scatter snapshot panel."""
+    _style_plot(ax, "I-V Snapshot: Id vs Vd (Output)", "Vd (V)", "Id (mA)")
+    ax.scatter(vd, current_true_ma, c="#ffffff", s=10, alpha=0.3, label="True")
+    ax.scatter(vd, current_pred_ma, c="#00ffff", s=10, alpha=0.5, marker="x", label="Pred")
+    ax.legend(loc="upper left", fontsize=9)
+
+
 def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None):
     """
     Evaluates model on a random dataset sample and plots I-V characteristics.
@@ -198,71 +289,42 @@ def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None):
     plt.style.use("dark_background")
     if sample_idx is None:
         sample_idx = np.random.randint(0, len(dataset))
-    (voltages_norm, physics_norm), current_log = dataset[sample_idx]
-    voltages_norm = voltages_norm.unsqueeze(0).to(device)
-    physics_norm = physics_norm.to(device)
-    with torch.no_grad():
-        pred_log = model(voltages_norm, physics_norm).cpu().numpy().flatten()
-    current_log = current_log.cpu().numpy().flatten()
-    # Inverse of arcsinh transform: I = scale * sinh(x)
-    current_true_ma = ARCSINH_SCALE_MA * np.sinh(current_log)
-    current_pred_ma = ARCSINH_SCALE_MA * np.sinh(pred_log)
-    voltages_raw = voltages_norm.cpu().numpy()[0]
-    if dataset.normalize:
-        voltages_mean = dataset.voltages_mean.numpy()
-        voltages_std = dataset.voltages_std.numpy()
-        voltages_raw = voltages_raw * voltages_std + voltages_mean
-    vg = voltages_raw[0]
-    vd = voltages_raw[1]
-    vs = voltages_raw[2]
-    vb = voltages_raw[3]
-    physics_raw = physics_norm.cpu().numpy()[0]
-    if dataset.normalize:
-        physics_raw = physics_raw * dataset.physics_std.numpy() + dataset.physics_mean.numpy()
-    try:
-        w_idx = ParameterSchema.TRAINING_KEYS.index("w")
-        l_idx = ParameterSchema.TRAINING_KEYS.index("l")
-        vth_idx = ParameterSchema.TRAINING_KEYS.index("vth0")
-        w = physics_raw[w_idx]
-        l = physics_raw[l_idx]
-        vth0 = physics_raw[vth_idx]
-    except (ValueError, IndexError):
-        w, l, vth0 = 0, 0, 0
+    current_true_ma, current_pred_ma, vg, vd, vs, physics_raw = _infer_and_denormalize_sample(
+        model, dataset, sample_idx, device
+    )
+    w, l, vth0 = _extract_geometry_label(physics_raw)
     mse = np.mean((current_true_ma - current_pred_ma) ** 2)
     r2 = calculate_r2(current_true_ma, current_pred_ma)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     time_us = np.linspace(0, 1, len(current_true_ma))
-    _style_plot(
-        axes[0, 0],
-        f"MOSFET Transient Response\nW={w:.2f}µm, L={l:.2f}µm, Vth0={vth0:.3f}V | MSE={mse:.2e}, R²={r2:.4f}",
-        "Normalized Time",
-        "Current (mA)",
-    )
-    axes[0, 0].plot(time_us, current_true_ma, color="#ffffff", linewidth=2, alpha=0.7, label="Ground Truth")
-    axes[0, 0].plot(time_us, current_pred_ma, color="#00ffff", linestyle=":", linewidth=2, label="FNO Prediction")
-    axes[0, 0].axhline(0, color="gray", linewidth=0.5, alpha=0.5)
-    axes[0, 0].legend(loc="upper right", fontsize=9)
-    _style_plot(axes[0, 1], "Terminal Voltages", "Normalized Time", "Voltage (V)")
-    axes[0, 1].plot(time_us, vg, color="#00ff00", label="Vg (Gate)", linewidth=1.5)
-    axes[0, 1].plot(time_us, vd, color="#ff00ff", label="Vd (Drain)", linewidth=1.5)
-    axes[0, 1].plot(time_us, vs, color="#ffff00", label="Vs (Source)", linewidth=1.5, linestyle="--")
-    axes[0, 1].legend(loc="upper right", fontsize=9)
-    _style_plot(axes[1, 0], f"Parity Plot: Current Prediction | R²={r2:.4f}", "True Id (mA)", "Predicted Id (mA)")
-    axes[1, 0].scatter(
-        current_true_ma, current_pred_ma, c="#00ffff", s=15, alpha=0.6, edgecolors="white", linewidth=0.5
-    )
-    lim_min = min(current_true_ma.min(), current_pred_ma.min())
-    lim_max = max(current_true_ma.max(), current_pred_ma.max())
-    axes[1, 0].plot([lim_min, lim_max], [lim_min, lim_max], "r--", linewidth=1.5, alpha=0.7, label="Perfect (y=x)")
-    axes[1, 0].set_xlim(lim_min, lim_max)
-    axes[1, 0].set_ylim(lim_min, lim_max)
-    axes[1, 0].legend(loc="upper left", fontsize=9)
-    _style_plot(axes[1, 1], "I-V Snapshot: Id vs Vd (Output)", "Vd (V)", "Id (mA)")
-    axes[1, 1].scatter(vd, current_true_ma, c="#ffffff", s=10, alpha=0.3, label="True")
-    axes[1, 1].scatter(vd, current_pred_ma, c="#00ffff", s=10, alpha=0.5, marker="x", label="Pred")
-    axes[1, 1].legend(loc="upper left", fontsize=9)
+    _draw_transient_panel(axes[0, 0], time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2)
+    _draw_voltage_panel(axes[0, 1], time_us, vg, vd, vs)
+    _draw_parity_panel(axes[1, 0], current_true_ma, current_pred_ma, r2)
+    _draw_snapshot_panel(axes[1, 1], vd, current_true_ma, current_pred_ma)
     plt.tight_layout()
     return fig, r2
+
+
+def _build_p_tensor(spice_dataset, dataset, w_um: float, l_um: float, device: str):
+    """
+    Builds and normalizes the physics parameter tensor for a given device geometry.
+
+    Inspects BSIM parameters at (w_um, l_um), selects the curated parameter subset
+    if required, and normalizes using dataset statistics.
+
+    :param spice_dataset: InfiniteSpiceMosfetDataset used for BSIM parameter queries.
+    :param dataset: PreGeneratedMosfetDataset providing normalization statistics.
+    :param w_um: Device width in microns.
+    :param l_um: Device length in microns.
+    :param device: Torch device string.
+    :return: Physics parameter tensor of shape (1, n_params) on the target device.
+    """
+    raw_params = spice_dataset.parser.inspect_model(spice_dataset.strategy.model_name, w=str(w_um), l=str(l_um))
+    p_full = ParameterSchema.to_tensor(raw_params).squeeze()
+    p_curated = p_full[ParameterSchema.TRAINING_INDICES] if dataset.use_curated_params else p_full
+    if dataset.normalize:
+        p_curated = (p_curated - dataset.physics_mean) / dataset.physics_std
+    return p_curated.unsqueeze(0).to(device)
 
 
 def evaluate_spice_iv_sweeps(
@@ -297,59 +359,28 @@ def evaluate_spice_iv_sweeps(
     vb_gnd = np.zeros(raw_steps)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     metrics = {}
-    timing = {"spice_ms": [], "fno_ms": []}
+    timing_spice_ms: list[float] = []
+    timing_fno_ms: list[float] = []
+    p_tensor = _build_p_tensor(spice_dataset, dataset, w_um, l_um, device)
     vg_sweep = np.linspace(0, 1.8, raw_steps)
     vd_sat = np.full(raw_steps, 1.8)
     logger.info("Running Id-Vg transfer sweep (Vd=1.8V, Vg: 0->1.8V)...")
-    pwl_g = spice_dataset._build_pwl_string(time_grid, vg_sweep)
-    pwl_d = spice_dataset._build_pwl_string(time_grid, vd_sat)
-    pwl_s = spice_dataset._build_pwl_string(time_grid, vs_gnd)
-    pwl_b = spice_dataset._build_pwl_string(time_grid, vb_gnd)
-    netlist = spice_dataset._build_netlist(w_um, l_um, pwl_g, pwl_d, pwl_s, pwl_b)
-    t0_spice = time.perf_counter()
-    results = spice_dataset._run_transient_simulation(netlist)
-    t1_spice = time.perf_counter()
-    timing["spice_ms"].append((t1_spice - t0_spice) * 1000.0)
-    if results is None:
+    id_spice_transfer, id_pred_transfer, spice_ms, fno_ms = _run_timed_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_gnd, vb_gnd, w_um, l_um, device
+    )
+    if id_spice_transfer is None:
         logger.error("SPICE simulation failed for Id-Vg sweep")
         return fig, {}
-    current_raw = spice_dataset._extract_drain_current(results)
-    if current_raw is None:
-        logger.error("Could not extract drain current")
-        return fig, {}
-    id_spice_a = spice_dataset._interpolate_current(current_raw, results.get("time"))
-    if id_spice_a is None:
-        return fig, {}
-    id_spice_ma = id_spice_a * 1000.0
-    v_stack = np.stack([vg_sweep, vd_sat, vs_gnd, vb_gnd])
-    v_tensor = torch.tensor(v_stack, dtype=torch.float32).unsqueeze(0).to(device)
-    if dataset.normalize:
-        v_tensor = (v_tensor - dataset.voltages_mean.to(device)) / dataset.voltages_std.to(device)
-    raw_params = spice_dataset.parser.inspect_model(spice_dataset.strategy.model_name, w=str(w_um), l=str(l_um))
-    p_full = ParameterSchema.to_tensor(raw_params).squeeze()
-    if dataset.use_curated_params:
-        p_curated = p_full[ParameterSchema.TRAINING_INDICES]
-    else:
-        p_curated = p_full
-    if dataset.normalize:
-        p_curated = (p_curated - dataset.physics_mean) / dataset.physics_std
-    p_tensor = p_curated.unsqueeze(0).to(device)
-    t0_fno = time.perf_counter()
-    with torch.no_grad():
-        pred_log = model(v_tensor, p_tensor).cpu().numpy().flatten()
-    t1_fno = time.perf_counter()
-    timing["fno_ms"].append((t1_fno - t0_fno) * 1000.0)
-    # Inverse of arcsinh transform: I = scale * sinh(x)
-    id_pred_ma = ARCSINH_SCALE_MA * np.sinh(pred_log)
-    vg_plot, id_spice_plot, id_pred_plot = _apply_eval_trim(vg_sweep, id_spice_ma, id_pred_ma, trim=trim_eval)
+    timing_spice_ms.append(spice_ms)
+    timing_fno_ms.append(fno_ms)
+    vg_plot, id_spice_plot, id_pred_plot = _apply_eval_trim(vg_sweep, id_spice_transfer, id_pred_transfer, trim=trim_eval)
     r2_transfer = calculate_r2(id_spice_plot, id_pred_plot)
     r2_subth = calculate_subthreshold_r2(vg_plot, id_spice_plot, id_pred_plot)
     l2_transfer = _compute_l2_relative_error(id_spice_plot, id_pred_plot)
-    male_transfer = calculate_male(id_spice_plot, id_pred_plot)
     metrics["r2_transfer"] = r2_transfer
     metrics["r2_transfer_subth"] = r2_subth if r2_subth is not None else 0.0
     metrics["l2_transfer"] = l2_transfer
-    metrics["male_transfer"] = male_transfer
+    metrics["male_transfer"] = calculate_male(id_spice_plot, id_pred_plot)
     subth_str = f", SubTh-R²={r2_subth:.4f}" if r2_subth is not None else ""
     _style_plot(
         axes[0, 0],
@@ -366,54 +397,33 @@ def evaluate_spice_iv_sweeps(
     vd_sweep = np.linspace(0, 1.8, raw_steps)
     vg_drive = np.full(raw_steps, 1.2)
     logger.info("Running Id-Vd output sweep (Vg=1.2V, Vd: 0→1.8V)...")
-    pwl_g2 = spice_dataset._build_pwl_string(time_grid, vg_drive)
-    pwl_d2 = spice_dataset._build_pwl_string(time_grid, vd_sweep)
-    netlist2 = spice_dataset._build_netlist(w_um, l_um, pwl_g2, pwl_d2, pwl_s, pwl_b)
-    t0_spice2 = time.perf_counter()
-    results2 = spice_dataset._run_transient_simulation(netlist2)
-    t1_spice2 = time.perf_counter()
-    timing["spice_ms"].append((t1_spice2 - t0_spice2) * 1000.0)
-    if results2 is None:
+    id_spice_output, id_pred_output, spice_ms2, fno_ms2 = _run_timed_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_gnd, vb_gnd, w_um, l_um, device
+    )
+    if id_spice_output is None:
         logger.error("SPICE simulation failed for Id-Vd sweep")
     else:
-        current_raw2 = spice_dataset._extract_drain_current(results2)
-        if current_raw2 is not None:
-            id_spice_a2 = spice_dataset._interpolate_current(current_raw2, results2.get("time"))
-            if id_spice_a2 is not None:
-                id_spice_ma2 = id_spice_a2 * 1000.0
-                v_stack2 = np.stack([vg_drive, vd_sweep, vs_gnd, vb_gnd])
-                v_tensor2 = torch.tensor(v_stack2, dtype=torch.float32).unsqueeze(0).to(device)
-                if dataset.normalize:
-                    v_tensor2 = (v_tensor2 - dataset.voltages_mean.to(device)) / dataset.voltages_std.to(device)
-                t0_fno2 = time.perf_counter()
-                with torch.no_grad():
-                    pred_log2 = model(v_tensor2, p_tensor).cpu().numpy().flatten()
-                t1_fno2 = time.perf_counter()
-                timing["fno_ms"].append((t1_fno2 - t0_fno2) * 1000.0)
-                # Inverse of arcsinh transform: I = scale * sinh(x)
-                id_pred_ma2 = ARCSINH_SCALE_MA * np.sinh(pred_log2)
-                vd_plot, id_spice_plot2, id_pred_plot2 = _apply_eval_trim(
-                    vd_sweep, id_spice_ma2, id_pred_ma2, trim=trim_eval
-                )
-                r2_output = calculate_r2(id_spice_plot2, id_pred_plot2)
-                l2_output = _compute_l2_relative_error(id_spice_plot2, id_pred_plot2)
-                male_output = calculate_male(id_spice_plot2, id_pred_plot2)
-                metrics["r2_output"] = r2_output
-                metrics["l2_output"] = l2_output
-                metrics["male_output"] = male_output
-                _style_plot(
-                    axes[1, 0],
-                    f"Id-Vd Output (Linear/Sat)\nVg=1.2V, Vs=0V, Vb=0V | R²={r2_output:.4f}, L2={l2_output:.4f}",
-                    "Vd (V)",
-                    "Id (mA)",
-                )
-                axes[1, 0].plot(vd_plot, id_spice_plot2, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
-                axes[1, 0].plot(vd_plot, id_pred_plot2, color="#ff00ff", linestyle=":", linewidth=2, label="FNO")
-                axes[1, 0].legend(loc="upper left", fontsize=9)
-                _plot_error_dual(axes[1, 1], vd_plot, id_spice_plot2, id_pred_plot2, "Vd (V)", "Output Error")
+        timing_spice_ms.append(spice_ms2)
+        timing_fno_ms.append(fno_ms2)
+        vd_plot, id_spice_plot2, id_pred_plot2 = _apply_eval_trim(vd_sweep, id_spice_output, id_pred_output, trim=trim_eval)
+        r2_output = calculate_r2(id_spice_plot2, id_pred_plot2)
+        l2_output = _compute_l2_relative_error(id_spice_plot2, id_pred_plot2)
+        metrics["r2_output"] = r2_output
+        metrics["l2_output"] = l2_output
+        metrics["male_output"] = calculate_male(id_spice_plot2, id_pred_plot2)
+        _style_plot(
+            axes[1, 0],
+            f"Id-Vd Output (Linear/Sat)\nVg=1.2V, Vs=0V, Vb=0V | R²={r2_output:.4f}, L2={l2_output:.4f}",
+            "Vd (V)",
+            "Id (mA)",
+        )
+        axes[1, 0].plot(vd_plot, id_spice_plot2, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+        axes[1, 0].plot(vd_plot, id_pred_plot2, color="#ff00ff", linestyle=":", linewidth=2, label="FNO")
+        axes[1, 0].legend(loc="upper left", fontsize=9)
+        _plot_error_dual(axes[1, 1], vd_plot, id_spice_plot2, id_pred_plot2, "Vd (V)", "Output Error")
     plt.tight_layout()
-    avg_spice_ms = sum(timing["spice_ms"]) / len(timing["spice_ms"]) if timing["spice_ms"] else 0.0
-    avg_fno_ms = sum(timing["fno_ms"]) / len(timing["fno_ms"]) if timing["fno_ms"] else 0.0
+    avg_spice_ms = sum(timing_spice_ms) / len(timing_spice_ms) if timing_spice_ms else 0.0
+    avg_fno_ms = sum(timing_fno_ms) / len(timing_fno_ms) if timing_fno_ms else 0.0
     speedup = avg_spice_ms / avg_fno_ms if avg_fno_ms > 0 else 0.0
     metrics["timing_spice_avg_ms"] = avg_spice_ms
     metrics["timing_fno_avg_ms"] = avg_fno_ms
@@ -537,7 +547,7 @@ def evaluate_comprehensive(
     return all_metrics, all_figures
 
 
-def _evaluate_single_geomentry_ramp(
+def _evaluate_single_geometry_ramp(
     t_steps: int,
     model,
     dataset,
@@ -710,18 +720,10 @@ def _evaluate_single_geometry_comprehensive(
     time_grid = np.linspace(0, spice_dataset.t_end, raw_steps)
     vs_gnd = np.zeros(raw_steps)
     vb_gnd = np.zeros(raw_steps)
-    raw_params = spice_dataset.parser.inspect_model(spice_dataset.strategy.model_name, w=str(w_um), l=str(l_um))
-    p_full = ParameterSchema.to_tensor(raw_params).squeeze()
-    if dataset.use_curated_params:
-        p_curated = p_full[ParameterSchema.TRAINING_INDICES]
-    else:
-        p_curated = p_full
-    if dataset.normalize:
-        p_curated = (p_curated - dataset.physics_mean) / dataset.physics_std
-    p_tensor = p_curated.unsqueeze(0).to(device)
+    p_tensor = _build_p_tensor(spice_dataset, dataset, w_um, l_um, device)
     metrics = {}
     logger.info("  [1/3] Ramp (Id-Vg transfer)...")
-    _evaluate_single_geomentry_ramp(
+    _evaluate_single_geometry_ramp(
         t_steps=t_steps,
         model=model,
         dataset=dataset,
@@ -784,6 +786,43 @@ def _evaluate_single_geometry_comprehensive(
     return metrics, fig
 
 
+def _run_timed_sweep(
+    model, dataset, spice_dataset, p_tensor, time_grid, vg, vd, vs, vb, w_um, l_um, device
+) -> tuple[np.ndarray | None, np.ndarray | None, float, float]:
+    """
+    Runs a single SPICE + FNO comparison for given voltage waveforms, tracking wall-clock time.
+
+    :return: (id_spice_ma, id_pred_ma, spice_elapsed_ms, fno_elapsed_ms), or
+        (None, None, spice_elapsed_ms, 0.0) on SPICE failure.
+    """
+    pwl_g = spice_dataset._build_pwl_string(time_grid, vg)
+    pwl_d = spice_dataset._build_pwl_string(time_grid, vd)
+    pwl_s = spice_dataset._build_pwl_string(time_grid, vs)
+    pwl_b = spice_dataset._build_pwl_string(time_grid, vb)
+    netlist = spice_dataset._build_netlist(w_um, l_um, pwl_g, pwl_d, pwl_s, pwl_b)
+    t0_spice = time.perf_counter()
+    results = spice_dataset._run_transient_simulation(netlist)
+    spice_ms = (time.perf_counter() - t0_spice) * 1000.0
+    if results is None:
+        return None, None, spice_ms, 0.0
+    current_raw = spice_dataset._extract_drain_current(results)
+    if current_raw is None:
+        return None, None, spice_ms, 0.0
+    id_spice_a = spice_dataset._interpolate_current(current_raw, results.get("time"))
+    if id_spice_a is None:
+        return None, None, spice_ms, 0.0
+    id_spice_ma = id_spice_a * 1000.0
+    v_stack = np.stack([vg, vd, vs, vb])
+    v_tensor = torch.tensor(v_stack, dtype=torch.float32).unsqueeze(0).to(device)
+    if dataset.normalize:
+        v_tensor = (v_tensor - dataset.voltages_mean.to(device)) / dataset.voltages_std.to(device)
+    t0_fno = time.perf_counter()
+    with torch.no_grad():
+        pred_log = model(v_tensor, p_tensor).cpu().numpy().flatten()
+    fno_ms = (time.perf_counter() - t0_fno) * 1000.0
+    return id_spice_ma, ARCSINH_SCALE_MA * np.sinh(pred_log), spice_ms, fno_ms
+
+
 def _run_single_sweep(
     model, dataset, spice_dataset, p_tensor, time_grid, vg, vd, vs, vb, w_um, l_um, device
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
@@ -792,28 +831,9 @@ def _run_single_sweep(
 
     :return: (id_spice_ma, id_pred_ma) tuple or (None, None) on failure.
     """
-    pwl_g = spice_dataset._build_pwl_string(time_grid, vg)
-    pwl_d = spice_dataset._build_pwl_string(time_grid, vd)
-    pwl_s = spice_dataset._build_pwl_string(time_grid, vs)
-    pwl_b = spice_dataset._build_pwl_string(time_grid, vb)
-    netlist = spice_dataset._build_netlist(w_um, l_um, pwl_g, pwl_d, pwl_s, pwl_b)
-    results = spice_dataset._run_transient_simulation(netlist)
-    if results is None:
-        return None, None
-    current_raw = spice_dataset._extract_drain_current(results)
-    if current_raw is None:
-        return None, None
-    id_spice_a = spice_dataset._interpolate_current(current_raw, results.get("time"))
-    if id_spice_a is None:
-        return None, None
-    id_spice_ma = id_spice_a * 1000.0
-    v_stack = np.stack([vg, vd, vs, vb])
-    v_tensor = torch.tensor(v_stack, dtype=torch.float32).unsqueeze(0).to(device)
-    if dataset.normalize:
-        v_tensor = (v_tensor - dataset.voltages_mean.to(device)) / dataset.voltages_std.to(device)
-    with torch.no_grad():
-        pred_log = model(v_tensor, p_tensor).cpu().numpy().flatten()
-    id_pred_ma = ARCSINH_SCALE_MA * np.sinh(pred_log)
+    id_spice_ma, id_pred_ma, _, _ = _run_timed_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg, vd, vs, vb, w_um, l_um, device
+    )
     return id_spice_ma, id_pred_ma
 
 
