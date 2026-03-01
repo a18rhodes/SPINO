@@ -2,7 +2,6 @@
 
 import logging
 import multiprocessing as mp
-import queue
 import shutil
 import sys
 from pathlib import Path
@@ -376,6 +375,7 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         if strategy_config is None:
             strategy_config = {}
         self.strategy = DeviceStrategy.create(strategy_name, **strategy_config)
+        self.cache = PhysicsCache()
         self.t_steps = t_steps
         self.t_end = t_end
         self.sim_step = t_end / (t_steps * 2.0)
@@ -400,11 +400,11 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         """
         Extracts and caches curated physics parameters for specific device geometry.
 
-        Returns only the curated BSIM4 parameters defined in ParameterSchema.TRAINING_KEYS.
+        Returns only the 24 curated BSIM4 parameters defined in ParameterSchema.TRAINING_KEYS.
 
         :param w: Transistor width in microns.
         :param l: Transistor length in microns.
-        :return: Curated parameter tensor of shape (len(ParameterSchema.TRAINING_KEYS),).
+        :return: Curated parameter tensor of shape (24,).
         """
         cached_params = self.cache.get(self.strategy.model_name, w, l)
         if cached_params is not None:
@@ -1216,7 +1216,7 @@ def generate_offline_dataset(
                 completed += result
                 if progress_callback:
                     progress_callback(completed)
-        except queue.Empty:
+        except:
             pass
     for p in processes:
         p.join()
