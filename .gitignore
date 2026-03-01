@@ -51,3 +51,8 @@ libs/
 
 # Local large datasets
 datasets/
+spino/mosfet/CURRENT_STATUS.md
+spino/mosfet/NEXT_STEPS.md
+spino/benchmarking/
+spino/benchmarking/
+spino/mosfet/grid_search.py
