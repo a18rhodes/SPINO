@@ -52,8 +52,7 @@ def timeit(name: str):
         else:
             logger.info("%s lap: %s", name, _convert_seconds_to_hms(elapsed))
 
-    try:
-        yield _lapper
-    finally:
-        elapsed = time.time() - start_time
-        logger.info("%s took %s", name, _convert_seconds_to_hms(elapsed))
+    yield _lapper
+    end_time = time.time()
+    elapsed = end_time - start_time
+    logger.info("%s took %s", name, _convert_seconds_to_hms(elapsed))
