@@ -31,7 +31,7 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock ./
 RUN poetry lock
 RUN poetry install --no-root --no-interaction
-COPY scripts ./
+COPY scripts ./scripts/
 RUN chmod +x scripts/setup_pdk.sh && scripts/setup_pdk.sh
 COPY . .
 RUN poetry install --only-root --no-interaction
