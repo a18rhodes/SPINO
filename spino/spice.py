@@ -109,12 +109,16 @@ def _execute_ngspice(cmd: list[str], timeout: float) -> subprocess.CompletedProc
             start_new_session=True,
         )
         stdout, stderr = process.communicate(timeout=timeout)
-        return subprocess.CompletedProcess(
+        result = subprocess.CompletedProcess(
             args=cmd,
             returncode=process.returncode,
             stdout=stdout,
             stderr=stderr,
         )
+        if result.returncode != 0:
+            logger.error("NGSpice exited with code %d. stderr: %s", result.returncode, stderr.strip())
+            return None
+        return result
     except subprocess.TimeoutExpired:
         if process is not None:
             _kill_process_group(process)
