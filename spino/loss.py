@@ -19,7 +19,6 @@ __all__ = [
     "LpLoss",
     "LpLossWithFloor",
     "Log10Loss",
-    "QuarticWeightedLoss",
     "RegionAdaptiveLoss",
     "SubthresholdWeightedLoss",
     "rc_physics_residual",
