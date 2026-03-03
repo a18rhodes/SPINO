@@ -31,7 +31,6 @@ from spino.loss import (
     LpLoss,
     LpLossWithFloor,
     Log10Loss,
-    QuarticWeightedLoss,
     RegionAdaptiveLoss,
     SubthresholdWeightedLoss,
 )
@@ -109,7 +108,7 @@ def _initialize_training_components(
 
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=n_epochs // warm_restart_count, eta_min=1e-6
+        optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6
     )
     if loss_type == "mse":
         loss_fn = ArcSinhMSELoss().cuda()
@@ -123,9 +122,6 @@ def _initialize_training_components(
     elif loss_type == "log10":
         loss_fn = Log10Loss().cuda()
         logger.info("Using Log10Loss")
-    elif loss_type == "quartic":
-        loss_fn = QuarticWeightedLoss().cuda()
-        logger.info("Using QuarticWeightedLoss")
     elif loss_type == "region_adaptive":
         if vg_mean is None or vg_std is None:
             logger.warning("vg_mean/vg_std not provided, using defaults from 40K dataset")
@@ -477,6 +473,7 @@ def run_mosfet_training(
             warm_restart_count, early_stop_patience, early_stop_threshold
         )
         logger.info("Starting Training Loop...")
+        avg_loss = float("nan")
         final_epoch = n_epochs - 1
         with timeit("Training Loop") as lap_epoch:
             for epoch in range(n_epochs):
@@ -535,7 +532,7 @@ def run_mosfet_training(
 @click.option(
     "--loss-type",
     default="lp",
-    type=click.Choice(["lp", "mse", "lp_floor", "weighted", "log10", "quartic", "region_adaptive"]),
+    type=click.Choice(["lp", "mse", "lp_floor", "weighted", "log10", "region_adaptive"]),
     help="Loss function type. 'mse': plain MSE in arcsinh space (no denominator). 'lp_floor': relative L2 with clamped denominator.",
 )
 @click.option("--denom-floor", default=10.0, help="For 'lp_floor': minimum denominator value in arcsinh units.")
