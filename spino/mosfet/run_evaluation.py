@@ -23,9 +23,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 from spino.config import PathConfig
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO
+from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO
 from spino.mosfet.train import run_final_evaluations
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
+
+_MODEL_CLASSES = {"concat": MosfetFNO, "film": MosfetFiLMFNO, "vcfilm": MosfetVCFiLMFNO}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -96,14 +98,35 @@ def run_evaluation(
     path_config = PathConfig("mosfet")
     logger.info("Loading model: %s", model_path)
     input_param_dim = ParameterSchema.input_dim()
-    model = MosfetFNO(
+    raw = torch.load(model_path, map_location="cuda", weights_only=False)
+    if isinstance(raw, dict) and "state_dict" in raw:
+        state_dict = raw["state_dict"]
+        saved_cfg = raw.get("model_config", {})
+        # CLI flags override if explicitly non-default; otherwise prefer saved config
+        effective_model_type = saved_cfg.get("model_type", "concat")
+        effective_modes = saved_cfg.get("modes", modes)
+        effective_width = saved_cfg.get("width", width)
+        effective_embedding_dim = saved_cfg.get("embedding_dim", embedding_dim)
+        logger.info(
+            "Checkpoint config: model_type=%s, modes=%d, width=%d, embedding_dim=%d",
+            effective_model_type, effective_modes, effective_width, effective_embedding_dim,
+        )
+    else:
+        state_dict = raw
+        effective_model_type = "concat"
+        effective_modes = modes
+        effective_width = width
+        effective_embedding_dim = embedding_dim
+        logger.warning("Legacy checkpoint (no embedded config) — using CLI flags for architecture")
+    if isinstance(state_dict, dict):
+        state_dict.pop("_metadata", None)
+    model_cls = _MODEL_CLASSES.get(effective_model_type, MosfetFNO)
+    model = model_cls(
         input_param_dim=input_param_dim,
-        embedding_dim=embedding_dim,
-        modes=modes,
-        width=width,
+        embedding_dim=effective_embedding_dim,
+        modes=effective_modes,
+        width=effective_width,
     ).cuda()
-    state_dict = torch.load(model_path, weights_only=False)
-    state_dict.pop("_metadata", None)
     model.load_state_dict(state_dict)
     model.eval()
     logger.info("Loading dataset for normalization stats: %s", dataset_path)
