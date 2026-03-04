@@ -4,11 +4,14 @@
 # on various test cases, including standard, adversarial, and out-of-distribution scenarios.
 
 # %%
+import time
+
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from spino.plot_styles import get_palette
 from spino.rc.solve import solve_rc_ode
 
 # %% [markdown]
@@ -20,9 +23,10 @@ from spino.rc.solve import solve_rc_ode
 # Tests the model on a variety of RC time constants (Tau) and evaluates R² performance.
 
 # %%
-def evaluate_ic_spectrum(model, device="cuda", display=False):
+def evaluate_ic_spectrum(model, device="cuda", dark: bool = True, display=False):
     model.eval()
-
+    plt.style.use("dark_background" if dark else "default")
+    p = get_palette(dark)
     print("=" * 60)
     print("RUNNING STANDARD TEST")
     print("=" * 60)
@@ -40,7 +44,8 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
 
     t_steps = 2048
     r2_data = {}
-
+    total_solver_ms = 0.0
+    total_fno_ms = 0.0
     for i, case in enumerate(test_cases):
         R_val = case["R"]
         C_val = case["C"]
@@ -69,11 +74,12 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
         decay = np.exp(-dt / tau)
         gain = R_val * (1.0 - decay)
         v_curr = 0.0
+        t0 = time.perf_counter()
         for t in range(t_steps):
             v_next = v_curr * decay + I_physical[t] * gain
             v_true[t] = v_next
             v_curr = v_next
-
+        total_solver_ms += (time.perf_counter() - t0) * 1000
         # 4. Prepare Model Input [I_unitless, Lambda]
         I_tens = torch.tensor(I_np, dtype=torch.float32).to(device)
         Lambda_tens = torch.full_like(I_tens, Lambda)
@@ -81,9 +87,10 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
         x_in = torch.stack([I_tens, Lambda_tens], dim=0).unsqueeze(0)
 
         # 5. Predict & De-Normalize
+        t0 = time.perf_counter()
         with torch.no_grad():
             v_pred_hat = model(x_in).cpu().numpy().flatten()
-
+        total_fno_ms += (time.perf_counter() - t0) * 1000
         # De-Norm: V = V_hat * (I_scale * R)
         v_pred = v_pred_hat * (1e-3 * R_val)
 
@@ -100,8 +107,8 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
         ax = plt.subplot(gs[i, 0])
         ax2 = ax.twinx()
         ax2.step(t_axis, I_physical * 1000, color="gray", alpha=0.3)  # mA
-        ax.plot(t_axis, v_true, "w--", label="True")
-        ax.plot(t_axis, v_pred, "r-", alpha=0.8, label=f"Pred R2={r2:.4f}")
+        ax.plot(t_axis, v_true, "--", color=p["gt"], label="True")
+        ax.plot(t_axis, v_pred, "-", alpha=0.8, color=p["pred"], label=f"Pred R2={r2:.4f}")
         ax.set_title(f"{case['Label']} | Lambda={Lambda:.4f}")
         ax.legend()
 
@@ -110,6 +117,13 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
         ax_p.plot([v_true.min(), v_true.max()], [v_true.min(), v_true.max()], "r--")
         ax_p.set_title(f"MSE: {mse:.2e}")
 
+    n = len(test_cases)
+    speedup = total_solver_ms / max(total_fno_ms, 1e-9)
+    print(
+        f"ODE solver avg: {total_solver_ms / n:.2f}ms | "
+        f"FNO avg: {total_fno_ms / n:.2f}ms | "
+        f"Ratio: {speedup:.3f}x  (< 1 means FNO is slower; expected on single-sample CPU)"
+    )
     plt.tight_layout()
     if display:
         plt.show()
@@ -120,8 +134,10 @@ def evaluate_ic_spectrum(model, device="cuda", display=False):
 # Tests the model under challenging scenarios, including corner frequency, white noise, and resolution changes.
 
 # %%
-def evaluate_adversarial_spectrum(model, device="cuda", display=False):
+def evaluate_adversarial_spectrum(model, device="cuda", dark: bool = True, display=False):
     model.eval()
+    plt.style.use("dark_background" if dark else "default")
+    p = get_palette(dark)
     print("=" * 60)
     print("RUNNING ADVERSARIAL STRESS TEST")
     print("=" * 60)
@@ -242,8 +258,8 @@ def evaluate_adversarial_spectrum(model, device="cuda", display=False):
         ax_curr.set_ylabel("I (mA)", color="gray")
 
         # Voltages
-        ax_wave.plot(t_axis, v_true, "w-", linewidth=2.5, alpha=0.6, label="Ground Truth")
-        ax_wave.plot(t_axis, v_pred, "r--", linewidth=1.5, label="Prediction")
+        ax_wave.plot(t_axis, v_true, "-", linewidth=2.5, alpha=0.6, color=p["gt"], label="Ground Truth")
+        ax_wave.plot(t_axis, v_pred, "--", linewidth=1.5, color=p["pred"], label="Prediction")
 
         ax_wave.set_title(f"{title}", loc="left", fontsize=12)
         ax_wave.set_ylabel("V (Volts)")
@@ -277,8 +293,10 @@ def evaluate_adversarial_spectrum(model, device="cuda", display=False):
 
 
 # %%
-def evaluate_ood_physics(model, device="cuda", display=False):
+def evaluate_ood_physics(model, device="cuda", dark: bool = True, display=False):
     model.eval()
+    plt.style.use("dark_background" if dark else "default")
+    p = get_palette(dark)
     print("=" * 60)
     print("RUNNING OOD PHYSICS SUITE (Chirp & Sawtooth)")
     print("=" * 60)
@@ -360,8 +378,8 @@ def evaluate_ood_physics(model, device="cuda", display=False):
         ax_curr.set_ylabel("I (mA)", color="gray")
 
         # Plot Voltages
-        ax_wave.plot(t_axis * 1000, v_true, "w-", linewidth=2.5, label="True")
-        ax_wave.plot(t_axis * 1000, v_pred, "r--", linewidth=1.5, label="Pred")
+        ax_wave.plot(t_axis * 1000, v_true, "-", linewidth=2.5, color=p["gt"], label="True")
+        ax_wave.plot(t_axis * 1000, v_pred, "--", linewidth=1.5, color=p["pred"], label="Pred")
 
         ax_wave.set_title(f"{title}\nWindow: {T_end*1000:.1f}ms", loc="left")
         ax_wave.set_ylabel("V (Volts)")

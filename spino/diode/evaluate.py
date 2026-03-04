@@ -1,9 +1,13 @@
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
 import PySpice.Logging.Logging as Logging
 import torch
 from PySpice.Spice.Netlist import Circuit
 from PySpice.Unit import u_Ohm, u_s
+
+from spino.plot_styles import coerce_palette, get_palette
 
 # Suppress SPICE output
 Logging.setup_logging(logging_level="ERROR")
@@ -57,28 +61,32 @@ def run_spice_rectifier(t_steps, t_end, freq, R_val, C_val, Is_val, N_val):
         return None, None, None
 
 
-def _style_plot(ax, title, xlabel, ylabel):
+def _style_plot(ax, title, xlabel, ylabel, palette=None):
     """Helper to apply consistent styling matching RC plots."""
-    ax.set_title(title, fontsize=11, fontweight="bold", color="white")
+    p = coerce_palette(palette)
+    ax.set_title(title, fontsize=11, fontweight="bold", color=p["title"])
     ax.set_xlabel(xlabel, fontsize=10)
     ax.set_ylabel(ylabel, fontsize=10)
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.4)
     ax.tick_params(axis="both", which="major", labelsize=9)
 
 
-def evaluate_rectifier(model, device="cuda"):
+def evaluate_rectifier(model, device="cuda", dark: bool = True):
     """
     Visual Validation: Comparison against ground truth SPICE for the standard rectifier.
     """
     model.eval()
+    plt.style.use("dark_background" if dark else "default")
+    p = get_palette(dark)
 
     # Standard Test Parameters
     R_val, C_val, Is_val, N_val = 1000.0, 4e-12, 2.5e-9, 1.75
     t_steps, t_end, freq = 2048, 1e-3, 2000
 
     # 1. Run Ground Truth Simulation
+    t0_spice = time.perf_counter()
     t, I_mA, v_true = run_spice_rectifier(t_steps, t_end, freq, R_val, C_val, Is_val, N_val)
-
+    spice_ms = (time.perf_counter() - t0_spice) * 1000
     if v_true is None:
         return plt.figure()
 
@@ -93,39 +101,43 @@ def evaluate_rectifier(model, device="cuda"):
     x_in = torch.stack([ch0, ch1, ch2, ch3, ch4]).unsqueeze(0)
 
     # 3. Predict
+    t0_fno = time.perf_counter()
     with torch.no_grad():
         v_pred = model(x_in).cpu().numpy().flatten()
-
+    fno_ms = (time.perf_counter() - t0_fno) * 1000
     # 4. Metrics
     mse = np.mean((v_true - v_pred) ** 2)
     r2 = calculate_r2(v_true, v_pred)
+    print(f"SPICE: {spice_ms:.0f}ms | FNO: {fno_ms:.2f}ms | Speedup: {spice_ms / max(fno_ms, 1e-9):.0f}x")
 
     # 5. Plotting
     fig, ax = plt.subplots(1, 2, figsize=(14, 6))
 
     # Time Domain
-    _style_plot(ax[0], f"Standard Rectifier Check\nMSE: {mse:.2e} | R2: {r2:.4f}", "Time (ms)", "Voltage (V)")
-    ax[0].plot(t * 1000, I_mA, color="#00ff00", linestyle="--", alpha=0.4, label="Input Current (mA)")
-    ax[0].plot(t * 1000, v_true, color="#ffffff", linewidth=2.5, alpha=0.6, label="Ground Truth (SPICE)")
-    ax[0].plot(t * 1000, v_pred, color="#00ffff", linestyle=":", linewidth=2, label="Prediction (FNO)")
+    _style_plot(ax[0], f"Standard Rectifier Check\nMSE: {mse:.2e} | R2: {r2:.4f}", "Time (ms)", "Voltage (V)", palette=p)
+    ax[0].plot(t * 1000, I_mA, color=p["vg"], linestyle="--", alpha=0.4, label="Input Current (mA)")
+    ax[0].plot(t * 1000, v_true, color=p["gt"], linewidth=2.5, alpha=0.6, label="Ground Truth (SPICE)")
+    ax[0].plot(t * 1000, v_pred, color=p["pred"], linestyle=":", linewidth=2, label="Prediction (FNO)")
     ax[0].legend(loc="upper right", fontsize=9)
 
     # IV Curve
-    _style_plot(ax[1], "Dynamic I-V Characteristic", "Voltage (V)", "Current (mA)")
-    ax[1].plot(v_true, I_mA, color="#ffffff", marker="o", markersize=2, linestyle="None", alpha=0.3, label="True")
-    ax[1].plot(v_pred, I_mA, color="#ff00ff", marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred")
+    _style_plot(ax[1], "Dynamic I-V Characteristic", "Voltage (V)", "Current (mA)", palette=p)
+    ax[1].plot(v_true, I_mA, color=p["gt"], marker="o", markersize=2, linestyle="None", alpha=0.3, label="True")
+    ax[1].plot(v_pred, I_mA, color=p["pred_sweep"], marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred")
     ax[1].legend(loc="lower right", fontsize=9)
 
     plt.tight_layout()
     return fig, r2
 
 
-def evaluate_adversarial(model, data_loader, device="cuda"):
+def evaluate_adversarial(model, data_loader, device="cuda", dark: bool = True):
     """
     Evaluates the model on a random "Adversarial" sample from the generator.
     These samples are effectively OOD/Adversarial because the parameters are random.
     """
     model.eval()
+    plt.style.use("dark_background" if dark else "default")
+    p = get_palette(dark)
 
     # Fetch one batch
     try:
@@ -161,17 +173,17 @@ def evaluate_adversarial(model, data_loader, device="cuda"):
     title_str = (
         f"Adversarial Sample (Random Params)\nR={R:.0f}Ω, C={C:.1e}F, Is={Is:.1e}A\nMSE: {mse:.2e} | R2: {r2:.4f}"
     )
-    _style_plot(ax[0], title_str, "Normalized Time", "Voltage (V)")
+    _style_plot(ax[0], title_str, "Normalized Time", "Voltage (V)", palette=p)
 
-    ax[0].plot(t_axis, I_mA, color="#00ff00", linestyle="--", alpha=0.3, label="Input Current (mA)")
-    ax[0].plot(t_axis, y_true, color="#ffffff", linewidth=2.5, alpha=0.6, label="Ground Truth")
-    ax[0].plot(t_axis, y_pred, color="#00ffff", linestyle=":", linewidth=2, label="Prediction")
+    ax[0].plot(t_axis, I_mA, color=p["vg"], linestyle="--", alpha=0.3, label="Input Current (mA)")
+    ax[0].plot(t_axis, y_true, color=p["gt"], linewidth=2.5, alpha=0.6, label="Ground Truth")
+    ax[0].plot(t_axis, y_pred, color=p["pred"], linestyle=":", linewidth=2, label="Prediction")
     ax[0].legend(loc="upper right", fontsize=9)
 
     # IV Curve (Hysteresis Check)
-    _style_plot(ax[1], "Dynamic I-V Hysteresis Loop", "Voltage (V)", "Current (mA)")
-    ax[1].plot(y_true, I_mA, color="#ffffff", marker="o", markersize=2, linestyle="None", alpha=0.3, label="True")
-    ax[1].plot(y_pred, I_mA, color="#ff00ff", marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred")
+    _style_plot(ax[1], "Dynamic I-V Hysteresis Loop", "Voltage (V)", "Current (mA)", palette=p)
+    ax[1].plot(y_true, I_mA, color=p["gt"], marker="o", markersize=2, linestyle="None", alpha=0.3, label="True")
+    ax[1].plot(y_pred, I_mA, color=p["pred_sweep"], marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred")
     ax[1].legend(loc="lower right", fontsize=9)
 
     plt.tight_layout()
