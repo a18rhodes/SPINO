@@ -32,8 +32,9 @@ from waveform representation.
 
 **Phase 1 — Full training (300 epochs):**
 61,041 samples from NGSPICE transient simulations of the Sky130 NMOS device across five
-geometry bins (tiny through xlarge). Each sample is a 512-step time series of random PWL
-voltage excitation and corresponding drain current, paired with a 29-element BSIM4 parameter
+geometry bins (tiny through xlarge). Each sample is a 2048-step time series (2007 steps
+post startup-trim; see Startup trim below) of random PWL voltage excitation and corresponding
+drain current, paired with a 29-element BSIM4 parameter
 vector covering geometry, threshold, mobility, and parasitic parameters.
 All 2.3 M model parameters trained end-to-end.
 

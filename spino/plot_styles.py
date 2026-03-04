@@ -6,7 +6,7 @@ monitoring) and one for light-background figures (documentation / publication).
 All evaluation modules should import from here rather than defining colours inline.
 """
 
-__all__ = ["DARK_PALETTE", "LIGHT_PALETTE", "get_palette", "coerce_palette"]
+__all__ = ["DARK_PALETTE", "LIGHT_PALETTE", "coerce_palette", "get_palette"]
 
 DARK_PALETTE: dict[str, str] = {
     "gt": "#ffffff",

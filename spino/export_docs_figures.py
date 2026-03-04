@@ -33,7 +33,7 @@ __all__ = ["export_mosfet_figures", "export_rc_figures", "export_diode_figures"]
 # See CURRENT_STATUS.md -- 2026-03-03 entry for full metrics.
 # This is a pre-config-embedding checkpoint; architecture params are hardcoded below.
 _MOSFET_CHECKPOINT = MODELS_ROOT / "mosfet" / "mosfet_vcfilm_exp19b_full_finetune_wtmjf8yn.pt"
-_MOSFET_DATASET = Path("/app/datasets/sky130_nmos_61k_plus_shortch_supp8k.h5")
+_DEFAULT_MOSFET_DATASET = Path("/app/datasets/sky130_nmos_61k_plus_shortch_supp8k.h5")
 # Hardcoded fallback for legacy checkpoints that predate embedded config saving.
 # Matches the architecture trained in Exp 16b and fine-tuned in Exp 19b.
 _MOSFET_FALLBACK_CFG: dict = {"modes": 256, "width": 64, "embedding_dim": 16}
@@ -61,7 +61,7 @@ def _latest_checkpoint(model_dir: Path) -> Path:
     return candidates[-1]
 
 
-def export_mosfet_figures(output_dir: Path, device: str) -> None:
+def export_mosfet_figures(output_dir: Path, device: str, dataset_path: Path | None = None) -> None:
     """
     Loads the production MOSFET checkpoint and writes light-background figures.
 
@@ -72,7 +72,11 @@ def export_mosfet_figures(output_dir: Path, device: str) -> None:
 
     :param output_dir: Destination directory for all MOSFET documentation figures.
     :param device: Torch device string (e.g. "cuda" or "cpu").
+    :param dataset_path: Path to the MOSFET HDF5 dataset; defaults to the production dataset.
     """
+    resolved_dataset = dataset_path or _DEFAULT_MOSFET_DATASET
+    if not resolved_dataset.exists():
+        raise FileNotFoundError(f"MOSFET dataset not found: {resolved_dataset}")
     output_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Loading MOSFET checkpoint: %s", _MOSFET_CHECKPOINT)
     raw = torch.load(_MOSFET_CHECKPOINT, map_location=device, weights_only=False)
@@ -93,7 +97,7 @@ def export_mosfet_figures(output_dir: Path, device: str) -> None:
     model.load_state_dict(state_dict)
     model.eval()
     logger.info("MOSFET model loaded. Generating documentation figures...")
-    with PreGeneratedMosfetDataset(str(_MOSFET_DATASET)) as dataset:
+    with PreGeneratedMosfetDataset(str(resolved_dataset)) as dataset:
         fig_sample, _ = evaluate_sample_iv_curves(model, dataset, device=device, dark=False)
         fig_sample.savefig(output_dir / "sample_iv.png", dpi=150, bbox_inches="tight")
         fig_sample.clf()
@@ -124,7 +128,8 @@ def export_rc_figures(output_dir: Path, device: str) -> None:
     ckpt = _latest_checkpoint(MODELS_ROOT / "simple_rc")
     logger.info("Loading RC checkpoint: %s", ckpt)
     model = _get_rc_model()
-    model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=False))
+    raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
+    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
     model.to(device).eval()
     logger.info("RC model loaded. Generating documentation figures...")
     fig_ic, _ = evaluate_ic_spectrum(model, device=device, dark=False)
@@ -156,7 +161,8 @@ def export_diode_figures(output_dir: Path, device: str) -> None:
     ckpt = _latest_checkpoint(MODELS_ROOT / "diode")
     logger.info("Loading diode checkpoint: %s", ckpt)
     model = _get_diode_model()
-    model.load_state_dict(torch.load(ckpt, map_location=device, weights_only=False))
+    raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
+    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
     model.to(device).eval()
     logger.info("Diode model loaded. Generating documentation figures...")
     fig_rect, _ = evaluate_rectifier(model, device=device, dark=False)
@@ -187,7 +193,14 @@ def export_diode_figures(output_dir: Path, device: str) -> None:
 @click.option("--mosfet/--no-mosfet", default=True, help="Export MOSFET figures.")
 @click.option("--rc/--no-rc", default=True, help="Export RC circuit figures.")
 @click.option("--diode/--no-diode", default=True, help="Export diode figures.")
-def main(docs_assets: str, device: str, mosfet: bool, rc: bool, diode: bool) -> None:
+@click.option(
+    "--dataset-path",
+    default=None,
+    show_default=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to MOSFET HDF5 dataset. Defaults to the production dataset path.",
+)
+def main(docs_assets: str, device: str, mosfet: bool, rc: bool, diode: bool, dataset_path: Path | None) -> None:
     """
     Exports light-background evaluation figures for documentation.
 
@@ -196,7 +209,7 @@ def main(docs_assets: str, device: str, mosfet: bool, rc: bool, diode: bool) -> 
     """
     root = Path(docs_assets)
     if mosfet:
-        export_mosfet_figures(root / "mosfet", device)
+        export_mosfet_figures(root / "mosfet", device, dataset_path=dataset_path)
     if rc:
         export_rc_figures(root / "simple_rc", device)
     if diode:

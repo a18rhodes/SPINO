@@ -35,7 +35,7 @@ This runs automatically during container build.
 
 ## Project Layout
 
-```
+```text
 spino/
     mosfet/         NMOS operator (VCFiLM-FNO)
     rc/             RC circuit operator (dimensionless FNO)
