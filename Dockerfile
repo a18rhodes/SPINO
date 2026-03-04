@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     libngspice0-dev \
     tree \
     bat \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
