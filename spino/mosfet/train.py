@@ -512,19 +512,7 @@ def run_mosfet_training(
                     break
                 lap_epoch(alt_msg=f"Epoch {epoch+1} completed")
         logger.info("Training Complete.")
-        torch.save(
-            {
-                "state_dict": model.state_dict(),
-                "model_config": {
-                    "model_type": model_type,
-                    "modes": modes,
-                    "width": width,
-                    "embedding_dim": embedding_dim,
-                    "input_param_dim": input_param_dim,
-                },
-            },
-            path_config.model_dir / f"{run_name}.pt",
-        )
+        torch.save(model.state_dict(), path_config.model_dir / f"{run_name}.pt")
         final_r2_fast, final_metrics_spice, comprehensive_metrics = run_final_evaluations(
             model, dataset, path_config, run_name, writer, n_epochs
         )

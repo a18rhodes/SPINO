@@ -24,7 +24,6 @@ from rich.table import Table
 
 from spino.constants import ARCSINH_SCALE_MA
 from spino.mosfet.gen_data import GEOMETRY_BINS, InfiniteSpiceMosfetDataset, ParameterSchema
-from spino.plot_styles import coerce_palette, get_palette
 
 # Default number of initial timesteps to discard from evaluation.
 # Removes the SPICE .op-to-transient solver artifact (not physical device behavior).
@@ -118,10 +117,9 @@ def calculate_male(y_true, y_pred):
     return male_ua
 
 
-def _style_plot(ax, title, xlabel, ylabel, palette=None):
-    """Applies consistent styling to plots, using palette for title color."""
-    title_color = palette["title"] if palette else "white"
-    ax.set_title(title, fontsize=11, fontweight="bold", color=title_color)
+def _style_plot(ax, title, xlabel, ylabel):
+    """Applies consistent dark-mode styling to plots."""
+    ax.set_title(title, fontsize=11, fontweight="bold", color="white")
     ax.set_xlabel(xlabel, fontsize=10)
     ax.set_ylabel(ylabel, fontsize=10)
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.4)
@@ -141,7 +139,7 @@ def _compute_l2_relative_error(y_true, y_pred):
     return norm_diff / norm_ref
 
 
-def _plot_error_dual(ax, x, y_true, y_pred, xlabel, title_prefix, palette=None):
+def _plot_error_dual(ax, x, y_true, y_pred, xlabel, title_prefix):
     """
     Plots absolute and relative error on dual y-axes.
 
@@ -154,21 +152,19 @@ def _plot_error_dual(ax, x, y_true, y_pred, xlabel, title_prefix, palette=None):
     :param y_pred: Predicted current (mA).
     :param xlabel: X-axis label.
     :param title_prefix: Title prefix string.
-    :param palette: Color palette dict, or None for dark defaults.
     """
-    p = coerce_palette(palette)
     abs_error = y_pred - y_true
     rel_error_pct = 100.0 * abs_error / (np.abs(y_true) + 1e-9)
     rel_error_pct = np.clip(rel_error_pct, -500, 500)
-    ax.plot(x, abs_error * 1000.0, color=p["err_abs"], linewidth=1.5, label="Abs (uA)")
+    ax.plot(x, abs_error * 1000.0, color="#ff6b6b", linewidth=1.5, label="Abs (uA)")
     ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
     ax.set_xlabel(xlabel, fontsize=10)
-    ax.set_ylabel("Absolute Error (uA)", fontsize=10, color=p["err_abs"])
-    ax.tick_params(axis="y", labelcolor=p["err_abs"], labelsize=9)
+    ax.set_ylabel("Absolute Error (uA)", fontsize=10, color="#ff6b6b")
+    ax.tick_params(axis="y", labelcolor="#ff6b6b", labelsize=9)
     ax_rel = ax.twinx()
-    ax_rel.plot(x, rel_error_pct, color=p["err_rel"], linewidth=1.2, linestyle="--", alpha=0.8, label="Rel (%)")
-    ax_rel.set_ylabel("Relative Error (%)", fontsize=10, color=p["err_rel"])
-    ax_rel.tick_params(axis="y", labelcolor=p["err_rel"], labelsize=9)
+    ax_rel.plot(x, rel_error_pct, color="#4ecdc4", linewidth=1.2, linestyle="--", alpha=0.8, label="Rel (%)")
+    ax_rel.set_ylabel("Relative Error (%)", fontsize=10, color="#4ecdc4")
+    ax_rel.tick_params(axis="y", labelcolor="#4ecdc4", labelsize=9)
     ax_rel.set_ylim(-100, 100)
     mae_ua = np.mean(np.abs(abs_error)) * 1000.0
     mape = np.mean(np.abs(rel_error_pct[np.abs(y_true) > 0.001]))
@@ -177,7 +173,7 @@ def _plot_error_dual(ax, x, y_true, y_pred, xlabel, title_prefix, palette=None):
         f"{title_prefix}\nMAE={mae_ua:.2f}uA, MAPE={mape:.1f}%, MALE={male_ua:.2f}uA",
         fontsize=10,
         fontweight="bold",
-        color=p["title"],
+        color="white",
     )
     ax.legend(loc="upper left", fontsize=8)
     ax_rel.legend(loc="upper right", fontsize=8)
@@ -231,37 +227,33 @@ def _extract_geometry_label(physics_raw: np.ndarray) -> tuple[float, float, floa
     return w, l, vth0
 
 
-def _draw_transient_panel(ax, time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2, palette=None):
+def _draw_transient_panel(ax, time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2):
     """Draws the time-domain transient response panel."""
-    p = coerce_palette(palette)
     _style_plot(
         ax,
         f"MOSFET Transient Response\nW={w:.2f}\u00b5m, L={l:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}",
         "Normalized Time",
         "Current (mA)",
-        palette=p,
     )
-    ax.plot(time_us, current_true_ma, color=p["gt"], linewidth=2, alpha=0.7, label="Ground Truth")
-    ax.plot(time_us, current_pred_ma, color=p["pred"], linestyle=":", linewidth=2, label="FNO Prediction")
+    ax.plot(time_us, current_true_ma, color="#ffffff", linewidth=2, alpha=0.7, label="Ground Truth")
+    ax.plot(time_us, current_pred_ma, color="#00ffff", linestyle=":", linewidth=2, label="FNO Prediction")
     ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
     ax.legend(loc="upper right", fontsize=9)
 
 
-def _draw_voltage_panel(ax, time_us, vg, vd, vs, palette=None):
+def _draw_voltage_panel(ax, time_us, vg, vd, vs):
     """Draws the terminal voltages panel."""
-    p = coerce_palette(palette)
-    _style_plot(ax, "Terminal Voltages", "Normalized Time", "Voltage (V)", palette=p)
-    ax.plot(time_us, vg, color=p["vg"], label="Vg (Gate)", linewidth=1.5)
-    ax.plot(time_us, vd, color=p["vd"], label="Vd (Drain)", linewidth=1.5)
-    ax.plot(time_us, vs, color=p["vs"], label="Vs (Source)", linewidth=1.5, linestyle="--")
+    _style_plot(ax, "Terminal Voltages", "Normalized Time", "Voltage (V)")
+    ax.plot(time_us, vg, color="#00ff00", label="Vg (Gate)", linewidth=1.5)
+    ax.plot(time_us, vd, color="#ff00ff", label="Vd (Drain)", linewidth=1.5)
+    ax.plot(time_us, vs, color="#ffff00", label="Vs (Source)", linewidth=1.5, linestyle="--")
     ax.legend(loc="upper right", fontsize=9)
 
 
-def _draw_parity_panel(ax, current_true_ma, current_pred_ma, r2, palette=None):
+def _draw_parity_panel(ax, current_true_ma, current_pred_ma, r2):
     """Draws the true-vs-predicted parity scatter panel."""
-    p = coerce_palette(palette)
-    _style_plot(ax, f"Parity Plot: Current Prediction | R\u00b2={r2:.4f}", "True Id (mA)", "Predicted Id (mA)", palette=p)
-    ax.scatter(current_true_ma, current_pred_ma, c=p["parity_scatter"], s=15, alpha=0.6, edgecolors=p["parity_edge"], linewidth=0.5)
+    _style_plot(ax, f"Parity Plot: Current Prediction | R\u00b2={r2:.4f}", "True Id (mA)", "Predicted Id (mA)")
+    ax.scatter(current_true_ma, current_pred_ma, c="#00ffff", s=15, alpha=0.6, edgecolors="white", linewidth=0.5)
     lim_min = min(current_true_ma.min(), current_pred_ma.min())
     lim_max = max(current_true_ma.max(), current_pred_ma.max())
     ax.plot([lim_min, lim_max], [lim_min, lim_max], "r--", linewidth=1.5, alpha=0.7, label="Perfect (y=x)")
@@ -270,16 +262,15 @@ def _draw_parity_panel(ax, current_true_ma, current_pred_ma, r2, palette=None):
     ax.legend(loc="upper left", fontsize=9)
 
 
-def _draw_snapshot_panel(ax, vd, current_true_ma, current_pred_ma, palette=None):
+def _draw_snapshot_panel(ax, vd, current_true_ma, current_pred_ma):
     """Draws the Id-vs-Vd scatter snapshot panel."""
-    p = coerce_palette(palette)
-    _style_plot(ax, "I-V Snapshot: Id vs Vd (Output)", "Vd (V)", "Id (mA)", palette=p)
-    ax.scatter(vd, current_true_ma, c=p["snapshot_true"], s=10, alpha=0.3, label="True")
-    ax.scatter(vd, current_pred_ma, c=p["snapshot_pred"], s=10, alpha=0.5, marker="x", label="Pred")
+    _style_plot(ax, "I-V Snapshot: Id vs Vd (Output)", "Vd (V)", "Id (mA)")
+    ax.scatter(vd, current_true_ma, c="#ffffff", s=10, alpha=0.3, label="True")
+    ax.scatter(vd, current_pred_ma, c="#00ffff", s=10, alpha=0.5, marker="x", label="Pred")
     ax.legend(loc="upper left", fontsize=9)
 
 
-def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None, dark=True):
+def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None):
     """
     Evaluates model on a random dataset sample and plots I-V characteristics.
 
@@ -292,12 +283,10 @@ def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None, da
     :param dataset: PreGeneratedMosfetDataset instance.
     :param device: Torch device for inference.
     :param sample_idx: Specific sample index, or None for random.
-    :param dark: If True, use dark-background style (TensorBoard). If False, use white (docs).
     :return: (figure, r2_score) tuple.
     """
     model.eval()
-    plt.style.use("dark_background" if dark else "default")
-    palette = get_palette(dark)
+    plt.style.use("dark_background")
     if sample_idx is None:
         sample_idx = np.random.randint(0, len(dataset))
     current_true_ma, current_pred_ma, vg, vd, vs, physics_raw = _infer_and_denormalize_sample(
@@ -308,10 +297,10 @@ def evaluate_sample_iv_curves(model, dataset, device="cuda", sample_idx=None, da
     r2 = calculate_r2(current_true_ma, current_pred_ma)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     time_us = np.linspace(0, 1, len(current_true_ma))
-    _draw_transient_panel(axes[0, 0], time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2, palette=palette)
-    _draw_voltage_panel(axes[0, 1], time_us, vg, vd, vs, palette=palette)
-    _draw_parity_panel(axes[1, 0], current_true_ma, current_pred_ma, r2, palette=palette)
-    _draw_snapshot_panel(axes[1, 1], vd, current_true_ma, current_pred_ma, palette=palette)
+    _draw_transient_panel(axes[0, 0], time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2)
+    _draw_voltage_panel(axes[0, 1], time_us, vg, vd, vs)
+    _draw_parity_panel(axes[1, 0], current_true_ma, current_pred_ma, r2)
+    _draw_snapshot_panel(axes[1, 1], vd, current_true_ma, current_pred_ma)
     plt.tight_layout()
     return fig, r2
 
@@ -339,7 +328,7 @@ def _build_p_tensor(spice_dataset, dataset, w_um: float, l_um: float, device: st
 
 
 def evaluate_spice_iv_sweeps(
-    model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=DEFAULT_TRIM_EVAL, dark=True
+    model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=DEFAULT_TRIM_EVAL
 ):
     """
     Generates deterministic Id-Vg and Id-Vd sweeps using SPICE ground truth.
@@ -358,12 +347,10 @@ def evaluate_spice_iv_sweeps(
     :param t_steps: Number of time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard from SPICE and FNO
         outputs before computing metrics. Removes the .op-to-transient solver artifact.
-    :param dark: If True, use dark-background style (TensorBoard). If False, use white (docs).
     :return: (figure, metrics_dict) tuple with timing metrics.
     """
     model.eval()
-    plt.style.use("dark_background" if dark else "default")
-    palette = get_palette(dark)
+    plt.style.use("dark_background")
     logger.info("Running SPICE-based I-V sweep validation (this will take ~30-60s)...")
     raw_steps = t_steps + trim_eval
     spice_dataset = InfiniteSpiceMosfetDataset(strategy_name="sky130_nmos", t_steps=raw_steps, t_end=raw_steps * 1e-9)
@@ -400,14 +387,13 @@ def evaluate_spice_iv_sweeps(
         f"Id-Vg Transfer (Saturation)\nW={w_um}µm, L={l_um}µm | R²={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd=1.8V, Vs=0V, Vb=0V",
         "Vg (V)",
         "Id (mA)",
-        palette=palette,
     )
-    axes[0, 0].plot(vg_plot, id_spice_plot, color=palette["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
-    axes[0, 0].plot(vg_plot, id_pred_plot, color=palette["pred"], linestyle=":", linewidth=2, label="FNO")
+    axes[0, 0].plot(vg_plot, id_spice_plot, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+    axes[0, 0].plot(vg_plot, id_pred_plot, color="#00ffff", linestyle=":", linewidth=2, label="FNO")
     axes[0, 0].set_yscale("log")
-    axes[0, 0].axvline(0.5, color=palette["vth_line"], linewidth=1, linestyle=":", alpha=0.5, label="SubTh (Vg<0.5V)")
+    axes[0, 0].axvline(0.5, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label="SubTh (Vg<0.5V)")
     axes[0, 0].legend(loc="upper left", fontsize=9)
-    _plot_error_dual(axes[0, 1], vg_plot, id_spice_plot, id_pred_plot, "Vg (V)", "Transfer Error", palette=palette)
+    _plot_error_dual(axes[0, 1], vg_plot, id_spice_plot, id_pred_plot, "Vg (V)", "Transfer Error")
     vd_sweep = np.linspace(0, 1.8, raw_steps)
     vg_drive = np.full(raw_steps, 1.2)
     logger.info("Running Id-Vd output sweep (Vg=1.2V, Vd: 0→1.8V)...")
@@ -430,12 +416,11 @@ def evaluate_spice_iv_sweeps(
             f"Id-Vd Output (Linear/Sat)\nVg=1.2V, Vs=0V, Vb=0V | R²={r2_output:.4f}, L2={l2_output:.4f}",
             "Vd (V)",
             "Id (mA)",
-            palette=palette,
         )
-        axes[1, 0].plot(vd_plot, id_spice_plot2, color=palette["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
-        axes[1, 0].plot(vd_plot, id_pred_plot2, color=palette["pred_sweep"], linestyle=":", linewidth=2, label="FNO")
+        axes[1, 0].plot(vd_plot, id_spice_plot2, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+        axes[1, 0].plot(vd_plot, id_pred_plot2, color="#ff00ff", linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
-        _plot_error_dual(axes[1, 1], vd_plot, id_spice_plot2, id_pred_plot2, "Vd (V)", "Output Error", palette=palette)
+        _plot_error_dual(axes[1, 1], vd_plot, id_spice_plot2, id_pred_plot2, "Vd (V)", "Output Error")
     plt.tight_layout()
     avg_spice_ms = sum(timing_spice_ms) / len(timing_spice_ms) if timing_spice_ms else 0.0
     avg_fno_ms = sum(timing_fno_ms) / len(timing_fno_ms) if timing_fno_ms else 0.0
@@ -456,7 +441,6 @@ def evaluate_multi_geometry(
     device: str = "cuda",
     t_steps: int = 512,
     trim_eval: int = DEFAULT_TRIM_EVAL,
-    dark: bool = True,
 ) -> dict:
     """
     Runs SPICE-based I-V validation across multiple device geometries.
@@ -471,7 +455,6 @@ def evaluate_multi_geometry(
     :param device: Torch device for inference.
     :param t_steps: Time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
-    :param dark: If True, use dark-background style (TensorBoard). If False, use white (docs).
     :return: Tuple of (metrics_dict, figures_dict) where figures_dict maps geometry keys to matplotlib figures.
     """
     if geometries is None:
@@ -491,7 +474,7 @@ def evaluate_multi_geometry(
         geom_key = f"W{w_um:.2f}_L{l_um:.2f}"
         logger.info("Evaluating geometry: W=%.2f um, L=%.2f um", w_um, l_um)
         fig, metrics = evaluate_spice_iv_sweeps(
-            model, dataset, device=device, w_um=w_um, l_um=l_um, t_steps=t_steps, trim_eval=trim_eval, dark=dark
+            model, dataset, device=device, w_um=w_um, l_um=l_um, t_steps=t_steps, trim_eval=trim_eval
         )
         fig_path = output_dir / f"iv_sweep_{geom_key}.png"
         fig.savefig(fig_path, dpi=150)
@@ -516,8 +499,6 @@ def evaluate_comprehensive(
     device: str = "cuda",
     t_steps: int = 512,
     trim_eval: int = DEFAULT_TRIM_EVAL,
-    dark: bool = True,
-    save_summary: bool = True,
 ) -> dict:
     """
     Comprehensive SPICE validation across geometry bins and waveform types.
@@ -535,9 +516,6 @@ def evaluate_comprehensive(
     :param device: Torch device for inference.
     :param t_steps: Time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
-    :param dark: If True, use dark-background style (TensorBoard). If False, use white (docs).
-    :param save_summary: If True, write summary_metrics.txt alongside the plot files. Disable
-        when generating figures for documentation assets where non-image files are noise.
     :return: Tuple of (metrics_dict, figures_dict) where figures_dict maps geometry names to matplotlib figures.
     """
     output_dir = Path(output_dir)
@@ -558,12 +536,11 @@ def evaluate_comprehensive(
     for geom_name, (w_um, l_um) in test_geometries.items():
         logger.info("Evaluating %s geometry: W=%.2f um, L=%.2f um", geom_name.upper(), w_um, l_um)
         geom_metrics, geom_fig = _evaluate_single_geometry_comprehensive(
-            model, dataset, w_um, l_um, geom_name, output_dir, device, t_steps, trim_eval, dark=dark
+            model, dataset, w_um, l_um, geom_name, output_dir, device, t_steps, trim_eval
         )
         all_metrics[geom_name] = geom_metrics
         all_figures[geom_name] = geom_fig
-    if save_summary:
-        _generate_summary_table(all_metrics, output_dir)
+    _generate_summary_table(all_metrics, output_dir)
     logger.info("=" * 80)
     logger.info("Comprehensive evaluation complete. Results in: %s", output_dir)
     logger.info("=" * 80)
@@ -584,7 +561,6 @@ def _evaluate_single_geometry_ramp(
     device,
     metrics,
     axes,
-    palette=None,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
     raw_steps = len(time_grid)
@@ -601,21 +577,20 @@ def _evaluate_single_geometry_ramp(
         metrics["ramp_r2_subth"] = r2_ramp_subth if r2_ramp_subth is not None else 0.0
         metrics["ramp_mae_ua"] = np.mean(np.abs(id_pred_ramp - id_spice_ramp)) * 1000.0
         metrics["ramp_male_ua"] = calculate_male(id_spice_ramp, id_pred_ramp)
-        p = coerce_palette(palette)
         subth_str = f", SubTh={r2_ramp_subth:.4f}" if r2_ramp_subth is not None else ""
         _style_plot(
-            axes[0, 0], f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd=1.8V, Vs=0V, Vb=0V", "Vg (V)", "Id (mA)", palette=p
+            axes[0, 0], f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd=1.8V, Vs=0V, Vb=0V", "Vg (V)", "Id (mA)"
         )
-        axes[0, 0].plot(vg_sweep, id_spice_ramp, color=p["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
-        axes[0, 0].plot(vg_sweep, id_pred_ramp, color=p["pred"], linestyle=":", linewidth=2, label="FNO")
-        axes[0, 0].axvline(0.5, color=p["vth_line"], linewidth=1, linestyle=":", alpha=0.5, label="SubTh")
+        axes[0, 0].plot(vg_sweep, id_spice_ramp, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+        axes[0, 0].plot(vg_sweep, id_pred_ramp, color="#00ffff", linestyle=":", linewidth=2, label="FNO")
+        axes[0, 0].axvline(0.5, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label="SubTh")
         axes[0, 0].set_yscale("log")
         axes[0, 0].legend(loc="upper left", fontsize=9)
-        _plot_error_dual(axes[0, 1], vg_sweep, id_spice_ramp, id_pred_ramp, "Vg (V)", "Ramp Error", palette=p)
-        axes[0, 2].scatter(id_spice_ramp, id_pred_ramp, c=p["ramp_parity"], s=10, alpha=0.5)
+        _plot_error_dual(axes[0, 1], vg_sweep, id_spice_ramp, id_pred_ramp, "Vg (V)", "Ramp Error")
+        axes[0, 2].scatter(id_spice_ramp, id_pred_ramp, c="#00ffff", s=10, alpha=0.5)
         lims = [min(id_spice_ramp.min(), id_pred_ramp.min()), max(id_spice_ramp.max(), id_pred_ramp.max())]
         axes[0, 2].plot(lims, lims, "r--", linewidth=1, alpha=0.7)
-        _style_plot(axes[0, 2], f"Ramp Parity | R2={r2_ramp:.4f}", "SPICE Id (mA)", "FNO Id (mA)", palette=p)
+        _style_plot(axes[0, 2], f"Ramp Parity | R2={r2_ramp:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
 
 
 def _evaluate_single_geometry_sweep(
@@ -632,7 +607,6 @@ def _evaluate_single_geometry_sweep(
     device,
     metrics,
     axes,
-    palette=None,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
     raw_steps = len(time_grid)
@@ -649,16 +623,15 @@ def _evaluate_single_geometry_sweep(
         metrics["sweep_r2"] = r2_sweep
         metrics["sweep_mae_ua"] = np.mean(np.abs(id_pred_sweep - id_spice_sweep)) * 1000.0
         metrics["sweep_male_ua"] = calculate_male(id_spice_sweep, id_pred_sweep)
-        p = coerce_palette(palette)
-        _style_plot(axes[1, 0], f"Sweep: Id-Vd | R2={r2_sweep:.4f}\nVg=1.2V, Vs=0V, Vb=0V", "Vd (V)", "Id (mA)", palette=p)
-        axes[1, 0].plot(vd_sweep, id_spice_sweep, color=p["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
-        axes[1, 0].plot(vd_sweep, id_pred_sweep, color=p["pred_sweep"], linestyle=":", linewidth=2, label="FNO")
+        _style_plot(axes[1, 0], f"Sweep: Id-Vd | R2={r2_sweep:.4f}\nVg=1.2V, Vs=0V, Vb=0V", "Vd (V)", "Id (mA)")
+        axes[1, 0].plot(vd_sweep, id_spice_sweep, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+        axes[1, 0].plot(vd_sweep, id_pred_sweep, color="#ff00ff", linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
-        _plot_error_dual(axes[1, 1], vd_sweep, id_spice_sweep, id_pred_sweep, "Vd (V)", "Sweep Error", palette=p)
-        axes[1, 2].scatter(id_spice_sweep, id_pred_sweep, c=p["sweep_parity"], s=10, alpha=0.5)
+        _plot_error_dual(axes[1, 1], vd_sweep, id_spice_sweep, id_pred_sweep, "Vd (V)", "Sweep Error")
+        axes[1, 2].scatter(id_spice_sweep, id_pred_sweep, c="#ff00ff", s=10, alpha=0.5)
         lims = [min(id_spice_sweep.min(), id_pred_sweep.min()), max(id_spice_sweep.max(), id_pred_sweep.max())]
         axes[1, 2].plot(lims, lims, "r--", linewidth=1, alpha=0.7)
-        _style_plot(axes[1, 2], f"Sweep Parity | R2={r2_sweep:.4f}", "SPICE Id (mA)", "FNO Id (mA)", palette=p)
+        _style_plot(axes[1, 2], f"Sweep Parity | R2={r2_sweep:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
 
 
 def _evaluate_single_geometry_random(
@@ -675,7 +648,6 @@ def _evaluate_single_geometry_random(
     metrics,
     axes,
     geom_name,
-    palette=None,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
     np.random.seed(42 + hash(geom_name) % 1000)
@@ -697,24 +669,23 @@ def _evaluate_single_geometry_random(
         metrics["random_mae_ua"] = np.mean(np.abs(id_pred_pwl - id_spice_pwl)) * 1000.0
         metrics["random_male_ua"] = calculate_male(id_spice_pwl, id_pred_pwl)
         time_us = time_grid_t * 1e6
-        p = coerce_palette(palette)
         _style_plot(
-            axes[2, 0], f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs=0V, Vb=0V", "Time (us)", "Id (mA)", palette=p
+            axes[2, 0], f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs=0V, Vb=0V", "Time (us)", "Id (mA)"
         )
-        axes[2, 0].plot(time_us, id_spice_pwl, color=p["gt"], linewidth=2, alpha=0.7, label="SPICE")
-        axes[2, 0].plot(time_us, id_pred_pwl, color=p["pred_random"], linestyle=":", linewidth=1.5, label="FNO")
+        axes[2, 0].plot(time_us, id_spice_pwl, color="#ffffff", linewidth=2, alpha=0.7, label="SPICE")
+        axes[2, 0].plot(time_us, id_pred_pwl, color="#00ff00", linestyle=":", linewidth=1.5, label="FNO")
         axes[2, 0].legend(loc="upper right", fontsize=9)
         ax_v = axes[2, 0].twinx()
-        ax_v.plot(time_us, vg_pwl, color=p["voltage_overlay_vg"], linewidth=1, alpha=0.5, linestyle="--", label="Vg")
-        ax_v.plot(time_us, vd_pwl, color=p["voltage_overlay_vd"], linewidth=1, alpha=0.5, linestyle=":", label="Vd")
-        ax_v.set_ylabel("Voltage (V)", fontsize=9, color=p["voltage_overlay_label"])
+        ax_v.plot(time_us, vg_pwl, color="#ffff00", linewidth=1, alpha=0.5, linestyle="--", label="Vg")
+        ax_v.plot(time_us, vd_pwl, color="#ff6600", linewidth=1, alpha=0.5, linestyle=":", label="Vd")
+        ax_v.set_ylabel("Voltage (V)", fontsize=9, color="#ffff00")
         ax_v.set_ylim(0, 2.0)
         ax_v.legend(loc="lower right", fontsize=8)
-        _plot_error_dual(axes[2, 1], time_us, id_spice_pwl, id_pred_pwl, "Time (us)", "Random Error", palette=p)
-        axes[2, 2].scatter(id_spice_pwl, id_pred_pwl, c=p["random_parity"], s=10, alpha=0.5)
+        _plot_error_dual(axes[2, 1], time_us, id_spice_pwl, id_pred_pwl, "Time (us)", "Random Error")
+        axes[2, 2].scatter(id_spice_pwl, id_pred_pwl, c="#00ff00", s=10, alpha=0.5)
         lims = [min(id_spice_pwl.min(), id_pred_pwl.min()), max(id_spice_pwl.max(), id_pred_pwl.max())]
         axes[2, 2].plot(lims, lims, "r--", linewidth=1, alpha=0.7)
-        _style_plot(axes[2, 2], f"Random Parity | R2={r2_pwl:.4f}", "SPICE Id (mA)", "FNO Id (mA)", palette=p)
+        _style_plot(axes[2, 2], f"Random Parity | R2={r2_pwl:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
 
 
 def _evaluate_single_geometry_comprehensive(
@@ -727,7 +698,6 @@ def _evaluate_single_geometry_comprehensive(
     device: str,
     t_steps: int,
     trim_eval: int = DEFAULT_TRIM_EVAL,
-    dark: bool = True,
 ) -> dict:
     """
     Evaluates a single geometry with all three waveform types.
@@ -743,8 +713,7 @@ def _evaluate_single_geometry_comprehensive(
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
     :return: Metrics dict for this geometry.
     """
-    plt.style.use("dark_background" if dark else "default")
-    palette = get_palette(dark)
+    plt.style.use("dark_background")
     fig, axes = plt.subplots(3, 3, figsize=(18, 14))
     raw_steps = t_steps + trim_eval
     spice_dataset = InfiniteSpiceMosfetDataset(strategy_name="sky130_nmos", t_steps=raw_steps, t_end=raw_steps * 1e-9)
@@ -768,7 +737,6 @@ def _evaluate_single_geometry_comprehensive(
         device=device,
         metrics=metrics,
         axes=axes,
-        palette=palette,
         trim_eval=trim_eval,
     )
     logger.info("  [2/3] Sweep (Id-Vd output)...")
@@ -786,7 +754,6 @@ def _evaluate_single_geometry_comprehensive(
         device=device,
         metrics=metrics,
         axes=axes,
-        palette=palette,
         trim_eval=trim_eval,
     )
     logger.info("  [3/3] Random (PWL transient)...")
@@ -804,14 +771,13 @@ def _evaluate_single_geometry_comprehensive(
         metrics=metrics,
         axes=axes,
         geom_name=geom_name,
-        palette=palette,
         trim_eval=trim_eval,
     )
     fig.suptitle(
         f"Comprehensive Evaluation: {geom_name.upper()} (W={w_um:.2f}um, L={l_um:.2f}um)",
         fontsize=14,
         fontweight="bold",
-        color=palette["suptitle"],
+        color="white",
     )
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     fig_path = output_dir / f"comprehensive_{geom_name}.png"
