@@ -19,15 +19,17 @@ Three device operators have been trained and validated against NGSPICE ground tr
 | Operator | Conditioning | Peak R² | Speedup | Documentation |
 |---|---|---|---|---|
 | Linear RC | Dimensionless $\lambda$ | 0.9999 | < 1× | [RC Circuit](docs/rc.md) |
-| Shockley Diode | Direct channel injection | 0.9996 | ~58× | [Diode](docs/diode.md) |
+| Shockley Diode | Dimensionless $\lambda$ + direct injection | 0.9999 | ~66× | [Diode](docs/diode.md) |
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
 
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
 (W = 1.0 µm, L = 0.18 µm), with warm-inference throughput approximately 1300× that of NGSPICE.
-The diode operator matches NGSPICE to within 0.38% relative error at ~58× the simulation speed.
-The RC operator, while not faster than a scalar ODE loop on CPU, demonstrates that a single
-trained FNO generalizes across the full stiffness ratio spectrum without per-circuit solver
-configuration.
+The diode operator extends the RC dimensionless framework to the nonlinear Shockley equation,
+achieving R² = 0.9994 on a standard rectifier and R² = 0.9999 on adversarial samples at ~66×
+NGSpice speed — with validated resolution invariance ($\Delta R^2 < 0.0001$ at 1024/2048/4096
+steps) and time-scale invariance (R² ≥ 0.997 across $T_{end}$ spanning 100 µs to 10 ms).
+The RC operator demonstrates that a single trained FNO generalises across the full stiffness
+ratio spectrum without per-circuit solver configuration.
 
 ---
 
@@ -75,11 +77,15 @@ the operator learns integration rather than memorizing pulse shapes.
 
 ### 2. Shockley Diode
 
-The diode introduces exponential nonlinearity via the Shockley equation. Four circuit
-parameters ($R$, $C$, $I_S$, $N$) are injected directly as constant-valued channels
-alongside the input current waveform. Log-encoding of parameters spanning 14 orders of
-magnitude ($I_S$) prevents gradient instability. The FNO replaces NGSPICE's inner-loop
-Newton-Raphson solver with a single forward pass, achieving ~58× speedup.
+The diode introduces exponential nonlinearity via the Shockley equation. Following the same
+dimensionless approach as the RC operator, the circuit ODE is reformulated in terms of
+$\hat{t} = t/T_{end}$, $\hat{I} = I/I_{scale}$, $\hat{V} = V/(I_{scale}R)$, with the
+stiffness ratio $\lambda = RC/T_{end}$ injected as a constant channel. This makes the
+operator invariant to simulation window and grid resolution. Five circuit parameters
+($\lambda$, $R$, $C$, $I_S$, $N$) are injected directly as constant-valued channels
+alongside the normalised current waveform. Log-encoding of parameters spanning 15 orders of
+magnitude ($I_S$) prevents gradient instability. The FNO replaces NGSpice's inner-loop
+Newton–Raphson solver with a single forward pass, achieving ~66× speedup.
 
 ### 3. sky130 NMOS (VCFiLM-FNO)
 
@@ -101,7 +107,8 @@ bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 |---|---|---|---|
 | Linear RC | Corner frequency ($\lambda = 1.0$) | 0.9999 | < 0.1% |
 | Linear RC | White noise (OOD) | 0.9884 | ~1% |
-| Shockley diode | Adversarial (random params) | 0.9996 | ~0.4% |
+| Shockley diode | Standard rectifier ($\lambda = 0.01$) | 0.9994 | ~0.45% |
+| Shockley diode | Adversarial (random params) | 0.9999 | < 0.1% |
 | sky130 NMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9995 | -- |
 | sky130 NMOS | Output (W=1 µm, L=0.18 µm) | 0.9960 | -- |
 | sky130 NMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9861 | -- |
@@ -110,7 +117,7 @@ bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 
 | Operator | Baseline | FNO | Speedup | Notes |
 |---|---|---|---|---|
-| Shockley diode | NGSPICE ~240 ms | ~4 ms | **~58×** | Single 2048-step transient |
+| Shockley diode | NGSPICE ~264 ms | ~4 ms | **~66×** | Single 2048-step transient |
 | sky130 NMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~1300×** | Sustained throughput |
 | sky130 NMOS (cold) | NGSPICE `.tran` | First call (incl. JIT) | **~21×** | One-time compilation cost |
 | Linear RC | ODE loop < 1 ms | FNO ~96 ms | **< 1×** | Value is generalization, not speed |
@@ -119,52 +126,36 @@ bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 
 ## Known Limitations
 
-### Fixed Temporal Resolution (Diode, MOSFET)
+### Fixed Temporal Resolution (MOSFET)
 
-The diode and MOSFET operators are trained on a **fixed discretization grid** — 2048 steps
-over 1 ms for the diode, 512 steps over ~1 µs for the MOSFET. The FNO's spectral
-convolutions learn frequency-domain filters tied to this specific grid: each Fourier mode
-corresponds to a physical frequency determined by the training-time relationship between
-step count and simulation window.
+The MOSFET operator is trained on a **fixed discretization grid** — 512 steps over ~1 µs.
+The FNO's spectral convolutions learn frequency-domain filters tied to this specific grid:
+each Fourier mode corresponds to a physical frequency determined by the training-time
+relationship between step count and simulation window.
 
 Changing either the number of steps or the simulation window at inference breaks this
-correspondence. A 2048-step simulation spanning 100 ns contains fundamentally different
-spectral content than one spanning 100 µs at the same step count — yet the FNO treats both
-identically. In practice, this means:
+correspondence. In practice, this means:
 
 - The operator cannot be used at arbitrary `.tran` resolutions the way a SPICE model can.
-- Designers who need sub-nanosecond resolution to catch switching transients, or millisecond
+- Designers who need sub-nanosecond resolution to catch switching transients, or microsecond
   windows for settling behaviour, cannot simply adjust `tstep` and `tstop`.
-- Waveform features that fall between the training grid's effective Nyquist limit are invisible
-  to the surrogate.
 
-**The RC operator does not share this limitation.** Its dimensionless formulation
-(see [RC Circuit](docs/rc.md)) non-dimensionalizes time via $\lambda = \tau / T_{end}$,
-factoring out the physical time scale entirely. The operator is invariant to simulation
-window — a 100 fs parasitic and a 10 s drift are identical if their stiffness ratios match.
+**The RC and diode operators do not share this limitation.** Both use the dimensionless
+formulation with $\lambda = \tau / T_{end}$ to factor out physical time scale entirely.
+The diode operator was validated at grid resolutions of 1024, 2048, and 4096 steps with
+$\Delta R^2 < 0.0001$, and across simulation windows from 100 µs to 10 ms with R² ≥ 0.997
+(see [Diode](docs/diode.md)).
 
-**Potential mitigations (future work):**
+**Potential mitigations for MOSFET (future work):**
 
-1. **Dimensionless reformulation.** Extend the RC approach to nonlinear devices by
-   identifying characteristic time scales (e.g., $\tau_{RC}$ from parasitic capacitances,
-   transit time $\tau_t$) and conditioning the FNO on a dimensionless stiffness parameter.
-   This is the cleanest solution but requires careful identification of the dominant time
-   constant for each device regime.
-2. **Time-scale conditioning.** Inject $T_{end}$ and $\Delta t$ (or their logarithms) as
-   additional conditioning parameters alongside the physics vector. The FNO would learn to
-   adapt its spectral filters to the declared resolution. Requires retraining on diverse
-   time windows.
-3. **Canonical-grid resampling.** Interpolate arbitrary-resolution input waveforms onto the
-   training grid, run the FNO, and resample the output back. This preserves the trained
-   operator unchanged but introduces interpolation error and cannot recover information
-   below the training grid's Nyquist frequency.
-4. **Multi-scale training.** Train on a distribution of $T_{end}$ values spanning the
-   target resolution range. Brute-force but straightforward; trades training cost for
-   generality.
-
-Until one of these mitigations is implemented, the diode and MOSFET operators are restricted
-to inference at or near their training resolution. This is the single most significant
-constraint for real EDA integration.
+1. **Dimensionless reformulation.** Identify the dominant MOSFET time constant (transit
+   time $\tau_t = L^2 / \mu V_{DS}$ or parasitic RC) and condition the VCFiLM FNO on
+   $\lambda = \tau_t / T_{end}$ as an additional input channel. Requires dataset regeneration.
+2. **Time-scale conditioning.** Inject $T_{end}$ and $\Delta t$ as additional parameters.
+   The FNO learns to adapt its spectral filters to the declared resolution.
+3. **Canonical-grid resampling.** Interpolate arbitrary-resolution inputs to the training
+   grid, run the FNO, resample output back. Preserves the trained operator unchanged but
+   cannot recover information below the training Nyquist frequency.
 
 ---
 
