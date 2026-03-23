@@ -341,12 +341,10 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         - "pwl": Random piecewise-linear (default, chaotic)
         - "monotonic": Smooth DC-sweep-like ramps (up or down)
         - "vth_focused": Gate voltage concentrated near threshold (uses approximate vth calculated from BSIM params)
+        - "output_sweep": Gate held constant (random bias), drain ramps (Id-Vd characteristic)
+        - "transfer_sweep": Drain held constant (random bias), gate ramps (Id-Vg characteristic)
 
     """
-
-    # Nominal Vth for Sky130 NMOS with generous spread to cover all corners
-    VTH_NOMINAL = 0.50
-    VTH_SPREAD = 0.25
 
     def __init__(
         self,
@@ -359,6 +357,9 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         geometry_bin: str | None = None,
         w_bin: str | None = None,
         l_bin: str | None = None,
+        variable_t_end: bool = False,
+        t_end_min: float = 1e-8,
+        t_end_max: float = 1e-5,
     ):
         """
         Initializes the dataset generator with simulation parameters.
@@ -366,12 +367,15 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
         :param strategy_config: Optional dict of voltage range overrides for hyperparameter tuning.
         :param t_steps: Number of time points in output grid.
-        :param t_end: Simulation end time in seconds.
+        :param t_end: Simulation end time in seconds (fixed mode) or fallback (variable mode).
         :param cache_dir: Directory for persistent physics parameter cache.
-        :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused", "deep_subthreshold").
+        :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused", "deep_subthreshold", "output_sweep", "transfer_sweep").
         :param geometry_bin: Optional geometry bin name for stratified sampling (tiny/small/medium/large/xlarge).
         :param w_bin: Optional width bin for cross-bin sampling (requires l_bin).
         :param l_bin: Optional length bin for cross-bin sampling (requires w_bin).
+        :param variable_t_end: If True, sample T_end log-uniformly per sample from [t_end_min, t_end_max].
+        :param t_end_min: Minimum T_end for variable mode (seconds).
+        :param t_end_max: Maximum T_end for variable mode (seconds).
         """
         if strategy_config is None:
             strategy_config = {}
@@ -395,6 +399,9 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
             raise ValueError(f"Unknown w_bin: {w_bin}. Valid: {list(GEOMETRY_BINS.keys())}")
         if l_bin and self.l_bin is None:
             raise ValueError(f"Unknown l_bin: {l_bin}. Valid: {list(GEOMETRY_BINS.keys())}")
+        self.variable_t_end = variable_t_end
+        self.t_end_min = t_end_min
+        self.t_end_max = t_end_max
 
     def _get_physics_tensor(self, w: float, l: float) -> torch.Tensor:
         """
@@ -453,6 +460,15 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         volts = np.array([v_start, v_end])
         return times, volts
 
+    def _generate_constant_voltage(self, voltage: float) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Generates a flat (constant) voltage waveform.
+
+        :param voltage: Constant voltage value (V).
+        :return: Tuple of (time_points, voltage_values).
+        """
+        return np.array([0.0, self.t_end]), np.array([voltage, voltage])
+
     def _generate_vth_focused_voltage(self, min_v: float = 0.0, max_v: float = 1.8) -> tuple[np.ndarray, np.ndarray]:
         """
         Generates gate voltage waveform concentrated around threshold voltage.
@@ -464,7 +480,8 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         :param max_v: Maximum voltage boundary.
         :return: Tuple of (time_points, voltage_values).
         """
-        vth_center = self.VTH_NOMINAL + np.random.uniform(-self.VTH_SPREAD, self.VTH_SPREAD)
+        wc = self.strategy.waveform_config
+        vth_center = wc.vth_nominal + np.random.uniform(-wc.vth_spread, wc.vth_spread)
         vth_window = 0.35
         v_low = max(min_v, vth_center - vth_window)
         v_high = min(max_v, vth_center + vth_window)
@@ -479,11 +496,19 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         """
         Generates gate voltage waveform concentrated around subthreshold region.
 
+        Uses WaveformConfig to determine which side of Vth the subthreshold
+        region lives on (below for NMOS, above for PMOS).
+
         :return: Tuple of (time_points, voltage_values).
         """
-        vth_jitter = np.random.uniform(0, self.VTH_SPREAD)
-        v_low = 0.0
-        v_high = self.VTH_NOMINAL - vth_jitter
+        wc = self.strategy.waveform_config
+        vth_jitter = np.random.uniform(0, wc.vth_spread)
+        if max(wc.deep_subth_vg_range) < wc.vth_nominal:
+            v_low = min(wc.deep_subth_vg_range)
+            v_high = wc.vth_nominal - vth_jitter
+        else:
+            v_low = wc.vth_nominal + vth_jitter
+            v_high = max(wc.deep_subth_vg_range)
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
         if np.random.random() < 0.5:
@@ -496,10 +521,17 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         """
         Generates gate voltage waveform concentrated strictly in deep subthreshold region.
 
+        Uses the strategy's deep_subth_vg_range to determine the correct
+        voltage window for the device type.
+
         :return: Tuple of (time_points, voltage_values).
         """
-        v_low = 0.0
-        v_high = np.random.uniform(0.1, 0.3)
+        wc = self.strategy.waveform_config
+        v_low = min(wc.deep_subth_vg_range)
+        v_high = np.random.uniform(
+            min(wc.deep_subth_vg_range) + 0.1 * abs(wc.deep_subth_vg_range[1] - wc.deep_subth_vg_range[0]),
+            max(wc.deep_subth_vg_range),
+        )
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
         if np.random.random() < 0.5:
@@ -510,16 +542,22 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
 
     def _generate_transitional_subthreshold_voltage(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Generates gate voltage in the transitional subthreshold region (0.15V-0.5V).
+        Generates gate voltage in the transitional subthreshold region.
 
         Targets the gm/Id design sweet spot where currents are 1-100 nA: large
         enough that LpLoss denominators do not collapse, yet firmly in weak
         inversion where analog designers care about accuracy.
 
+        Uses the strategy's trans_subth_vg_range to determine the correct
+        voltage window for the device type.
+
         :return: Tuple of (time_points, voltage_values).
         """
-        v_low = np.random.uniform(0.05, 0.20)
-        v_high = np.random.uniform(0.35, 0.55)
+        wc = self.strategy.waveform_config
+        range_span = abs(wc.trans_subth_vg_range[1] - wc.trans_subth_vg_range[0])
+        range_lo = min(wc.trans_subth_vg_range)
+        v_low = np.random.uniform(range_lo, range_lo + 0.3 * range_span)
+        v_high = np.random.uniform(range_lo + 0.6 * range_span, range_lo + range_span)
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
         if np.random.random() < 0.5:
@@ -680,6 +718,26 @@ Vb b 0 {pwl_b}
                 "source": self._generate_monotonic_ramp(*source_range),
                 "bulk": self._generate_monotonic_ramp(*bulk_range),
             }
+        elif self.waveform_mode == "output_sweep":
+            ec = self.strategy.eval_config
+            gate_range = self.strategy.gate_range
+            vg_bias = np.random.uniform(*gate_range)
+            return {
+                "gate": self._generate_constant_voltage(vg_bias),
+                "drain": self._generate_monotonic_ramp(*self.strategy.drain_range),
+                "source": self._generate_constant_voltage(ec.vs_bias),
+                "bulk": self._generate_constant_voltage(ec.vb_bias),
+            }
+        elif self.waveform_mode == "transfer_sweep":
+            ec = self.strategy.eval_config
+            drain_range = self.strategy.drain_range
+            vd_bias = np.random.uniform(*drain_range)
+            return {
+                "gate": self._generate_monotonic_ramp(*self.strategy.gate_range),
+                "drain": self._generate_constant_voltage(vd_bias),
+                "source": self._generate_constant_voltage(ec.vs_bias),
+                "bulk": self._generate_constant_voltage(ec.vb_bias),
+            }
         return self.strategy.sample_terminal_voltages(self._generate_pwl_voltage)
 
     def _interpolate_terminal_voltages(
@@ -753,8 +811,16 @@ Vb b 0 {pwl_b}
         """
         Generates a single training sample via SPICE simulation.
 
+        When variable_t_end is enabled, each sample uses a T_end drawn
+        log-uniformly from [t_end_min, t_end_max]. This creates diverse
+        slew rates without informing the model of T_end (quasi-static).
+
         :return: Tuple of ((voltages, physics), current) tensors.
         """
+        if self.variable_t_end:
+            log_t_end = np.random.uniform(np.log10(self.t_end_min), np.log10(self.t_end_max))
+            self.t_end = 10.0 ** log_t_end
+            self.sim_step = self.t_end / (self.t_steps * 2.0)
         while True:
             width_um, length_um = self._sample_device_geometry()
             terminal_voltages = self._sample_terminal_voltages()
@@ -1113,6 +1179,9 @@ def generate_offline_dataset(
     geometry_bin: str | None = None,
     w_bin: str | None = None,
     l_bin: str | None = None,
+    variable_t_end: bool = False,
+    t_end_min: float = 1e-8,
+    t_end_max: float = 1e-5,
 ):
     """
     Generates pre-computed dataset using multiprocessing and saves to HDF5.
@@ -1122,7 +1191,7 @@ def generate_offline_dataset(
     :param strategy_name: Device strategy identifier.
     :param strategy_config: Optional voltage range overrides.
     :param t_steps: Number of time points per sample.
-    :param t_end: Simulation end time in seconds.
+    :param t_end: Simulation end time in seconds (fixed mode).
     :param num_workers: Number of parallel workers (16 recommended for 22GB RAM).
     :param progress_callback: Optional callback(completed_count) for progress tracking.
     :param overwrite: If True, overwrite existing file. If False (default), append to existing file.
@@ -1130,6 +1199,9 @@ def generate_offline_dataset(
     :param geometry_bin: Optional geometry bin for stratified sampling (tiny/small/medium/large/xlarge).
     :param w_bin: Optional width bin for cross-bin sampling (requires l_bin).
     :param l_bin: Optional length bin for cross-bin sampling (requires w_bin).
+    :param variable_t_end: If True, sample T_end log-uniformly per sample.
+    :param t_end_min: Minimum T_end for variable mode (seconds).
+    :param t_end_max: Maximum T_end for variable mode (seconds).
     """
     if geometry_bin and (w_bin or l_bin):
         raise ValueError("geometry_bin cannot be combined with w_bin/l_bin")
@@ -1177,6 +1249,9 @@ def generate_offline_dataset(
                 geometry_bin=geometry_bin,
                 w_bin=w_bin,
                 l_bin=l_bin,
+                variable_t_end=variable_t_end,
+                t_end_min=t_end_min,
+                t_end_max=t_end_max,
             )
             with h5py.File(temp_file, "w") as f:
                 voltages_ds = f.create_dataset("voltages", shape=(num_samples_worker, 4, t_steps), dtype="float32")
@@ -1257,6 +1332,10 @@ def generate_offline_dataset(
         f_out.attrs["t_end"] = t_end
         f_out.attrs["num_samples"] = total_samples
         f_out.attrs["waveform_mode"] = waveform_mode
+        f_out.attrs["variable_t_end"] = variable_t_end
+        if variable_t_end:
+            f_out.attrs["t_end_min"] = t_end_min
+            f_out.attrs["t_end_max"] = t_end_max
         if geometry_bin:
             f_out.attrs["geometry_bin"] = geometry_bin
             f_out.attrs["geometry_mode"] = "single_bin"

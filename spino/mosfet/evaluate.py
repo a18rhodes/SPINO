@@ -23,6 +23,7 @@ from rich.console import Console
 from rich.table import Table
 
 from spino.constants import ARCSINH_SCALE_MA
+from spino.mosfet.device_strategy import DeviceStrategy, EvalConfig
 from spino.mosfet.gen_data import GEOMETRY_BINS, InfiniteSpiceMosfetDataset, ParameterSchema
 
 # Default number of initial timesteps to discard from evaluation.
@@ -81,17 +82,22 @@ def calculate_r2(y_true, y_pred):
     return 1 - (ss_res / (ss_tot + 1e-12))
 
 
-def calculate_subthreshold_r2(vg, y_true, y_pred, vg_threshold=0.5):
+def calculate_subthreshold_r2(vg, y_true, y_pred, vg_threshold=0.5, below=True):
     """
-    Calculates R² Score for the sub-threshold region (Vg < threshold).
+    Calculates R² Score for the sub-threshold region.
+
+    For NMOS, sub-threshold is Vg < threshold (below=True).
+    For PMOS, sub-threshold is Vg > threshold (below=False), because
+    |Vgs| = |Vg - Vs| < |Vtp| when Vg is near Vs (Vdd).
 
     :param vg: Gate voltage array.
     :param y_true: Ground truth current values.
     :param y_pred: Predicted current values.
     :param vg_threshold: Voltage threshold defining sub-threshold region (default 0.5V).
+    :param below: If True, mask where Vg < threshold (NMOS). If False, Vg > threshold (PMOS).
     :return: Sub-threshold R² score, or None if insufficient data points.
     """
-    mask = vg < vg_threshold
+    mask = vg < vg_threshold if below else vg > vg_threshold
     if np.sum(mask) < 5:
         return None
     return calculate_r2(y_true[mask], y_pred[mask])
@@ -328,7 +334,7 @@ def _build_p_tensor(spice_dataset, dataset, w_um: float, l_um: float, device: st
 
 
 def evaluate_spice_iv_sweeps(
-    model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=DEFAULT_TRIM_EVAL
+    model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"
 ):
     """
     Generates deterministic Id-Vg and Id-Vd sweeps using SPICE ground truth.
@@ -347,26 +353,31 @@ def evaluate_spice_iv_sweeps(
     :param t_steps: Number of time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard from SPICE and FNO
         outputs before computing metrics. Removes the .op-to-transient solver artifact.
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     :return: (figure, metrics_dict) tuple with timing metrics.
     """
     model.eval()
     plt.style.use("dark_background")
+    ec = DeviceStrategy.create(strategy_name).eval_config
     logger.info("Running SPICE-based I-V sweep validation (this will take ~30-60s)...")
     raw_steps = t_steps + trim_eval
-    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name="sky130_nmos", t_steps=raw_steps, t_end=raw_steps * 1e-9)
+    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9)
     time_grid = np.linspace(0, spice_dataset.t_end, raw_steps)
-    vs_gnd = np.zeros(raw_steps)
-    vb_gnd = np.zeros(raw_steps)
+    vs_bias = np.full(raw_steps, ec.vs_bias)
+    vb_bias = np.full(raw_steps, ec.vb_bias)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     metrics = {}
     timing_spice_ms: list[float] = []
     timing_fno_ms: list[float] = []
     p_tensor = _build_p_tensor(spice_dataset, dataset, w_um, l_um, device)
-    vg_sweep = np.linspace(0, 1.8, raw_steps)
-    vd_sat = np.full(raw_steps, 1.8)
-    logger.info("Running Id-Vg transfer sweep (Vd=1.8V, Vg: 0->1.8V)...")
+    vg_sweep = np.linspace(ec.transfer_vg_start, ec.transfer_vg_stop, raw_steps)
+    vd_sat = np.full(raw_steps, ec.transfer_vd_bias)
+    logger.info(
+        "Running Id-Vg transfer sweep (Vd=%.1fV, Vg: %.1f->%.1fV)...",
+        ec.transfer_vd_bias, ec.transfer_vg_start, ec.transfer_vg_stop,
+    )
     id_spice_transfer, id_pred_transfer, spice_ms, fno_ms = _run_timed_sweep(
-        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_gnd, vb_gnd, w_um, l_um, device
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device
     )
     if id_spice_transfer is None:
         logger.error("SPICE simulation failed for Id-Vg sweep")
@@ -375,7 +386,7 @@ def evaluate_spice_iv_sweeps(
     timing_fno_ms.append(fno_ms)
     vg_plot, id_spice_plot, id_pred_plot = _apply_eval_trim(vg_sweep, id_spice_transfer, id_pred_transfer, trim=trim_eval)
     r2_transfer = calculate_r2(id_spice_plot, id_pred_plot)
-    r2_subth = calculate_subthreshold_r2(vg_plot, id_spice_plot, id_pred_plot)
+    r2_subth = calculate_subthreshold_r2(vg_plot, id_spice_plot, id_pred_plot, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below)
     l2_transfer = _compute_l2_relative_error(id_spice_plot, id_pred_plot)
     metrics["r2_transfer"] = r2_transfer
     metrics["r2_transfer_subth"] = r2_subth if r2_subth is not None else 0.0
@@ -384,21 +395,25 @@ def evaluate_spice_iv_sweeps(
     subth_str = f", SubTh-R²={r2_subth:.4f}" if r2_subth is not None else ""
     _style_plot(
         axes[0, 0],
-        f"Id-Vg Transfer (Saturation)\nW={w_um}µm, L={l_um}µm | R²={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd=1.8V, Vs=0V, Vb=0V",
+        f"Id-Vg Transfer (Saturation)\nW={w_um}µm, L={l_um}µm | R²={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
         "Vg (V)",
-        "Id (mA)",
+        "|Id| (mA)",
     )
-    axes[0, 0].plot(vg_plot, id_spice_plot, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
-    axes[0, 0].plot(vg_plot, id_pred_plot, color="#00ffff", linestyle=":", linewidth=2, label="FNO")
+    axes[0, 0].plot(vg_plot, np.abs(id_spice_plot), color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+    axes[0, 0].plot(vg_plot, np.abs(id_pred_plot), color="#00ffff", linestyle=":", linewidth=2, label="FNO")
     axes[0, 0].set_yscale("log")
-    axes[0, 0].axvline(0.5, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label="SubTh (Vg<0.5V)")
+    subth_label = f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
+    axes[0, 0].axvline(ec.subth_vg_threshold, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label=subth_label)
     axes[0, 0].legend(loc="upper left", fontsize=9)
     _plot_error_dual(axes[0, 1], vg_plot, id_spice_plot, id_pred_plot, "Vg (V)", "Transfer Error")
-    vd_sweep = np.linspace(0, 1.8, raw_steps)
-    vg_drive = np.full(raw_steps, 1.2)
-    logger.info("Running Id-Vd output sweep (Vg=1.2V, Vd: 0→1.8V)...")
+    vd_sweep = np.linspace(ec.output_vd_start, ec.output_vd_stop, raw_steps)
+    vg_drive = np.full(raw_steps, ec.output_vg_drive)
+    logger.info(
+        "Running Id-Vd output sweep (Vg=%.1fV, Vd: %.1f->%.1fV)...",
+        ec.output_vg_drive, ec.output_vd_start, ec.output_vd_stop,
+    )
     id_spice_output, id_pred_output, spice_ms2, fno_ms2 = _run_timed_sweep(
-        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_gnd, vb_gnd, w_um, l_um, device
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device
     )
     if id_spice_output is None:
         logger.error("SPICE simulation failed for Id-Vd sweep")
@@ -413,7 +428,7 @@ def evaluate_spice_iv_sweeps(
         metrics["male_output"] = calculate_male(id_spice_plot2, id_pred_plot2)
         _style_plot(
             axes[1, 0],
-            f"Id-Vd Output (Linear/Sat)\nVg=1.2V, Vs=0V, Vb=0V | R²={r2_output:.4f}, L2={l2_output:.4f}",
+            f"Id-Vd Output (Linear/Sat)\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V | R²={r2_output:.4f}, L2={l2_output:.4f}",
             "Vd (V)",
             "Id (mA)",
         )
@@ -441,6 +456,7 @@ def evaluate_multi_geometry(
     device: str = "cuda",
     t_steps: int = 512,
     trim_eval: int = DEFAULT_TRIM_EVAL,
+    strategy_name: str = "sky130_nmos",
 ) -> dict:
     """
     Runs SPICE-based I-V validation across multiple device geometries.
@@ -455,6 +471,7 @@ def evaluate_multi_geometry(
     :param device: Torch device for inference.
     :param t_steps: Time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     :return: Tuple of (metrics_dict, figures_dict) where figures_dict maps geometry keys to matplotlib figures.
     """
     if geometries is None:
@@ -474,7 +491,8 @@ def evaluate_multi_geometry(
         geom_key = f"W{w_um:.2f}_L{l_um:.2f}"
         logger.info("Evaluating geometry: W=%.2f um, L=%.2f um", w_um, l_um)
         fig, metrics = evaluate_spice_iv_sweeps(
-            model, dataset, device=device, w_um=w_um, l_um=l_um, t_steps=t_steps, trim_eval=trim_eval
+            model, dataset, device=device, w_um=w_um, l_um=l_um, t_steps=t_steps, trim_eval=trim_eval,
+            strategy_name=strategy_name,
         )
         fig_path = output_dir / f"iv_sweep_{geom_key}.png"
         fig.savefig(fig_path, dpi=150)
@@ -499,6 +517,7 @@ def evaluate_comprehensive(
     device: str = "cuda",
     t_steps: int = 512,
     trim_eval: int = DEFAULT_TRIM_EVAL,
+    strategy_name: str = "sky130_nmos",
 ) -> dict:
     """
     Comprehensive SPICE validation across geometry bins and waveform types.
@@ -516,6 +535,7 @@ def evaluate_comprehensive(
     :param device: Torch device for inference.
     :param t_steps: Time steps for quasi-static sweep (after trim).
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     :return: Tuple of (metrics_dict, figures_dict) where figures_dict maps geometry names to matplotlib figures.
     """
     output_dir = Path(output_dir)
@@ -530,13 +550,14 @@ def evaluate_comprehensive(
     logger.info("=" * 80)
     logger.info("COMPREHENSIVE SPICE EVALUATION")
     logger.info("=" * 80)
+    logger.info("Strategy: %s", strategy_name)
     logger.info("Geometries: %s", list(test_geometries.keys()))
     logger.info("Waveforms: ramp (Id-Vg), sweep (Id-Vd), random (PWL transient)")
     logger.info("=" * 80)
     for geom_name, (w_um, l_um) in test_geometries.items():
         logger.info("Evaluating %s geometry: W=%.2f um, L=%.2f um", geom_name.upper(), w_um, l_um)
         geom_metrics, geom_fig = _evaluate_single_geometry_comprehensive(
-            model, dataset, w_um, l_um, geom_name, output_dir, device, t_steps, trim_eval
+            model, dataset, w_um, l_um, geom_name, output_dir, device, t_steps, trim_eval, strategy_name=strategy_name
         )
         all_metrics[geom_name] = geom_metrics
         all_figures[geom_name] = geom_fig
@@ -554,36 +575,44 @@ def _evaluate_single_geometry_ramp(
     spice_dataset,
     p_tensor,
     time_grid,
-    vs_gnd,
-    vb_gnd,
+    vs_bias,
+    vb_bias,
     w_um,
     l_um,
     device,
     metrics,
     axes,
+    eval_config: EvalConfig,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
     raw_steps = len(time_grid)
-    vg_sweep = np.linspace(0, 1.8, raw_steps)
-    vd_sat = np.full(raw_steps, 1.8)
+    ec = eval_config
+    vg_sweep = np.linspace(ec.transfer_vg_start, ec.transfer_vg_stop, raw_steps)
+    vd_sat = np.full(raw_steps, ec.transfer_vd_bias)
     id_spice_ramp, id_pred_ramp = _run_single_sweep(
-        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_gnd, vb_gnd, w_um, l_um, device
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device
     )
     if id_spice_ramp is not None:
         vg_sweep, id_spice_ramp, id_pred_ramp = _apply_eval_trim(vg_sweep, id_spice_ramp, id_pred_ramp, trim=trim_eval)
         r2_ramp = calculate_r2(id_spice_ramp, id_pred_ramp)
-        r2_ramp_subth = calculate_subthreshold_r2(vg_sweep, id_spice_ramp, id_pred_ramp)
+        r2_ramp_subth = calculate_subthreshold_r2(
+            vg_sweep, id_spice_ramp, id_pred_ramp, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below,
+        )
         metrics["ramp_r2"] = r2_ramp
         metrics["ramp_r2_subth"] = r2_ramp_subth if r2_ramp_subth is not None else 0.0
         metrics["ramp_mae_ua"] = np.mean(np.abs(id_pred_ramp - id_spice_ramp)) * 1000.0
         metrics["ramp_male_ua"] = calculate_male(id_spice_ramp, id_pred_ramp)
         subth_str = f", SubTh={r2_ramp_subth:.4f}" if r2_ramp_subth is not None else ""
         _style_plot(
-            axes[0, 0], f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd=1.8V, Vs=0V, Vb=0V", "Vg (V)", "Id (mA)"
+            axes[0, 0],
+            f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
+            "Vg (V)",
+            "|Id| (mA)",
         )
-        axes[0, 0].plot(vg_sweep, id_spice_ramp, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
-        axes[0, 0].plot(vg_sweep, id_pred_ramp, color="#00ffff", linestyle=":", linewidth=2, label="FNO")
-        axes[0, 0].axvline(0.5, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label="SubTh")
+        axes[0, 0].plot(vg_sweep, np.abs(id_spice_ramp), color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
+        axes[0, 0].plot(vg_sweep, np.abs(id_pred_ramp), color="#00ffff", linestyle=":", linewidth=2, label="FNO")
+        subth_label = f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
+        axes[0, 0].axvline(ec.subth_vg_threshold, color="#ffaa00", linewidth=1, linestyle=":", alpha=0.5, label=subth_label)
         axes[0, 0].set_yscale("log")
         axes[0, 0].legend(loc="upper left", fontsize=9)
         _plot_error_dual(axes[0, 1], vg_sweep, id_spice_ramp, id_pred_ramp, "Vg (V)", "Ramp Error")
@@ -600,20 +629,22 @@ def _evaluate_single_geometry_sweep(
     spice_dataset,
     p_tensor,
     time_grid,
-    vs_gnd,
-    vb_gnd,
+    vs_bias,
+    vb_bias,
     w_um,
     l_um,
     device,
     metrics,
     axes,
+    eval_config: EvalConfig,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
     raw_steps = len(time_grid)
-    vd_sweep = np.linspace(0, 1.8, raw_steps)
-    vg_drive = np.full(raw_steps, 1.2)
+    ec = eval_config
+    vd_sweep = np.linspace(ec.output_vd_start, ec.output_vd_stop, raw_steps)
+    vg_drive = np.full(raw_steps, ec.output_vg_drive)
     id_spice_sweep, id_pred_sweep = _run_single_sweep(
-        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_gnd, vb_gnd, w_um, l_um, device
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device
     )
     if id_spice_sweep is not None:
         vd_sweep, id_spice_sweep, id_pred_sweep = _apply_eval_trim(
@@ -623,7 +654,12 @@ def _evaluate_single_geometry_sweep(
         metrics["sweep_r2"] = r2_sweep
         metrics["sweep_mae_ua"] = np.mean(np.abs(id_pred_sweep - id_spice_sweep)) * 1000.0
         metrics["sweep_male_ua"] = calculate_male(id_spice_sweep, id_pred_sweep)
-        _style_plot(axes[1, 0], f"Sweep: Id-Vd | R2={r2_sweep:.4f}\nVg=1.2V, Vs=0V, Vb=0V", "Vd (V)", "Id (mA)")
+        _style_plot(
+            axes[1, 0],
+            f"Sweep: Id-Vd | R2={r2_sweep:.4f}\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
+            "Vd (V)",
+            "Id (mA)",
+        )
         axes[1, 0].plot(vd_sweep, id_spice_sweep, color="#ffffff", linewidth=2.5, alpha=0.7, label="SPICE")
         axes[1, 0].plot(vd_sweep, id_pred_sweep, color="#ff00ff", linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
@@ -640,26 +676,28 @@ def _evaluate_single_geometry_random(
     spice_dataset,
     p_tensor,
     time_grid,
-    vs_gnd,
-    vb_gnd,
+    vs_bias,
+    vb_bias,
     w_um,
     l_um,
     device,
     metrics,
     axes,
     geom_name,
+    eval_config: EvalConfig,
     trim_eval: int = DEFAULT_TRIM_EVAL,
 ):
+    ec = eval_config
     np.random.seed(42 + hash(geom_name) % 1000)
     n_pts = np.random.randint(8, 15)
     pwl_times = np.sort(np.random.uniform(0, spice_dataset.t_end, n_pts))
     pwl_times = np.concatenate(([0], pwl_times, [spice_dataset.t_end]))
-    vg_pwl_raw = np.random.uniform(0, 1.8, len(pwl_times))
-    vd_pwl_raw = np.random.uniform(0, 1.8, len(pwl_times))
+    vg_pwl_raw = np.random.uniform(*ec.random_vg_range, len(pwl_times))
+    vd_pwl_raw = np.random.uniform(*ec.random_vd_range, len(pwl_times))
     vg_pwl = np.interp(time_grid, pwl_times, vg_pwl_raw)
     vd_pwl = np.interp(time_grid, pwl_times, vd_pwl_raw)
     id_spice_pwl, id_pred_pwl = _run_single_sweep(
-        model, dataset, spice_dataset, p_tensor, time_grid, vg_pwl, vd_pwl, vs_gnd, vb_gnd, w_um, l_um, device
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_pwl, vd_pwl, vs_bias, vb_bias, w_um, l_um, device
     )
     if id_spice_pwl is not None:
         time_grid_t, id_spice_pwl, id_pred_pwl = _apply_eval_trim(time_grid, id_spice_pwl, id_pred_pwl, trim=trim_eval)
@@ -670,7 +708,10 @@ def _evaluate_single_geometry_random(
         metrics["random_male_ua"] = calculate_male(id_spice_pwl, id_pred_pwl)
         time_us = time_grid_t * 1e6
         _style_plot(
-            axes[2, 0], f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs=0V, Vb=0V", "Time (us)", "Id (mA)"
+            axes[2, 0],
+            f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
+            "Time (us)",
+            "Id (mA)",
         )
         axes[2, 0].plot(time_us, id_spice_pwl, color="#ffffff", linewidth=2, alpha=0.7, label="SPICE")
         axes[2, 0].plot(time_us, id_pred_pwl, color="#00ff00", linestyle=":", linewidth=1.5, label="FNO")
@@ -698,6 +739,7 @@ def _evaluate_single_geometry_comprehensive(
     device: str,
     t_steps: int,
     trim_eval: int = DEFAULT_TRIM_EVAL,
+    strategy_name: str = "sky130_nmos",
 ) -> dict:
     """
     Evaluates a single geometry with all three waveform types.
@@ -711,15 +753,17 @@ def _evaluate_single_geometry_comprehensive(
     :param device: Torch device.
     :param t_steps: Time steps (after trim).
     :param trim_eval: Number of initial timesteps to discard (SPICE .op artifact).
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     :return: Metrics dict for this geometry.
     """
     plt.style.use("dark_background")
     fig, axes = plt.subplots(3, 3, figsize=(18, 14))
     raw_steps = t_steps + trim_eval
-    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name="sky130_nmos", t_steps=raw_steps, t_end=raw_steps * 1e-9)
+    ec = DeviceStrategy.create(strategy_name).eval_config
+    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9)
     time_grid = np.linspace(0, spice_dataset.t_end, raw_steps)
-    vs_gnd = np.zeros(raw_steps)
-    vb_gnd = np.zeros(raw_steps)
+    vs_bias = np.full(raw_steps, ec.vs_bias)
+    vb_bias = np.full(raw_steps, ec.vb_bias)
     p_tensor = _build_p_tensor(spice_dataset, dataset, w_um, l_um, device)
     metrics = {}
     logger.info("  [1/3] Ramp (Id-Vg transfer)...")
@@ -730,13 +774,14 @@ def _evaluate_single_geometry_comprehensive(
         spice_dataset=spice_dataset,
         p_tensor=p_tensor,
         time_grid=time_grid,
-        vs_gnd=vs_gnd,
-        vb_gnd=vb_gnd,
+        vs_bias=vs_bias,
+        vb_bias=vb_bias,
         w_um=w_um,
         l_um=l_um,
         device=device,
         metrics=metrics,
         axes=axes,
+        eval_config=ec,
         trim_eval=trim_eval,
     )
     logger.info("  [2/3] Sweep (Id-Vd output)...")
@@ -747,13 +792,14 @@ def _evaluate_single_geometry_comprehensive(
         spice_dataset=spice_dataset,
         p_tensor=p_tensor,
         time_grid=time_grid,
-        vs_gnd=vs_gnd,
-        vb_gnd=vb_gnd,
+        vs_bias=vs_bias,
+        vb_bias=vb_bias,
         w_um=w_um,
         l_um=l_um,
         device=device,
         metrics=metrics,
         axes=axes,
+        eval_config=ec,
         trim_eval=trim_eval,
     )
     logger.info("  [3/3] Random (PWL transient)...")
@@ -763,14 +809,15 @@ def _evaluate_single_geometry_comprehensive(
         spice_dataset=spice_dataset,
         p_tensor=p_tensor,
         time_grid=time_grid,
-        vs_gnd=vs_gnd,
-        vb_gnd=vb_gnd,
+        vs_bias=vs_bias,
+        vb_bias=vb_bias,
         w_um=w_um,
         l_um=l_um,
         device=device,
         metrics=metrics,
         axes=axes,
         geom_name=geom_name,
+        eval_config=ec,
         trim_eval=trim_eval,
     )
     fig.suptitle(
