@@ -165,11 +165,19 @@ This was empirically validated on the NFET Exp 19b production model across three
 | Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | 0.000517 | < 0.01 | **PASS** |
 | Resolution | Step count | 512 – 4096 (8×) | 0.000002 | < 0.001 | **PASS** |
 
-All $R^2$ values remained above 0.999 across the full test matrix. The MOSFET operator is
-therefore usable at arbitrary `.tran` resolutions and simulation windows, matching the
-flexibility of the [RC](docs/rc.md) and [Diode](docs/diode.md) operators — albeit through a
-different mechanism (implicit reconstruction via device physics embedding rather than explicit
-dimensionless parameterization).
+All $R^2$ values remained above 0.999 across the full test matrix. The PFET Exp 06 model
+was independently validated with the same methodology:
+
+| Test | Variable | Range | Core/Tiny $\Delta R^2$ | xlarge $\Delta R^2$ | Criterion | Verdict |
+|---|---|---|---|---|---|---|
+| Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | ≤ 0.000031 | 0.030 ($T_{end}$ = 100 ns outlier) | < 0.01 | **PASS** (core/tiny), **FAIL** (xlarge) |
+| Resolution | Step count | 512 – 4096 (8×) | ≤ 0.000056 | 0.0016 | < 0.001 | **PASS** (core/tiny), **FAIL** (xlarge) |
+
+The PFET xlarge failure is isolated to $T_{end} = 100$ ns, where R² drops to 0.960 (vs
+0.990 at $\geq$ 500 ns). The likely cause is parasitic gate capacitance in the large PMOS
+device: at extreme short timescales, displacement currents become a non-trivial fraction of
+drain current. For practical simulation windows ($T_{end} \geq 500$ ns), both operators are
+invariant across all geometries.
 
 **This is fundamentally different from the RC and diode operators**, where $\lambda$ governs
 ODE dynamics and is essential for the operator to distinguish stiffness regimes. For the

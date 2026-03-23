@@ -1,7 +1,7 @@
 """
-NFET Invariance Characterization (Phase 0, Pre-PFET).
+MOSFET Invariance Characterization.
 
-Empirically validates two hypotheses about the existing Exp 19b MOSFET operator:
+Empirically validates two hypotheses about a trained VCFiLM-FNO MOSFET operator:
 
 1. **Time-scale invariance:** The MOSFET I-V mapping is quasi-static (algebraic,
    not ODE-governed). The FNO should produce equivalent predictions regardless of
@@ -23,10 +23,12 @@ Pass criteria:
   - Time-scale: delta R^2 < 0.01 across all T_end values.
   - Resolution: delta R^2 < 0.001 across all step counts.
 
-Results feed directly into the PFET architecture decision: if both pass, lambda
-is unnecessary for the MOSFET operator class and the PFET uses in_channels=4.
+Usage:
+    python -m scripts.test_mosfet_invariance --device-type nfet
+    python -m scripts.test_mosfet_invariance --device-type pfet
 """
 
+import argparse
 import logging
 from dataclasses import dataclass
 
@@ -36,6 +38,7 @@ from rich.console import Console
 from rich.table import Table
 
 from spino.constants import ARCSINH_SCALE_MA
+from spino.mosfet.device_strategy import DeviceStrategy
 from spino.mosfet.gen_data import (
     InfiniteSpiceMosfetDataset,
     ParameterSchema,
@@ -45,8 +48,20 @@ from spino.mosfet.gen_data import (
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-MODEL_PATH = "/app/spino/models/mosfet/mosfet_vcfilm_exp19b_full_finetune_wtmjf8yn.pt"
-DATASET_PATH = "/app/datasets/sky130_nmos_61k_plus_shortch_supp8k.h5"
+DEVICE_CONFIGS = {
+    "nfet": {
+        "model_path": "/app/spino/models/mosfet/mosfet_vcfilm_exp19b_full_finetune_wtmjf8yn.pt",
+        "dataset_path": "/app/datasets/sky130_nmos_61k_plus_shortch_supp8k.h5",
+        "strategy_name": "sky130_nmos",
+        "label": "NFET Exp 19b",
+    },
+    "pfet": {
+        "model_path": "/app/spino/models/mosfet/pfet/mosfet_pmos_exp06_sweep_aug_CzBVmMi4.pt",
+        "dataset_path": "/app/datasets/sky130_pmos_48k_sweep_aug.h5",
+        "strategy_name": "sky130_pmos",
+        "label": "PFET Exp 06",
+    },
+}
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 TRIM = 41
 SEED = 42
@@ -125,8 +140,8 @@ def _simulate_transient(
     time_grid = np.linspace(0, t_end, raw_steps)
     vg = np.interp(time_grid, times, vg_vals)
     vd = np.interp(time_grid, times, vd_vals)
-    vs = np.zeros(raw_steps)
-    vb = np.zeros(raw_steps)
+    vs = np.full(raw_steps, local_ds.strategy.eval_config.vs_bias)
+    vb = np.full(raw_steps, local_ds.strategy.eval_config.vb_bias)
     pwl_g = local_ds._build_pwl_string(time_grid, vg)
     pwl_d = local_ds._build_pwl_string(time_grid, vd)
     pwl_s = local_ds._build_pwl_string(time_grid, vs)
@@ -176,6 +191,7 @@ def run_spice_and_predict(
     geom: Geometry,
     t_end: float,
     t_steps: int,
+    strategy_name: str = "sky130_nmos",
 ) -> tuple[np.ndarray | None, np.ndarray | None]:
     """
     Runs a SPICE transient simulation and FNO inference for a single configuration.
@@ -186,10 +202,11 @@ def run_spice_and_predict(
     :param geom: Target device geometry.
     :param t_end: Simulation window in seconds.
     :param t_steps: Number of time steps (excluding startup trim).
+    :param strategy_name: Device strategy identifier.
     :return: (spice_current_ma, predicted_current_ma) or (None, None) on simulation failure.
     """
     raw_steps = t_steps + TRIM
-    local_ds = InfiniteSpiceMosfetDataset(strategy_name="sky130_nmos", t_steps=raw_steps, t_end=t_end)
+    local_ds = InfiniteSpiceMosfetDataset(strategy_name=strategy_name, t_steps=raw_steps, t_end=t_end)
     transient = _simulate_transient(local_ds, geom, pwl, t_end, raw_steps)
     if transient is None:
         return None, None
@@ -201,6 +218,7 @@ def test_time_scale_invariance(
     model: torch.nn.Module,
     dataset: PreGeneratedMosfetDataset,
     console: Console,
+    strategy_name: str = "sky130_nmos",
 ) -> dict:
     """
     Test A: Time-scale invariance across variable T_end.
@@ -208,6 +226,7 @@ def test_time_scale_invariance(
     :param model: Trained VCFiLM model.
     :param dataset: Pre-generated dataset for normalization.
     :param console: Rich console for output.
+    :param strategy_name: Device strategy identifier.
     :return: Nested dict of results: {geometry: {t_end: r2}}.
     """
     console.print("\n[bold cyan]Test A: Time-Scale Invariance[/bold cyan]")
@@ -226,7 +245,7 @@ def test_time_scale_invariance(
         row = [geom.name]
         for t_end in T_END_VALUES:
             id_spice, id_pred = run_spice_and_predict(
-                model, dataset, pwl, geom, t_end, REFERENCE_STEPS
+                model, dataset, pwl, geom, t_end, REFERENCE_STEPS, strategy_name=strategy_name
             )
             if id_spice is None:
                 geom_results[t_end] = None
@@ -250,6 +269,7 @@ def test_resolution_invariance(
     model: torch.nn.Module,
     dataset: PreGeneratedMosfetDataset,
     console: Console,
+    strategy_name: str = "sky130_nmos",
 ) -> dict:
     """
     Test B: Resolution invariance across variable step counts.
@@ -262,6 +282,7 @@ def test_resolution_invariance(
     :param model: Trained VCFiLM model.
     :param dataset: Pre-generated dataset for normalization.
     :param console: Rich console for output.
+    :param strategy_name: Device strategy identifier.
     :return: Nested dict of results: {geometry: {steps: r2}}.
     """
     console.print("\n[bold cyan]Test B: Resolution Invariance[/bold cyan]")
@@ -280,14 +301,15 @@ def test_resolution_invariance(
         console.print(f"  Generating hi-res SPICE for {geom.name} at {hi_res_steps} steps...")
         raw_steps_hi = hi_res_steps + TRIM
         local_ds = InfiniteSpiceMosfetDataset(
-            strategy_name="sky130_nmos", t_steps=raw_steps_hi, t_end=REFERENCE_T_END
+            strategy_name=strategy_name, t_steps=raw_steps_hi, t_end=REFERENCE_T_END
         )
+        ec = local_ds.strategy.eval_config
         times_pwl, vg_vals, vd_vals = instantiate_pwl(pwl, REFERENCE_T_END)
         time_grid_hi = np.linspace(0, REFERENCE_T_END, raw_steps_hi)
         vg_hi = np.interp(time_grid_hi, times_pwl, vg_vals)
         vd_hi = np.interp(time_grid_hi, times_pwl, vd_vals)
-        vs_hi = np.zeros(raw_steps_hi)
-        vb_hi = np.zeros(raw_steps_hi)
+        vs_hi = np.full(raw_steps_hi, ec.vs_bias)
+        vb_hi = np.full(raw_steps_hi, ec.vb_bias)
         pwl_g = local_ds._build_pwl_string(time_grid_hi, vg_hi)
         pwl_d = local_ds._build_pwl_string(time_grid_hi, vd_hi)
         pwl_s = local_ds._build_pwl_string(time_grid_hi, vs_hi)
@@ -340,35 +362,50 @@ def test_resolution_invariance(
     return results
 
 
-def load_model() -> torch.nn.Module:
-    """Loads the Exp 19b VCFiLM checkpoint."""
+def load_model(model_path: str) -> torch.nn.Module:
+    """
+    Loads a VCFiLM checkpoint from the given path.
+
+    :param model_path: Absolute path to the ``.pt`` state dict.
+    :return: Model in eval mode on ``DEVICE``.
+    """
     from spino.mosfet.model import MosfetVCFiLMFNO
     model = MosfetVCFiLMFNO(input_param_dim=29, embedding_dim=16, modes=256, width=64)
-    state_dict = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=False)
+    state_dict = torch.load(model_path, map_location=DEVICE, weights_only=False)
     model.load_state_dict(state_dict)
     model.to(DEVICE).eval()
     return model
 
 
-def main():
-    """Runs both invariance tests and prints summary."""
+def main() -> None:
+    """Parses device type and runs both invariance tests."""
+    parser = argparse.ArgumentParser(description="MOSFET operator invariance characterization.")
+    parser.add_argument(
+        "--device-type",
+        choices=list(DEVICE_CONFIGS.keys()),
+        required=True,
+        help="MOSFET type to test (nfet or pfet).",
+    )
+    args = parser.parse_args()
+    cfg = DEVICE_CONFIGS[args.device_type]
     console = Console()
-    console.print("[bold]NFET Invariance Characterization (Phase 0)[/bold]")
-    console.print(f"Model: {MODEL_PATH}")
-    console.print(f"Dataset: {DATASET_PATH}")
+    console.print(f"[bold]{cfg['label']} Invariance Characterization[/bold]")
+    console.print(f"Model: {cfg['model_path']}")
+    console.print(f"Dataset: {cfg['dataset_path']}")
+    console.print(f"Strategy: {cfg['strategy_name']}")
     console.print(f"Device: {DEVICE}\n")
     console.print("Loading model...")
-    model = load_model()
+    model = load_model(cfg["model_path"])
     console.print("Loading dataset for normalization stats...")
     dataset = PreGeneratedMosfetDataset(
-        hdf5_path=DATASET_PATH,
+        hdf5_path=cfg["dataset_path"],
         normalize=True,
         use_curated_params=True,
         trim_startup=TRIM,
     )
     console.print(f"  Samples: {len(dataset)}, V_mean shape: {dataset.voltages_mean.shape}\n")
-    ts_results = test_time_scale_invariance(model, dataset, console)
-    rs_results = test_resolution_invariance(model, dataset, console)
+    ts_results = test_time_scale_invariance(model, dataset, console, strategy_name=cfg["strategy_name"])
+    rs_results = test_resolution_invariance(model, dataset, console, strategy_name=cfg["strategy_name"])
     console.print("\n[bold]Summary[/bold]")
     ts_pass = True
     for geom_name, geom_data in ts_results.items():
@@ -394,16 +431,15 @@ def main():
         console.print("  [green]Resolution invariance: PASS (all delta R2 < 0.001)[/green]")
     console.print("\n[bold]Decision Gate[/bold]")
     if ts_pass and rs_pass:
-        console.print("  [green]Both PASS -> PFET uses in_channels=4, no lambda.[/green]")
-        console.print("  The MOSFET I-V is quasi-static. Lambda carries no information.")
+        console.print(f"  [green]Both PASS -> {cfg['label']} is quasi-static. Lambda carries no information.[/green]")
     elif not ts_pass and rs_pass:
-        console.print("  [yellow]Time-scale FAIL -> Lambda may be needed for PFET.[/yellow]")
+        console.print(f"  [yellow]Time-scale FAIL -> {cfg['label']} may need lambda.[/yellow]")
         console.print("  Displacement currents or transient effects are non-negligible.")
     elif ts_pass and not rs_pass:
-        console.print("  [yellow]Resolution FAIL -> Canonical-grid resampling at inference.[/yellow]")
+        console.print(f"  [yellow]Resolution FAIL -> {cfg['label']} needs canonical-grid resampling at inference.[/yellow]")
         console.print("  Spectral filters are grid-coupled. Multi-resolution training or resampling needed.")
     else:
-        console.print("  [red]Both FAIL -> Full dimensionless formulation needed.[/red]")
+        console.print(f"  [red]Both FAIL -> {cfg['label']} needs full dimensionless formulation.[/red]")
     dataset.close()
 
 

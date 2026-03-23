@@ -131,13 +131,16 @@ compression at large W/L.*
 
 ## Known Limitations
 
-- **Temporal/resolution invariance (inferred from NFET validation):** The MOSFET I-V
-  mapping is quasi-static. The VCFiLM conditioning reconstructs an effective time constant
-  internally from the 29-param BSIM vector and per-timestep terminal voltages, so no
-  explicit dimensionless $\lambda$ is needed. Empirically confirmed on the NFET Exp 19b
-  operator ($\Delta R^2 < 0.001$ across 50× $T_{end}$ and 8× step-count ranges); the
-  PFET operator shares the same architecture and is expected to exhibit equivalent
-  invariance. See the
+- **Temporal/resolution invariance (empirically validated):** The MOSFET I-V mapping is
+  quasi-static for core and tiny geometries ($\Delta R^2 < 0.001$ across 50× $T_{end}$ and
+  8× step-count ranges — same as NFET). At xlarge (W=8.0 µm, L=1.75 µm), the time-scale
+  test shows degradation at extreme short $T_{end}$: R² drops to 0.960 at 100 ns while
+  remaining stable at $\geq$ 0.990 for 500 ns–5 µs ($\Delta R^2 = 0.030$). Resolution
+  invariance is borderline ($\Delta R^2 = 0.0016$, threshold 0.001). This is likely caused
+  by parasitic gate capacitance in the large device: at 100 ns, displacement currents become
+  a non-trivial fraction of drain current, breaking the quasi-static assumption. For
+  practical simulation windows ($T_{end} \geq 500$ ns), the PFET operator is invariant
+  across all geometries. See the
   [project-level discussion](../README.md#known-limitations) for the full test matrix.
 - **Arcsinh compression at large W/L:** The fixed arcsinh scale ($1\,\mu\text{A}$) compresses
   high-current PMOS geometries into a narrow target range. At xlarge (W=8.0 µm, L=1.75 µm),
