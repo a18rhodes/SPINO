@@ -6,8 +6,8 @@ Produces the same plot types as the training-time dark-mode evaluation
 with a white-background palette suitable for documentation.
 
 Usage:
-    python -m scripts.generate_doc_plots --device pfet
-    python -m scripts.generate_doc_plots --device nfet
+    python -m scripts.generate_doc_plots --device-type pfet
+    python -m scripts.generate_doc_plots --device-type nfet
 """
 import argparse
 import logging
@@ -164,13 +164,13 @@ def generate_sample_iv(
     np.random.seed(42)
     sample_idx = np.random.randint(0, len(dataset))
     current_true_ma, current_pred_ma, vg, vd, vs, physics_raw = _infer_and_denormalize_sample(model, dataset, sample_idx, device)
-    w, l, vth0 = _extract_geometry_label(physics_raw)
+    w_um, l_um, vth0 = _extract_geometry_label(physics_raw)
     mse = np.mean((current_true_ma - current_pred_ma) ** 2)
     r2 = calculate_r2(current_true_ma, current_pred_ma)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     time_us = np.linspace(0, 1, len(current_true_ma))
     ax = axes[0, 0]
-    _style(ax, f"MOSFET Transient Response\nW={w:.2f}\u00b5m, L={l:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}", "Normalized Time", "Current (mA)")
+    _style(ax, f"MOSFET Transient Response\nW={w_um:.2f}\u00b5m, L={l_um:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}", "Normalized Time", "Current (mA)")
     ax.plot(time_us, current_true_ma, color=SPICE_COLOR, linewidth=2, alpha=0.7, label="Ground Truth")
     ax.plot(time_us, current_pred_ma, color=FNO_TRANSFER_COLOR, linestyle=":", linewidth=2, label="FNO Prediction")
     ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
@@ -331,7 +331,7 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
         lims = [min(id_spice_sweep.min(), id_pred_sweep.min()), max(id_spice_sweep.max(), id_pred_sweep.max())]
         axes[1, 2].plot(lims, lims, color=PERFECT_LINE_COLOR, linestyle="--", linewidth=1, alpha=0.7)
         _style(axes[1, 2], f"Sweep Parity | R2={r2_sweep:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
-    np.random.seed(42 + hash(geom_name) % 1000)
+    np.random.seed(42 + sum(ord(ch) for ch in geom_name))
     n_pts = np.random.randint(8, 15)
     pwl_times = np.sort(np.random.uniform(0, spice_dataset.t_end, n_pts))
     pwl_times = np.concatenate(([0], pwl_times, [spice_dataset.t_end]))
@@ -414,7 +414,11 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(description="Generate light-mode MOSFET doc plots.")
     parser.add_argument("--device-type", choices=list(DEVICE_CONFIGS.keys()), required=True, help="MOSFET type to generate plots for.")
-    parser.add_argument("--compute-device", default="cuda", help="Torch device (cuda/cpu).")
+    parser.add_argument(
+        "--compute-device",
+        default="cuda" if torch.cuda.is_available() else "cpu",
+        help="Torch device (cuda/cpu). Defaults to cuda if available.",
+    )
     args = parser.parse_args()
     cfg = DEVICE_CONFIGS[args.device_type]
     root = Path(__file__).resolve().parent.parent

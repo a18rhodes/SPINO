@@ -400,6 +400,11 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         if l_bin and self.l_bin is None:
             raise ValueError(f"Unknown l_bin: {l_bin}. Valid: {list(GEOMETRY_BINS.keys())}")
         self.variable_t_end = variable_t_end
+        if variable_t_end:
+            if t_end_min <= 0 or t_end_max <= 0:
+                raise ValueError(f"variable_t_end bounds must be positive, got min={t_end_min}, max={t_end_max}")
+            if t_end_min >= t_end_max:
+                raise ValueError(f"t_end_min ({t_end_min}) must be less than t_end_max ({t_end_max})")
         self.t_end_min = t_end_min
         self.t_end_max = t_end_max
 

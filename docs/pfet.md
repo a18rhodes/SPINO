@@ -131,11 +131,13 @@ compression at large W/L.*
 
 ## Known Limitations
 
-- **Temporal/resolution invariance validated:** The MOSFET I-V mapping is quasi-static.
-  The VCFiLM conditioning reconstructs an effective time constant internally from the
-  29-param BSIM vector and per-timestep terminal voltages, so no explicit dimensionless
-  $\lambda$ is needed. Empirically confirmed ($\Delta R^2 < 0.001$ across 50× $T_{end}$
-  and 8× step-count ranges). See the
+- **Temporal/resolution invariance (inferred from NFET validation):** The MOSFET I-V
+  mapping is quasi-static. The VCFiLM conditioning reconstructs an effective time constant
+  internally from the 29-param BSIM vector and per-timestep terminal voltages, so no
+  explicit dimensionless $\lambda$ is needed. Empirically confirmed on the NFET Exp 19b
+  operator ($\Delta R^2 < 0.001$ across 50× $T_{end}$ and 8× step-count ranges); the
+  PFET operator shares the same architecture and is expected to exhibit equivalent
+  invariance. See the
   [project-level discussion](../README.md#known-limitations) for the full test matrix.
 - **Arcsinh compression at large W/L:** The fixed arcsinh scale ($1\,\mu\text{A}$) compresses
   high-current PMOS geometries into a narrow target range. At xlarge (W=8.0 µm, L=1.75 µm),
