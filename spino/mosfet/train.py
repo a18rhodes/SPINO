@@ -285,7 +285,9 @@ def _run_periodic_evaluation(model, dataset, path_config, run_name, writer, epoc
     plt.close(fig_iv)
 
 
-def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL):
+def run_final_evaluations(
+    model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"
+):
     """
     Executes all final evaluation procedures after training.
 
@@ -296,6 +298,7 @@ def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epoch
     :param writer: TensorBoard writer.
     :param n_epochs: Total number of epochs (for logging).
     :param trim_eval: Number of initial timesteps to discard from eval (SPICE .op artifact).
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     :return: Tuple of (r2_fast, metrics_spice, comprehensive_metrics).
     """
     training_fig_dir = path_config.figure_dir / "training" / run_name
@@ -307,7 +310,8 @@ def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epoch
     plt.close(final_fig_fast)
     logger.info("Running final SPICE-based I-V sweep validation...")
     final_fig_spice, final_metrics_spice = evaluate_spice_iv_sweeps(
-        model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=trim_eval
+        model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=trim_eval,
+        strategy_name=strategy_name,
     )
     final_fig_spice.savefig(training_fig_dir / "iv_final_spice.png")
     writer.add_figure("Validation/Final_SPICE_Sweeps", final_fig_spice, n_epochs)
@@ -317,7 +321,8 @@ def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epoch
     logger.info("Running comprehensive multi-geometry SPICE validation...")
     comprehensive_dir = training_fig_dir / "comprehensive"
     comprehensive_metrics, comprehensive_figures = evaluate_comprehensive(
-        model, dataset, comprehensive_dir, device="cuda", t_steps=512, trim_eval=trim_eval
+        model, dataset, comprehensive_dir, device="cuda", t_steps=512, trim_eval=trim_eval,
+        strategy_name=strategy_name,
     )
     for geom_name, geom_metrics in comprehensive_metrics.items():
         for metric_name, metric_value in geom_metrics.items():
@@ -370,6 +375,7 @@ def run_mosfet_training(
     trim_startup=0,
     freeze_backbone=False,
     geometry_filter=None,
+    strategy_name="sky130_nmos",
 ):
     """
     Runs training loop using pre-generated HDF5 dataset.
@@ -397,13 +403,16 @@ def run_mosfet_training(
         Requires checkpoint_path and model_type='vcfilm'.
     :param geometry_filter: Optional geometry bin name (e.g. "xlarge") to restrict training samples.
         Normalization stats come from the full dataset for checkpoint compatibility.
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
+        Used for SPICE-based evaluation sweeps during and after training.
     """
     params = locals().copy()
     if freeze_backbone and not checkpoint_path:
         raise ValueError("--freeze-backbone requires --checkpoint-path (cannot freeze a randomly initialized model)")
     if freeze_backbone and model_type != "vcfilm":
         raise ValueError("--freeze-backbone is only supported for --model-type vcfilm")
-    path_config = PathConfig("mosfet")
+    _subdir = {"sky130_nmos": "mosfet/nfet", "sky130_pmos": "mosfet/pfet"}
+    path_config = PathConfig(_subdir[strategy_name])
     unique_id = generate_unique_id(json.dumps(params, sort_keys=True))
     run_name = f"{experiment_name}_{unique_id}"
     writer = SummaryWriter(log_dir=path_config.run_dir / run_name)
@@ -514,7 +523,7 @@ def run_mosfet_training(
         logger.info("Training Complete.")
         torch.save(model.state_dict(), path_config.model_dir / f"{run_name}.pt")
         final_r2_fast, final_metrics_spice, comprehensive_metrics = run_final_evaluations(
-            model, dataset, path_config, run_name, writer, n_epochs
+            model, dataset, path_config, run_name, writer, n_epochs, strategy_name=strategy_name
         )
         _log_hyperparameters(writer, params, avg_loss, final_r2_fast, final_metrics_spice)
         writer.close()
@@ -562,6 +571,12 @@ def run_mosfet_training(
     type=click.Choice(["tiny", "small", "medium", "large", "xlarge"]),
     help="Restrict training to samples from a single geometry bin.",
 )
+@click.option(
+    "--strategy-name",
+    default="sky130_nmos",
+    type=click.Choice(["sky130_nmos", "sky130_pmos"]),
+    help="Device strategy for SPICE evaluation sweeps (determines bias points, sweep directions).",
+)
 def main(
     dataset_path,
     experiment_name,
@@ -584,6 +599,7 @@ def main(
     trim_startup,
     freeze_backbone,
     geometry_filter,
+    strategy_name,
 ):
     run_mosfet_training(
         dataset_path=dataset_path,
@@ -607,6 +623,7 @@ def main(
         trim_startup=trim_startup,
         freeze_backbone=freeze_backbone,
         geometry_filter=geometry_filter,
+        strategy_name=strategy_name,
     )
 
 

@@ -41,9 +41,11 @@ def main():
             "subthreshold_focused",
             "deep_subthreshold",
             "transitional_subthreshold",
+            "output_sweep",
+            "transfer_sweep",
         ],
         default="pwl",
-        help="Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth)",
+        help="Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth), output_sweep (gate constant, drain ramps), transfer_sweep (drain constant, gate ramps)",
     )
     parser.add_argument(
         "--geometry-bin",
@@ -63,6 +65,13 @@ def main():
         default=None,
         help="Length bin for cross-bin geometry sampling. Requires --w-bin.",
     )
+    parser.add_argument(
+        "--variable-t-end",
+        action="store_true",
+        help="Sample T_end log-uniformly per sample from [--t-end-min, --t-end-max]. Creates diverse slew rates.",
+    )
+    parser.add_argument("--t-end-min", type=float, default=1e-8, help="Minimum T_end for variable mode (seconds)")
+    parser.add_argument("--t-end-max", type=float, default=1e-5, help="Maximum T_end for variable mode (seconds)")
     args = parser.parse_args()
     if args.geometry_bin and (args.w_bin or args.l_bin):
         parser.error("--geometry-bin cannot be combined with --w-bin/--l-bin")
@@ -100,6 +109,8 @@ def main():
         logger.info("  W sampled from %s: [%.2f, %.2f] um", args.w_bin, *w_bin.w_range)
         logger.info("  L sampled from %s: [%.2f, %.2f] um", args.l_bin, *l_bin.l_range)
     logger.info("Time steps: %d, End time: %.2e s", args.t_steps, args.t_end)
+    if args.variable_t_end:
+        logger.info("Variable T_end: [%.2e, %.2e] s (log-uniform)", args.t_end_min, args.t_end_max)
     logger.info("Workers: %d", args.workers)
     logger.info("Voltage config: %s", strategy_config)
     logger.info("=" * 80)
@@ -124,6 +135,9 @@ def main():
             geometry_bin=args.geometry_bin,
             w_bin=args.w_bin,
             l_bin=args.l_bin,
+            variable_t_end=args.variable_t_end,
+            t_end_min=args.t_end_min,
+            t_end_max=args.t_end_max,
         )
 
 

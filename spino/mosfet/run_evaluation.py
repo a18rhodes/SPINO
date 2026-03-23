@@ -23,7 +23,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from spino.config import PathConfig
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO
+from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO
 from spino.mosfet.train import run_final_evaluations
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
 
@@ -65,6 +65,18 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--trim-eval", default=DEFAULT_TRIM_EVAL, help="Timesteps to discard from eval start (SPICE .op artifact)."
 )
+@click.option(
+    "--model-type",
+    default="vcfilm",
+    type=click.Choice(["concat", "film", "vcfilm"]),
+    help="Architecture type (must match trained checkpoint).",
+)
+@click.option(
+    "--strategy-name",
+    default="sky130_nmos",
+    type=click.Choice(["sky130_nmos", "sky130_pmos"]),
+    help="Device strategy for SPICE evaluation sweeps (determines bias points, sweep directions).",
+)
 def run_evaluation(
     model_path: str,
     dataset_path: str,
@@ -74,6 +86,8 @@ def run_evaluation(
     embedding_dim: int,
     tensorboard_suffix: str,
     trim_eval: int,
+    model_type: str,
+    strategy_name: str,
 ):
     """
     Runs standardized post-training evaluation suite.
@@ -90,13 +104,17 @@ def run_evaluation(
     :param width: FNO hidden width.
     :param embedding_dim: Physics embedding dimension.
     :param trim_eval: Number of initial timesteps to discard from SPICE .op artifact.
+    :param model_type: Architecture type ('concat', 'film', or 'vcfilm').
+    :param strategy_name: Device strategy identifier (e.g., "sky130_nmos", "sky130_pmos").
     """
     model_path = Path(model_path)
     run_name = model_path.stem + tensorboard_suffix
-    path_config = PathConfig("mosfet")
-    logger.info("Loading model: %s", model_path)
+    _subdir = {"sky130_nmos": "mosfet/nfet", "sky130_pmos": "mosfet/pfet"}
+    path_config = PathConfig(_subdir[strategy_name])
+    logger.info("Loading model: %s (type=%s)", model_path, model_type)
     input_param_dim = ParameterSchema.input_dim()
-    model = MosfetFNO(
+    model_classes = {"concat": MosfetFNO, "film": MosfetFiLMFNO, "vcfilm": MosfetVCFiLMFNO}
+    model = model_classes[model_type](
         input_param_dim=input_param_dim,
         embedding_dim=embedding_dim,
         modes=modes,
@@ -124,6 +142,7 @@ def run_evaluation(
             writer=writer,
             n_epochs=0,
             trim_eval=trim_eval,
+            strategy_name=strategy_name,
         )
         if writer:
             writer.close()

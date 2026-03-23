@@ -49,7 +49,7 @@ __all__ = [
 ]
 
 
-@dataclass
+@dataclass(slots=True)
 class DiodeParameters:
     """
     Data Transfer Object for diode circuit parameters.

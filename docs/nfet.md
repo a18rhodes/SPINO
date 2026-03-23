@@ -111,35 +111,37 @@ Reference: single NGSPICE `.tran` simulation vs. single FNO forward pass on the 
 
 ## Figures
 
-![Random dataset sample I-V curves](assets/mosfet/sample_iv.png)
+![Random dataset sample I-V curves](assets/mosfet/nfet/sample_iv.png)
 *Randomly sampled dataset waveform: time-domain transient (top-left), terminal voltages
 (top-right), parity plot (bottom-left), I–V snapshot (bottom-right).*
 
-![Core geometry SPICE-validated sweeps](assets/mosfet/core_iv_sweeps.png)
+![Core geometry SPICE-validated sweeps](assets/mosfet/nfet/core_iv_sweeps.png)
 *SPICE-validated W=1.0 µm, L=0.18 µm. Transfer curve (log scale) and output curve with
 dual-axis absolute/relative error panels.*
 
-![Tiny geometry comprehensive](assets/mosfet/comprehensive/comprehensive_tiny.png)
+![Tiny geometry comprehensive](assets/mosfet/nfet/comprehensive/comprehensive_tiny.png)
 *Tiny geometry (W=0.47 µm, L=0.17 µm): 3×3 grid — ramp, sweep, and random waveforms with
 parity and error panels.*
 
-![Medium geometry comprehensive](assets/mosfet/comprehensive/comprehensive_medium.png)
+![Medium geometry comprehensive](assets/mosfet/nfet/comprehensive/comprehensive_medium.png)
 *Medium geometry (W=2.50 µm, L=0.75 µm).*
 
-![XLarge geometry comprehensive](assets/mosfet/comprehensive/comprehensive_xlarge.png)
+![XLarge geometry comprehensive](assets/mosfet/nfet/comprehensive/comprehensive_xlarge.png)
 *XLarge geometry (W=8.00 µm, L=1.75 µm). Note the degraded subthreshold R²=0.9113 at large W/L.*
 
 ---
 
 ## Known Limitations
 
-- **Fixed temporal resolution:** The operator is trained on 512-step waveforms over a ~1 µs
-  window. The FNO's spectral convolutions are coupled to this grid — changing the step count
-  or simulation window at inference alters the physical frequency mapping of the Fourier modes.
-  Unlike the [RC operator](rc.md), which factors out physical time via dimensionless
-  conditioning, the MOSFET operator cannot be used at arbitrary `.tran` resolutions. This is
-  the most significant constraint for practical EDA integration. See the
-  [project-level discussion](../README.md#known-limitations) for mitigation strategies.
+- **Temporal/resolution invariance validated:** Unlike the RC and diode operators, which
+  require an explicit dimensionless $\lambda$ to factor out physical time scale, the MOSFET
+  operator achieves time-scale and resolution invariance implicitly. The VCFiLM conditioning
+  pathway has access to all ingredients of the device time constant ($L$, $\mu_0$, $V_{th}$
+  via the 29-param BSIM vector; instantaneous $V_{eff}$ via per-timestep voltages), enabling
+  the network to reconstruct an effective $\lambda$ internally. Empirically confirmed:
+  $\Delta R^2 < 0.001$ across a 50× $T_{end}$ range (100 ns – 5 µs) and an 8× step-count
+  range (512 – 4096). See the [project-level discussion](../README.md#known-limitations)
+  for the full test matrix.
 - **XLarge subthreshold:** R²=0.9113 at W=8.0 µm, L=1.75 µm. Attempts to improve this via
   supplemental subthreshold data (5 K additional deep- and transitional-subthreshold samples)
   caused distribution shift that degraded core metrics across all tested loss functions.
@@ -149,5 +151,5 @@ parity and error panels.*
   not fully captured at the current dataset density.
 - **Cold-start latency:** The 21× cold speedup includes a one-time TorchScript JIT compilation.
   Sustained throughput (warm) is ~1300×.
-- **Single device type:** This model is specific to `sky130_fd_pr__nfet_01v8`. PMOS and other
-  flavours require retraining on their respective BSIM model cards.
+- **Single device type:** This model is specific to `sky130_fd_pr__nfet_01v8`. See
+  [PFET](pfet.md) for the companion PMOS operator.

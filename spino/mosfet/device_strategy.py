@@ -1,16 +1,87 @@
 """
 Defines device-specific strategies for MOSFET simulation and data generation.
 
-Strategies encapsulate model names, PDK paths, voltage biasing schemes, and
-polarity corrections for different transistor types (NMOS, PMOS) and process nodes.
+Strategies encapsulate model names, PDK paths, voltage biasing schemes, polarity
+corrections, and evaluation sweep configurations for different transistor types
+(NMOS, PMOS) and process nodes.
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import cached_property
 from typing import Callable
 
 import numpy as np
 
-__all__ = ["DeviceStrategy", "Sky130NMOSStrategy", "Sky130PMOSStrategy"]
+__all__ = ["DeviceStrategy", "EvalConfig", "Sky130NMOSStrategy", "Sky130PMOSStrategy", "WaveformConfig"]
+
+
+@dataclass(frozen=True, slots=True)
+class WaveformConfig:
+    """
+    Device-specific configuration for focused waveform generation.
+
+    Encapsulates threshold voltage location and subthreshold region boundaries
+    in absolute gate voltage space. These differ between NMOS and PMOS because
+    the relationship between Vg and |Vgs| inverts with device polarity.
+
+    For NMOS: subthreshold => small Vg (near 0V), far from Vs=0 threshold.
+    For PMOS: subthreshold => large Vg (near VDD), far from Vs=VDD threshold.
+
+    :param vth_nominal: Nominal threshold voltage in absolute Vg space (V).
+        NMOS: ~0.50V (Vth0). PMOS: ~1.30V (VDD - |Vth0|).
+    :param vth_spread: Random spread around Vth for process corner coverage (V).
+    :param deep_subth_vg_range: Absolute Vg bounds for deep subthreshold waveforms (V).
+    :param trans_subth_vg_range: Absolute Vg bounds for transitional subthreshold waveforms (V).
+    """
+
+    vth_nominal: float
+    vth_spread: float
+    deep_subth_vg_range: tuple[float, float]
+    trans_subth_vg_range: tuple[float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class EvalConfig:
+    """
+    Device-specific configuration for SPICE-based I-V evaluation sweeps.
+
+    Encapsulates all numerical constants that differ between NMOS and PMOS
+    evaluation: sweep directions, bias points, subthreshold definitions,
+    and random waveform bounds. Eliminates hardcoded assumptions about
+    device polarity from the evaluation pipeline.
+
+    :param strategy_name: Registry key for InfiniteSpiceMosfetDataset.
+    :param vdd: Supply voltage (V). Used for plot range annotations.
+    :param vs_bias: Fixed source bias for all evaluation sweeps (V).
+    :param vb_bias: Fixed bulk bias for all evaluation sweeps (V).
+    :param transfer_vg_start: Gate voltage at start of transfer sweep (V).
+    :param transfer_vg_stop: Gate voltage at end of transfer sweep (V).
+    :param transfer_vd_bias: Fixed drain voltage during transfer sweep (V).
+    :param output_vd_start: Drain voltage at start of output sweep (V).
+    :param output_vd_stop: Drain voltage at end of output sweep (V).
+    :param output_vg_drive: Fixed gate voltage during output sweep (V).
+    :param subth_vg_threshold: Gate voltage threshold defining subthreshold region (V).
+    :param subth_below: If True, subthreshold is Vg < threshold (NMOS).
+        If False, subthreshold is Vg > threshold (PMOS).
+    :param random_vg_range: Min/max gate voltage for random PWL waveforms (V).
+    :param random_vd_range: Min/max drain voltage for random PWL waveforms (V).
+    """
+
+    strategy_name: str
+    vdd: float
+    vs_bias: float
+    vb_bias: float
+    transfer_vg_start: float
+    transfer_vg_stop: float
+    transfer_vd_bias: float
+    output_vd_start: float
+    output_vd_stop: float
+    output_vg_drive: float
+    subth_vg_threshold: float
+    subth_below: bool
+    random_vg_range: tuple[float, float]
+    random_vd_range: tuple[float, float]
 
 
 class DeviceStrategy(ABC):
@@ -95,6 +166,24 @@ class DeviceStrategy(ABC):
         :return: Typically -1.0 for NMOS, may vary for PMOS.
         """
 
+    @property
+    @abstractmethod
+    def eval_config(self) -> EvalConfig:
+        """
+        Returns device-specific evaluation sweep configuration.
+
+        :return: Frozen configuration for SPICE-based I-V validation sweeps.
+        """
+
+    @property
+    @abstractmethod
+    def waveform_config(self) -> WaveformConfig:
+        """
+        Returns device-specific focused waveform generation configuration.
+
+        :return: Frozen configuration for threshold-aware waveform modes.
+        """
+
 
 class Sky130NMOSStrategy(DeviceStrategy, strategy_name="sky130_nmos"):
     """
@@ -163,9 +252,61 @@ class Sky130NMOSStrategy(DeviceStrategy, strategy_name="sky130_nmos"):
         """
         Returns NMOS current polarity correction factor.
 
-        :return: -1.0 to convert SPICE branch current to drain current convention.
+        SPICE branch convention: i(Vd) is positive when current flows out of node d
+        through the voltage source to ground. For NMOS in saturation, conventional
+        current flows drain-to-source (out of drain), so i(Vd) is negative when on.
+        Negation required to produce the standard positive Id convention.
+
+        :return: -1.0 (NMOS i(Vd) is negative when device conducts).
         """
         return -1.0
+
+    @cached_property
+    def eval_config(self) -> EvalConfig:
+        """
+        Returns NMOS evaluation sweep configuration.
+
+        Transfer: Vg 0->1.8V (turning on), Vd=1.8V (saturation).
+        Output: Vd 0->1.8V, Vg=1.2V (moderate overdrive).
+        Subthreshold: Vg < 0.5V (below Vth ~0.5V).
+        Source and bulk at ground.
+
+        :return: NMOS-specific evaluation configuration.
+        """
+        return EvalConfig(
+            strategy_name="sky130_nmos",
+            vdd=1.8,
+            vs_bias=0.0,
+            vb_bias=0.0,
+            transfer_vg_start=0.0,
+            transfer_vg_stop=1.8,
+            transfer_vd_bias=1.8,
+            output_vd_start=0.0,
+            output_vd_stop=1.8,
+            output_vg_drive=1.2,
+            subth_vg_threshold=0.5,
+            subth_below=True,
+            random_vg_range=(0.0, 1.8),
+            random_vd_range=(0.0, 1.8),
+        )
+
+    @cached_property
+    def waveform_config(self) -> WaveformConfig:
+        """
+        Returns NMOS waveform generation configuration.
+
+        Subthreshold is the low-Vg region (Vg < Vth ~0.50V).
+        Deep subthreshold: Vg in [0, 0.3V].
+        Transitional: Vg in [0.05, 0.55V].
+
+        :return: NMOS-specific waveform configuration.
+        """
+        return WaveformConfig(
+            vth_nominal=0.50,
+            vth_spread=0.25,
+            deep_subth_vg_range=(0.0, 0.3),
+            trans_subth_vg_range=(0.05, 0.55),
+        )
 
 
 class Sky130PMOSStrategy(DeviceStrategy, strategy_name="sky130_pmos"):
@@ -235,6 +376,63 @@ class Sky130PMOSStrategy(DeviceStrategy, strategy_name="sky130_pmos"):
         """
         Returns PMOS current polarity correction factor.
 
-        :return: -1.0 (same as NMOS due to SPICE branch current convention).
+        SPICE branch convention: i(Vd) is positive when current flows out of node d
+        through the voltage source to ground. For PMOS in saturation, conventional
+        current flows source-to-drain (into drain), so i(Vd) is already positive.
+        No negation required (unlike NMOS where i(Vd) is negative when on).
+
+        :return: 1.0 (PMOS i(Vd) is natively positive when device conducts).
         """
-        return -1.0
+        return 1.0
+
+    @cached_property
+    def eval_config(self) -> EvalConfig:
+        """
+        Returns PMOS evaluation sweep configuration.
+
+        Transfer: Vg 1.8->0V (increasing |Vgs| to turn on), Vd=0V (Vds=-1.8V, saturation).
+        Output: Vd 1.8->0V (increasing |Vds|), Vg=0.3V (|Vgs|=1.5V, strong overdrive).
+        Subthreshold: Vg > 1.3V (|Vgs| < |Vtp| ~0.5V).
+        Source and bulk tied near Vdd.
+
+        Vg=0.3V chosen over 0.6V because PMOS hole mobility (~0.4x NMOS) produces
+        drastically lower current at the same |Vov|. At Vg=0.6V, xlarge Id-Vd span
+        is only 0.74 uA (R^2 numerically degenerate). At Vg=0.3V, span is 17 uA.
+
+        :return: PMOS-specific evaluation configuration.
+        """
+        return EvalConfig(
+            strategy_name="sky130_pmos",
+            vdd=1.8,
+            vs_bias=1.8,
+            vb_bias=1.8,
+            transfer_vg_start=1.8,
+            transfer_vg_stop=0.0,
+            transfer_vd_bias=0.0,
+            output_vd_start=1.8,
+            output_vd_stop=0.0,
+            output_vg_drive=0.3,
+            subth_vg_threshold=1.3,
+            subth_below=False,
+            random_vg_range=(0.0, 1.8),
+            random_vd_range=(0.0, 1.8),
+        )
+
+    @cached_property
+    def waveform_config(self) -> WaveformConfig:
+        """
+        Returns PMOS waveform generation configuration.
+
+        Subthreshold is the high-Vg region (Vg > VDD-|Vth| ~1.30V) where
+        |Vgs| = Vs - Vg is small. Mirror-image of NMOS about VDD/2.
+        Deep subthreshold: Vg in [1.5, 1.8V] (|Vgs| < 0.3V).
+        Transitional: Vg in [1.25, 1.75V] (|Vgs| near |Vth|).
+
+        :return: PMOS-specific waveform configuration.
+        """
+        return WaveformConfig(
+            vth_nominal=1.30,
+            vth_spread=0.25,
+            deep_subth_vg_range=(1.5, 1.8),
+            trans_subth_vg_range=(1.25, 1.75),
+        )

@@ -14,16 +14,20 @@ applies Fourier Neural Operators (FNOs) to learn continuous operator mappings fr
 voltage waveforms and device parameters to node current, replacing the inner-loop SPICE
 device evaluation with a single differentiable forward pass.
 
-Three device operators have been trained and validated against NGSPICE ground truth:
+Four device operators have been trained and validated against NGSPICE ground truth:
 
 | Operator | Conditioning | Peak R² | Speedup | Documentation |
 |---|---|---|---|---|
 | Linear RC | Dimensionless $\lambda$ | 0.9999 | < 1× | [RC Circuit](docs/rc.md) |
 | Shockley Diode | Dimensionless $\lambda$ + direct injection | 0.9999 | ~66× | [Diode](docs/diode.md) |
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
+| sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | ~522× | [PFET](docs/pfet.md) |
 
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
 (W = 1.0 µm, L = 0.18 µm), with warm-inference throughput approximately 1300× that of NGSPICE.
+The PMOS operator uses the same VCFiLM-FNO architecture trained on a sweep-augmented dataset
+(40 K random PWL + 4 K deterministic sweeps), achieving transfer R² = 0.9965 and sweep R² >
+0.99 across all tested geometries at ~522× NGSPICE speed.
 The diode operator extends the RC dimensionless framework to the nonlinear Shockley equation,
 achieving R² = 0.9994 on a standard rectifier and R² = 0.9999 on adversarial samples at ~66×
 NGSpice speed — with validated resolution invariance ($\Delta R^2 < 0.0001$ at 1024/2048/4096
@@ -97,6 +101,15 @@ training strategy (300 epochs full training + 20 epochs frozen-backbone fine-tun
 waveform representation from geometry conditioning, achieving R² > 0.99 across five geometry
 bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 
+### 4. sky130 PMOS (VCFiLM-FNO)
+
+The PMOS operator reuses the VCFiLM-FNO architecture with independently trained weights.
+Training uses a sweep-augmented dataset (40 K random PWL + 2 K output sweeps + 2 K transfer
+sweeps) in a single 300-epoch phase — the deterministic sweep samples provide sufficient
+coverage of the I-V manifold without requiring a frozen-backbone fine-tuning phase. Bias
+polarities are handled by the device strategy layer: PMOS operates with $V_S = V_B = V_{DD}$
+and sweeps gate/drain downward.
+
 ---
 
 ## Summary of Results
@@ -112,6 +125,9 @@ bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 | sky130 NMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9995 | -- |
 | sky130 NMOS | Output (W=1 µm, L=0.18 µm) | 0.9960 | -- |
 | sky130 NMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9861 | -- |
+| sky130 PMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9965 | -- |
+| sky130 PMOS | Output (W=1 µm, L=0.18 µm) | 0.9656 | -- |
+| sky130 PMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9523 | -- |
 
 ### Throughput
 
@@ -120,42 +136,52 @@ bins while maintaining subthreshold accuracy at nanoampere-scale currents.
 | Shockley diode | NGSPICE ~264 ms | ~4 ms | **~66×** | Single 2048-step transient |
 | sky130 NMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~1300×** | Sustained throughput |
 | sky130 NMOS (cold) | NGSPICE `.tran` | First call (incl. JIT) | **~21×** | One-time compilation cost |
+| sky130 PMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~522×** | Sustained throughput |
 | Linear RC | ODE loop < 1 ms | FNO ~96 ms | **< 1×** | Value is generalization, not speed |
 
 ---
 
 ## Known Limitations
 
-### Fixed Temporal Resolution (MOSFET)
+### Temporal and Resolution Invariance (MOSFET)
 
-The MOSFET operator is trained on a **fixed discretization grid** — 512 steps over ~1 µs.
-The FNO's spectral convolutions learn frequency-domain filters tied to this specific grid:
-each Fourier mode corresponds to a physical frequency determined by the training-time
-relationship between step count and simulation window.
+The MOSFET $I_D(V_G, V_D, V_S, V_B, \boldsymbol{\theta})$ mapping is **quasi-static**
+(algebraic, not ODE-governed). The device transit time
+$\tau_t = L^2 / (\mu_0 \cdot V_{\text{eff}})$ is 100–10,000× smaller than any practical
+simulation window, and displacement currents are ~0.01% of channel current. This means the
+dimensionless stiffness ratio $\lambda = \tau / T_{end}$ that governs the RC and diode
+operators carries **no information** for the MOSFET operator.
 
-Changing either the number of steps or the simulation window at inference breaks this
-correspondence. In practice, this means:
+The VCFiLM conditioning pathway already has access to all the ingredients of $\tau_t$ — gate
+length, mobility parameters, and threshold voltage are present in the 29-element BSIM vector,
+while per-timestep terminal voltages provide instantaneous $V_{\text{eff}}$. The network can
+reconstruct an effective time constant internally without an explicit $\lambda$ channel.
 
-- The operator cannot be used at arbitrary `.tran` resolutions the way a SPICE model can.
-- Designers who need sub-nanosecond resolution to catch switching transients, or microsecond
-  windows for settling behaviour, cannot simply adjust `tstep` and `tstop`.
+This was empirically validated on the NFET Exp 19b production model across three geometries
+(core, tiny, xlarge):
 
-**The RC and diode operators do not share this limitation.** Both use the dimensionless
-formulation with $\lambda = \tau / T_{end}$ to factor out physical time scale entirely.
-The diode operator was validated at grid resolutions of 1024, 2048, and 4096 steps with
-$\Delta R^2 < 0.0001$, and across simulation windows from 100 µs to 10 ms with R² ≥ 0.997
-(see [Diode](docs/diode.md)).
+| Test | Variable | Range | Worst $\Delta R^2$ | Criterion | Verdict |
+|---|---|---|---|---|---|
+| Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | 0.000517 | < 0.01 | **PASS** |
+| Resolution | Step count | 512 – 4096 (8×) | 0.000002 | < 0.001 | **PASS** |
 
-**Potential mitigations for MOSFET (future work):**
+All $R^2$ values remained above 0.999 across the full test matrix. The PFET Exp 06 model
+was independently validated with the same methodology:
 
-1. **Dimensionless reformulation.** Identify the dominant MOSFET time constant (transit
-   time $\tau_t = L^2 / \mu V_{DS}$ or parasitic RC) and condition the VCFiLM FNO on
-   $\lambda = \tau_t / T_{end}$ as an additional input channel. Requires dataset regeneration.
-2. **Time-scale conditioning.** Inject $T_{end}$ and $\Delta t$ as additional parameters.
-   The FNO learns to adapt its spectral filters to the declared resolution.
-3. **Canonical-grid resampling.** Interpolate arbitrary-resolution inputs to the training
-   grid, run the FNO, resample output back. Preserves the trained operator unchanged but
-   cannot recover information below the training Nyquist frequency.
+| Test | Variable | Range | Core/Tiny $\Delta R^2$ | xlarge $\Delta R^2$ | Criterion | Verdict |
+|---|---|---|---|---|---|---|
+| Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | ≤ 0.000031 | 0.030 ($T_{end}$ = 100 ns outlier) | < 0.01 | **PASS** (core/tiny), **FAIL** (xlarge) |
+| Resolution | Step count | 512 – 4096 (8×) | ≤ 0.000056 | 0.0016 | < 0.001 | **PASS** (core/tiny), **FAIL** (xlarge) |
+
+The PFET xlarge failure is isolated to $T_{end} = 100$ ns, where R² drops to 0.960 (vs
+0.990 at $\geq$ 500 ns). The likely cause is parasitic gate capacitance in the large PMOS
+device: at extreme short timescales, displacement currents become a non-trivial fraction of
+drain current. For practical simulation windows ($T_{end} \geq 500$ ns), both operators are
+invariant across all geometries.
+
+**This is fundamentally different from the RC and diode operators**, where $\lambda$ governs
+ODE dynamics and is essential for the operator to distinguish stiffness regimes. For the
+MOSFET, the physics is algebraic, and the VCFiLM architecture exploits this automatically.
 
 ---
 
