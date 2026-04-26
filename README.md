@@ -9,7 +9,7 @@
 ## Abstract
 
 The verification of modern integrated circuits is bottlenecked by SPICE's super-linear
-scaling with circuit size ($O(N^{1.2})$ to $O(N^{2})$). **SPINO** (SPICE Neural Operator)
+scaling with circuit size ($O(N^{1.2})$ to $O(N^2)$). **SPINO** (SPICE Neural Operator)
 applies Fourier Neural Operators (FNOs) to learn continuous operator mappings from terminal
 voltage waveforms and device parameters to node current, replacing the inner-loop SPICE
 device evaluation with a single differentiable forward pass.
