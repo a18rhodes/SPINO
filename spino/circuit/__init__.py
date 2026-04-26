@@ -17,18 +17,38 @@ from spino.circuit.simulation import (
     run_transient,
 )
 from spino.circuit.topologies import build_cs_amp_active_load
+from spino.circuit.tuning import (
+    DesignPoint,
+    Metrics,
+    SelectionRule,
+    SweepResult,
+    extract_peak_gain,
+    extract_settling_time,
+    select_design_point,
+    simulate_design_point,
+    sweep_design_space,
+)
 
 __all__ = [
     "Capacitor",
     "Circuit",
     "DCSweepResult",
+    "DesignPoint",
+    "Metrics",
     "MosfetInstance",
     "OperatingPoint",
+    "SelectionRule",
     "SpiceDevice",
+    "SweepResult",
     "TransientResult",
     "VoltageSource",
     "build_cs_amp_active_load",
+    "extract_peak_gain",
+    "extract_settling_time",
     "run_dc_sweep",
     "run_operating_point",
     "run_transient",
+    "select_design_point",
+    "simulate_design_point",
+    "sweep_design_space",
 ]
