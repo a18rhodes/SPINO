@@ -23,6 +23,7 @@ venv/
 
 # --- IDE Settings ---
 .vscode/
+.cursor/
 .idea/
 
 # --- GitHub stuff ---
