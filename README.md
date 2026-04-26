@@ -9,7 +9,7 @@
 ## Abstract
 
 The verification of modern integrated circuits is bottlenecked by SPICE's super-linear
-scaling with circuit size ($O(N^{1.2})$ to $O(N^2)$). **SPINO** (SPICE Neural Operator)
+scaling with circuit size ($`O(N^{1.2})`$ to $`O(N^2)`$). **SPINO** (SPICE Neural Operator)
 applies Fourier Neural Operators (FNOs) to learn continuous operator mappings from terminal
 voltage waveforms and device parameters to node current, replacing the inner-loop SPICE
 device evaluation with a single differentiable forward pass.
@@ -18,8 +18,8 @@ Four device operators have been trained and validated against NGSPICE ground tru
 
 | Operator | Conditioning | Peak R² | Speedup | Documentation |
 |---|---|---|---|---|
-| Linear RC | Dimensionless $\lambda$ | 0.9999 | < 1× | [RC Circuit](docs/rc.md) |
-| Shockley Diode | Dimensionless $\lambda$ + direct injection | 0.9999 | ~66× | [Diode](docs/diode.md) |
+| Linear RC | Dimensionless $`\lambda`$ | 0.9999 | < 1× | [RC Circuit](docs/rc.md) |
+| Shockley Diode | Dimensionless $`\lambda`$ + direct injection | 0.9999 | ~66× | [Diode](docs/diode.md) |
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | ~522× | [PFET](docs/pfet.md) |
 
@@ -34,8 +34,8 @@ The PMOS operator uses the same VCFiLM-FNO architecture trained on a sweep-augme
 0.99 across all tested geometries at ~522× NGSPICE speed.
 The diode operator extends the RC dimensionless framework to the nonlinear Shockley equation,
 achieving R² = 0.9994 on a standard rectifier and R² = 0.9999 on adversarial samples at ~66×
-NGSpice speed — with validated resolution invariance ($\Delta R^2 < 0.0001$ at 1024/2048/4096
-steps) and time-scale invariance (R² ≥ 0.997 across $T_{end}$ spanning 100 µs to 10 ms).
+NGSpice speed — with validated resolution invariance ($`\Delta R^2 < 0.0001`$ at 1024/2048/4096
+steps) and time-scale invariance (R² ≥ 0.997 across $`T_{end}`$ spanning 100 µs to 10 ms).
 The RC operator demonstrates that a single trained FNO generalises across the full stiffness
 ratio spectrum without per-circuit solver configuration.
 
@@ -76,8 +76,8 @@ complex devices:
 
 ### 1. Linear RC Circuit
 
-A 1D FNO learns the voltage response $V(t) = \mathcal{F}(I(t), \lambda)$ of a first-order
-RC circuit in dimensionless form, where $\lambda = \tau / T_{end}$ is the stiffness ratio.
+A 1D FNO learns the voltage response $`V(t) = \mathcal{F}(I(t), \lambda)`$ of a first-order
+RC circuit in dimensionless form, where $`\lambda = \tau / T_{end}`$ is the stiffness ratio.
 Training on the non-dimensionalized ODE makes the operator invariant to physical time
 scale: a 100 fs parasitic transient and a 10 s saturation drift are identical if their
 stiffness ratios match. Spectral augmentation (white noise, chirp, dense switching) ensures
@@ -87,12 +87,12 @@ the operator learns integration rather than memorizing pulse shapes.
 
 The diode introduces exponential nonlinearity via the Shockley equation. Following the same
 dimensionless approach as the RC operator, the circuit ODE is reformulated in terms of
-$\hat{t} = t/T_{end}$, $\hat{I} = I/I_{scale}$, $\hat{V} = V/(I_{scale}R)$, with the
-stiffness ratio $\lambda = RC/T_{end}$ injected as a constant channel. This makes the
+$`\hat{t} = t/T_{end}`$, $`\hat{I} = I/I_{scale}`$, $`\hat{V} = V/(I_{scale}R)`$, with the
+stiffness ratio $`\lambda = RC/T_{end}`$ injected as a constant channel. This makes the
 operator invariant to simulation window and grid resolution. Five circuit parameters
-($\lambda$, $R$, $C$, $I_S$, $N$) are injected directly as constant-valued channels
+($`\lambda`$, $`R`$, $`C`$, $`I_S`$, $`N`$) are injected directly as constant-valued channels
 alongside the normalised current waveform. Log-encoding of parameters spanning 15 orders of
-magnitude ($I_S$) prevents gradient instability. The FNO replaces NGSpice's inner-loop
+magnitude ($`I_S`$) prevents gradient instability. The FNO replaces NGSpice's inner-loop
 Newton–Raphson solver with a single forward pass, achieving ~66× speedup.
 
 ### 3. sky130 NMOS (VCFiLM-FNO)
@@ -111,7 +111,7 @@ The PMOS operator reuses the VCFiLM-FNO architecture with independently trained 
 Training uses a sweep-augmented dataset (40 K random PWL + 2 K output sweeps + 2 K transfer
 sweeps) in a single 300-epoch phase — the deterministic sweep samples provide sufficient
 coverage of the I-V manifold without requiring a frozen-backbone fine-tuning phase. Bias
-polarities are handled by the device strategy layer: PMOS operates with $V_S = V_B = V_{DD}$
+polarities are handled by the device strategy layer: PMOS operates with $`V_S = V_B = V_{DD}`$
 and sweeps gate/drain downward.
 
 ---
@@ -122,9 +122,9 @@ and sweeps gate/drain downward.
 
 | Operator | Test Condition | R² | Relative Error |
 |---|---|---|---|
-| Linear RC | Corner frequency ($\lambda = 1.0$) | 0.9999 | < 0.1% |
+| Linear RC | Corner frequency ($`\lambda = 1.0`$) | 0.9999 | < 0.1% |
 | Linear RC | White noise (OOD) | 0.9884 | ~1% |
-| Shockley diode | Standard rectifier ($\lambda = 0.01$) | 0.9994 | ~0.45% |
+| Shockley diode | Standard rectifier ($`\lambda = 0.01`$) | 0.9994 | ~0.45% |
 | Shockley diode | Adversarial (random params) | 0.9999 | < 0.1% |
 | sky130 NMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9995 | -- |
 | sky130 NMOS | Output (W=1 µm, L=0.18 µm) | 0.9960 | -- |
@@ -149,41 +149,41 @@ and sweeps gate/drain downward.
 
 ### Temporal and Resolution Invariance (MOSFET)
 
-The MOSFET $I_D(V_G, V_D, V_S, V_B, \boldsymbol{\theta})$ mapping is **quasi-static**
+The MOSFET $`I_D(V_G, V_D, V_S, V_B, \boldsymbol{\theta})`$ mapping is **quasi-static**
 (algebraic, not ODE-governed). The device transit time
-$\tau_t = L^2 / (\mu_0 \cdot V_{\text{eff}})$ is 100–10,000× smaller than any practical
+$`\tau_t = L^2 / (\mu_0 \cdot V_{\text{eff}})`$ is 100–10,000× smaller than any practical
 simulation window, and displacement currents are ~0.01% of channel current. This means the
-dimensionless stiffness ratio $\lambda = \tau / T_{end}$ that governs the RC and diode
+dimensionless stiffness ratio $`\lambda = \tau / T_{end}`$ that governs the RC and diode
 operators carries **no information** for the MOSFET operator.
 
-The VCFiLM conditioning pathway already has access to all the ingredients of $\tau_t$ — gate
+The VCFiLM conditioning pathway already has access to all the ingredients of $`\tau_t`$ — gate
 length, mobility parameters, and threshold voltage are present in the 29-element BSIM vector,
-while per-timestep terminal voltages provide instantaneous $V_{\text{eff}}$. The network can
-reconstruct an effective time constant internally without an explicit $\lambda$ channel.
+while per-timestep terminal voltages provide instantaneous $`V_{\text{eff}}`$. The network can
+reconstruct an effective time constant internally without an explicit $`\lambda`$ channel.
 
 This was empirically validated on the NFET Exp 19b production model across three geometries
 (core, tiny, xlarge):
 
-| Test | Variable | Range | Worst $\Delta R^2$ | Criterion | Verdict |
+| Test | Variable | Range | Worst $`\Delta R^2`$ | Criterion | Verdict |
 |---|---|---|---|---|---|
-| Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | 0.000517 | < 0.01 | **PASS** |
+| Time-scale | $`T_{end}`$ | 100 ns – 5 µs (50×) | 0.000517 | < 0.01 | **PASS** |
 | Resolution | Step count | 512 – 4096 (8×) | 0.000002 | < 0.001 | **PASS** |
 
-All $R^2$ values remained above 0.999 across the full test matrix. The PFET Exp 06 model
+All $`R^2`$ values remained above 0.999 across the full test matrix. The PFET Exp 06 model
 was independently validated with the same methodology:
 
-| Test | Variable | Range | Core/Tiny $\Delta R^2$ | xlarge $\Delta R^2$ | Criterion | Verdict |
+| Test | Variable | Range | Core/Tiny $`\Delta R^2`$ | xlarge $`\Delta R^2`$ | Criterion | Verdict |
 |---|---|---|---|---|---|---|
-| Time-scale | $T_{end}$ | 100 ns – 5 µs (50×) | ≤ 0.000031 | 0.030 ($T_{end}$ = 100 ns outlier) | < 0.01 | **PASS** (core/tiny), **FAIL** (xlarge) |
+| Time-scale | $`T_{end}`$ | 100 ns – 5 µs (50×) | ≤ 0.000031 | 0.030 ($`T_{end}`$ = 100 ns outlier) | < 0.01 | **PASS** (core/tiny), **FAIL** (xlarge) |
 | Resolution | Step count | 512 – 4096 (8×) | ≤ 0.000056 | 0.0016 | < 0.001 | **PASS** (core/tiny), **FAIL** (xlarge) |
 
-The PFET xlarge failure is isolated to $T_{end} = 100$ ns, where R² drops to 0.960 (vs
-0.990 at $\geq$ 500 ns). The likely cause is parasitic gate capacitance in the large PMOS
+The PFET xlarge failure is isolated to $`T_{end} = 100`$ ns, where R² drops to 0.960 (vs
+0.990 at $`\geq`$ 500 ns). The likely cause is parasitic gate capacitance in the large PMOS
 device: at extreme short timescales, displacement currents become a non-trivial fraction of
-drain current. For practical simulation windows ($T_{end} \geq 500$ ns), both operators are
+drain current. For practical simulation windows ($`T_{end} \geq 500`$ ns), both operators are
 invariant across all geometries.
 
-**This is fundamentally different from the RC and diode operators**, where $\lambda$ governs
+**This is fundamentally different from the RC and diode operators**, where $`\lambda`$ governs
 ODE dynamics and is essential for the operator to distinguish stiffness regimes. For the
 MOSFET, the physics is algebraic, and the VCFiLM architecture exploits this automatically.
 
@@ -194,15 +194,15 @@ MOSFET, the physics is algebraic, and the VCFiLM architecture exploits this auto
 The trained device operators are fully differentiable. The planned composition layer exploits
 this property to assemble multi-device circuits without hand-derived conductance equations.
 
-Given a circuit with node voltage vector $\mathbf{V}$, Kirchhoff's Current Law (KCL) requires:
+Given a circuit with node voltage vector $`\mathbf{V}`$, Kirchhoff's Current Law (KCL) requires:
 
 $$\mathbf{R}(\mathbf{V}) = \sum_k \mathbf{I}_k(\mathbf{V}) = \mathbf{0}$$
 
 At each Newton iteration, PyTorch autograd computes the exact Jacobian
-$\frac{\partial \mathbf{I}}{\partial \mathbf{V}}$ through the FNO stack — the same
+$`\frac{\partial \mathbf{I}}{\partial \mathbf{V}}`$ through the FNO stack — the same
 information SPICE derives analytically from BSIM model cards, obtained here from backprop
 at no additional implementation cost. The Newton system scales with the number of **interface
-nodes** (typically $O(10)$), not the internal complexity of each device block.
+nodes** (typically $`O(10)`$), not the internal complexity of each device block.
 
 ### Composition Validation Plan
 
@@ -213,8 +213,8 @@ the analog and digital application classes are each represented and so the quest
 | Topology | Class | Devices | Primary metrics |
 |---|---|---|---|
 | Common-source amplifier (NFET driver + PFET active load) | Analog | 2 | DC bias, peak gain, settling time ([SPICE reference](docs/cs_amp.md)) |
-| CMOS inverter | Digital | 2 | $V_M$, $t_{pHL}$, $t_{pLH}$, rise/fall time |
-| Inverter chain, $N \in \{1, 2, 4, 8, 16\}$ | Digital | up to 32 | Per-stage R², end-to-end delay error |
+| CMOS inverter | Digital | 2 | $`V_M`$, $`t_{pHL}`$, $`t_{pLH}`$, rise/fall time |
+| Inverter chain, $`N \in \{1, 2, 4, 8, 16\}`$ | Digital | up to 32 | Per-stage R², end-to-end delay error |
 
 The analog target is exercised in two halves: a SPICE-only reference establishes a
 defended sizing point and the canonical traces; the FNO-composed counterpart then
@@ -223,10 +223,10 @@ loop and is required to reproduce the reference behaviour. The digital target is
 exercised the same way on a CMOS inverter, then extended to an inverter chain of
 increasing depth — the **compounding-error study**. At the measured per-device
 accuracies (R² ≈ 0.999 NMOS, R² ≈ 0.997 PMOS), naïve multiplicative propagation across
-an $N$-stage chain implies a $\approx (1 - \epsilon)^N$ degradation, but the
+an $`N`$-stage chain implies a $`\approx (1 - \epsilon)^N`$ degradation, but the
 propagation may also be sublinear or saturating depending on whether per-device errors
 are correlated. We characterize this empirically, fit a scaling model, and report the
-depth at which end-to-end fidelity drops below the standard $R^2 \geq 0.95$ threshold.
+depth at which end-to-end fidelity drops below the standard $`R^2 \geq 0.95`$ threshold.
 This experiment directly addresses the most likely reviewer concern about SPINO's
 applicability to large netlists.
 
