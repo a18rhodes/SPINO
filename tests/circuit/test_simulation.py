@@ -24,7 +24,7 @@ def cs_amp():
 @pytest.fixture()
 def cs_amp_with_step():
     """CS amp with 100mV step input for transient testing."""
-    return build_cs_amp_active_load(vin_tran="PWL(0 0.9 1n 0.9 2n 1.0 10u 1.0)")
+    return build_cs_amp_active_load(vin_tran="PWL(0 0.85 1n 0.85 2n 0.95 10u 0.95)")
 
 
 class TestOperatingPoint:

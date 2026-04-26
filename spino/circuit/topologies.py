@@ -32,12 +32,12 @@ def _resolve_lib_path(pdk_root: str = _DEFAULT_PDK_ROOT) -> str:
 
 
 def build_cs_amp_active_load(
-    nfet_w: float = 1.0,
+    nfet_w: float = 6.0,
     nfet_l: float = 0.18,
-    pfet_w: float = 2.0,
+    pfet_w: float = 4.5,
     pfet_l: float = 0.18,
     vdd: float = 1.8,
-    vin_dc: float = 0.9,
+    vin_dc: float = 0.85,
     vin_tran: str = "",
     c_load_f: float = 0.0,
     pdk_root: str = _DEFAULT_PDK_ROOT,
@@ -57,6 +57,9 @@ def build_cs_amp_active_load(
             [NFET] XM1 (common-source: gate = in, drain = out)
                |
               GND
+
+    Default widths and input bias correspond to the operating point selected
+    by the NGSpice sizing sweep documented in ``docs/cs_amp.md`` (tt corner).
 
     :param nfet_w: NFET channel width in microns.
     :param nfet_l: NFET channel length in microns.

@@ -35,12 +35,14 @@ _PDK_LIB = "/app/sky130_volare/sky130A/libs.tech/ngspice/sky130.lib.spice"
 _NMOS_MODEL = "sky130_fd_pr__nfet_01v8"
 _PMOS_MODEL = "sky130_fd_pr__pfet_01v8"
 
-# Deliberately "dumb" sizing: minimum channel lengths, 1x/2x widths.
-# Performance does not matter — the goal is pipeline correctness.
-_NFET_W, _NFET_L = 1.0, 0.18
-_PFET_W, _PFET_L = 2.0, 0.18
+# Sizing tracks the topology factory defaults, which were set by the NGSpice
+# sweep documented in docs/cs_amp.md. The point of this test is pipeline
+# correctness, but pinning to the published operating point keeps the
+# integration test honest against the same numbers used in the writeup.
+_NFET_W, _NFET_L = 6.0, 0.18
+_PFET_W, _PFET_L = 4.5, 0.18
 _VDD = 1.8
-_VIN_DC = 0.9
+_VIN_DC = 0.85
 
 
 @pytest.fixture(scope="module")
@@ -52,9 +54,7 @@ def cs_amp():
 @pytest.fixture(scope="module")
 def cs_amp_with_step():
     """CS amp with a 100 mV rising step at t=2 ns for transient tests."""
-    return build_cs_amp_active_load(
-        vin_tran=f"PWL(0 {_VIN_DC} 1n {_VIN_DC} 2n {_VIN_DC + 0.1} 10u {_VIN_DC + 0.1})"
-    )
+    return build_cs_amp_active_load(vin_tran=f"PWL(0 {_VIN_DC} 1n {_VIN_DC} 2n {_VIN_DC + 0.1} 10u {_VIN_DC + 0.1})")
 
 
 class TestDeckGeneration:
@@ -165,5 +165,5 @@ class TestTransient:
     def test_step_response_settles(self, step_response):
         """Output variation in the final 20% of the window must be < 10 mV."""
         vout = step_response.variables["v(out)"]
-        tail = vout[int(0.8 * len(vout)):]
+        tail = vout[int(0.8 * len(vout)) :]
         assert tail.max() - tail.min() < 0.01

@@ -23,6 +23,10 @@ Four device operators have been trained and validated against NGSPICE ground tru
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | ~522× | [PFET](docs/pfet.md) |
 
+A **composed-circuit NGSpice reference** (common-source amplifier, active PMOS load) is
+the first composition-validation milestone: methodology, sweep, and figures are in
+[CS amplifier characterization](docs/cs_amp.md).
+
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
 (W = 1.0 µm, L = 0.18 µm), with warm-inference throughput approximately 1300× that of NGSPICE.
 The PMOS operator uses the same VCFiLM-FNO architecture trained on a sweep-augmented dataset
@@ -195,13 +199,36 @@ Given a circuit with node voltage vector $\mathbf{V}$, Kirchhoff's Current Law (
 $$\mathbf{R}(\mathbf{V}) = \sum_k \mathbf{I}_k(\mathbf{V}) = \mathbf{0}$$
 
 At each Newton iteration, PyTorch autograd computes the exact Jacobian
-$\frac{\partial \mathbf{I}}{\partial \mathbf{V}}$ through the FNO stack -- the same
+$\frac{\partial \mathbf{I}}{\partial \mathbf{V}}$ through the FNO stack — the same
 information SPICE derives analytically from BSIM model cards, obtained here from backprop
-at no additional implementation cost.
+at no additional implementation cost. The Newton system scales with the number of **interface
+nodes** (typically $O(10)$), not the internal complexity of each device block.
 
-The Newton system scales with the number of **interface nodes** (typically $O(10)$), not
-the internal complexity of each device block. A common-source amplifier (MOSFET + resistor +
-capacitor) is the intended first integration test.
+### Composition Validation Plan
+
+Composition is validated against NGSPICE on three topologies of increasing depth, chosen so
+the analog and digital application classes are each represented and so the question of
+*how surrogate error compounds with depth* is answered empirically rather than asserted.
+
+| Topology | Class | Devices | Primary metrics |
+|---|---|---|---|
+| Common-source amplifier (NFET driver + PFET active load) | Analog | 2 | DC bias, peak gain, settling time ([SPICE reference](docs/cs_amp.md)) |
+| CMOS inverter | Digital | 2 | $V_M$, $t_{pHL}$, $t_{pLH}$, rise/fall time |
+| Inverter chain, $N \in \{1, 2, 4, 8, 16\}$ | Digital | up to 32 | Per-stage R², end-to-end delay error |
+
+The analog target is exercised in two halves: a SPICE-only reference establishes a
+defended sizing point and the canonical traces; the FNO-composed counterpart then
+replaces NGSPICE device evaluations with the trained operators inside a Newton-Raphson
+loop and is required to reproduce the reference behaviour. The digital target is
+exercised the same way on a CMOS inverter, then extended to an inverter chain of
+increasing depth — the **compounding-error study**. At the measured per-device
+accuracies (R² ≈ 0.999 NMOS, R² ≈ 0.997 PMOS), naïve multiplicative propagation across
+an $N$-stage chain implies a $\approx (1 - \epsilon)^N$ degradation, but the
+propagation may also be sublinear or saturating depending on whether per-device errors
+are correlated. We characterize this empirically, fit a scaling model, and report the
+depth at which end-to-end fidelity drops below the standard $R^2 \geq 0.95$ threshold.
+This experiment directly addresses the most likely reviewer concern about SPINO's
+applicability to large netlists.
 
 ---
 

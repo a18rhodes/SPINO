@@ -1,0 +1,746 @@
+{
+  "config": {
+    "nfet_widths_um": [
+      0.36,
+      0.6,
+      1.0,
+      1.6,
+      2.5,
+      4.0,
+      6.0
+    ],
+    "pfet_widths_um": [
+      0.36,
+      0.7,
+      1.4,
+      2.5,
+      4.5,
+      8.0,
+      14.0
+    ],
+    "vdd": 1.8,
+    "nfet_l_um": 0.18,
+    "pfet_l_um": 0.18,
+    "vtc_step_v": 0.01,
+    "vin_step_amplitude": 0.05,
+    "t_step_start": 1e-07,
+    "t_end": 5e-06,
+    "t_step": 1e-08,
+    "figure_c_load_f": 1e-11,
+    "figure_t_window_s": 2e-07
+  },
+  "selection_rule": {
+    "vout_min_v": 0.6,
+    "vout_max_v": 1.2
+  },
+  "selected": {
+    "point": {
+      "nfet_w_um": 6.0,
+      "pfet_w_um": 4.5
+    },
+    "metrics": {
+      "converged": true,
+      "peak_gain_v_per_v": 2.0519031123665847,
+      "vin_at_peak_gain_v": 0.8500000000000005,
+      "vout_at_peak_gain_v": 0.6089407918164571,
+      "static_current_a": 0.00012850328834028494,
+      "settling_time_s": 0.0
+    },
+    "figure_metrics": {
+      "converged": true,
+      "peak_gain_v_per_v": 2.0519031123665847,
+      "vin_at_peak_gain_v": 0.8500000000000005,
+      "vout_at_peak_gain_v": 0.6089407918164571,
+      "static_current_a": 0.00012850328834028494,
+      "settling_time_s": 2.5e-08
+    }
+  },
+  "sweep": [
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.8546953655519758,
+        "vin_at_peak_gain_v": 0.47000000000000025,
+        "vout_at_peak_gain_v": 1.387833880135533,
+        "static_current_a": 2.879912627278119e-09,
+        "settling_time_s": 3.0000000000000004e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.7403824396210013,
+        "vin_at_peak_gain_v": 0.49000000000000027,
+        "vout_at_peak_gain_v": 1.3590775099537336,
+        "static_current_a": 5.1426210607890765e-09,
+        "settling_time_s": 3.0000000000000004e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.6443039996015898,
+        "vin_at_peak_gain_v": 0.5100000000000002,
+        "vout_at_peak_gain_v": 1.3339953899861134,
+        "static_current_a": 9.068706208962822e-09,
+        "settling_time_s": 3.0000000000000004e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5594105965232785,
+        "vin_at_peak_gain_v": 0.5300000000000002,
+        "vout_at_peak_gain_v": 1.3229083629571403,
+        "static_current_a": 1.583723049249902e-08,
+        "settling_time_s": 3.0000000000000004e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4395948262363447,
+        "vin_at_peak_gain_v": 0.5500000000000003,
+        "vout_at_peak_gain_v": 1.3132416945411678,
+        "static_current_a": 2.7090404389190195e-08,
+        "settling_time_s": 6.9999999999999965e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.36,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.3657920534513863,
+        "vin_at_peak_gain_v": 0.5600000000000003,
+        "vout_at_peak_gain_v": 1.3266090613367172,
+        "static_current_a": 3.5495451388359983e-08,
+        "settling_time_s": 6.9999999999999965e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.6418523611425968,
+        "vin_at_peak_gain_v": 0.4300000000000002,
+        "vout_at_peak_gain_v": 1.3453061611525752,
+        "static_current_a": 5.562758840288372e-09,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5652809888446058,
+        "vin_at_peak_gain_v": 0.45000000000000023,
+        "vout_at_peak_gain_v": 1.3227123864939467,
+        "static_current_a": 9.243942959047709e-09,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5059438809374726,
+        "vin_at_peak_gain_v": 0.48000000000000026,
+        "vout_at_peak_gain_v": 1.287445863516255,
+        "static_current_a": 1.9537608604789075e-08,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4655653753733873,
+        "vin_at_peak_gain_v": 0.5000000000000002,
+        "vout_at_peak_gain_v": 1.2805247754878375,
+        "static_current_a": 3.215175124878266e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.3875813003144515,
+        "vin_at_peak_gain_v": 0.5300000000000002,
+        "vout_at_peak_gain_v": 1.261264914997283,
+        "static_current_a": 6.609848858063316e-08,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 0.6,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.3400003810921106,
+        "vin_at_peak_gain_v": 0.5400000000000003,
+        "vout_at_peak_gain_v": 1.2772662872872242,
+        "static_current_a": 8.461119408655168e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.9493071587193782,
+        "vin_at_peak_gain_v": 0.8900000000000006,
+        "vout_at_peak_gain_v": 0.6019911584476947,
+        "static_current_a": 2.4156227018212934e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.7807752030621202,
+        "vin_at_peak_gain_v": 0.45000000000000023,
+        "vout_at_peak_gain_v": 1.3219355391586307,
+        "static_current_a": 9.359175749486725e-09,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.706108667459148,
+        "vin_at_peak_gain_v": 0.47000000000000025,
+        "vout_at_peak_gain_v": 1.2976762479341153,
+        "static_current_a": 1.654215964173176e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.6504813651730288,
+        "vin_at_peak_gain_v": 0.49000000000000027,
+        "vout_at_peak_gain_v": 1.2866458124067441,
+        "static_current_a": 2.9082688396179917e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5532562648222878,
+        "vin_at_peak_gain_v": 0.5100000000000002,
+        "vout_at_peak_gain_v": 1.2774999041194917,
+        "static_current_a": 5.034531824667339e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.0,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4926153007303498,
+        "vin_at_peak_gain_v": 0.5200000000000002,
+        "vout_at_peak_gain_v": 1.2913305084114273,
+        "static_current_a": 6.649836419492548e-08,
+        "settling_time_s": 3.0000000000000004e-09
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.419989249372943,
+        "vin_at_peak_gain_v": 0.8600000000000005,
+        "vout_at_peak_gain_v": 0.4608701866441958,
+        "static_current_a": 4.023921760171063e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.7551231427260348,
+        "vin_at_peak_gain_v": 0.8700000000000006,
+        "vout_at_peak_gain_v": 0.5969362856458006,
+        "static_current_a": 4.631817384514279e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5673111938520066,
+        "vin_at_peak_gain_v": 0.4100000000000002,
+        "vout_at_peak_gain_v": 1.281956893321589,
+        "static_current_a": 2.1354226484817035e-08,
+        "settling_time_s": 9.999999999999957e-10
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5395458003731761,
+        "vin_at_peak_gain_v": 0.4400000000000002,
+        "vout_at_peak_gain_v": 1.2584462184662637,
+        "static_current_a": 4.5989527852588936e-08,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4730786643761107,
+        "vin_at_peak_gain_v": 0.46000000000000024,
+        "vout_at_peak_gain_v": 1.2526024389443244,
+        "static_current_a": 7.629634627806831e-08,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 1.6,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4325703658714914,
+        "vin_at_peak_gain_v": 0.48000000000000026,
+        "vout_at_peak_gain_v": 1.2536536279219497,
+        "static_current_a": 1.256655864643945e-07,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.928243231477037,
+        "vin_at_peak_gain_v": 0.8400000000000005,
+        "vout_at_peak_gain_v": 0.4178658258982011,
+        "static_current_a": 4.585494271886306e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.1726940834086896,
+        "vin_at_peak_gain_v": 0.8600000000000005,
+        "vout_at_peak_gain_v": 0.5364406796454383,
+        "static_current_a": 5.90897328118771e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.637720644045185,
+        "vin_at_peak_gain_v": 0.8600000000000005,
+        "vout_at_peak_gain_v": 0.6465153149274893,
+        "static_current_a": 6.200405014035489e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.555703489478958,
+        "vin_at_peak_gain_v": 0.45000000000000023,
+        "vout_at_peak_gain_v": 1.2513749312601634,
+        "static_current_a": 5.152129674724825e-08,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.502754568241528,
+        "vin_at_peak_gain_v": 0.48000000000000026,
+        "vout_at_peak_gain_v": 1.23034252102522,
+        "static_current_a": 1.0982615963447926e-07,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 2.5,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4715720635686083,
+        "vin_at_peak_gain_v": 0.49000000000000027,
+        "vout_at_peak_gain_v": 1.245924242825642,
+        "static_current_a": 1.4276058952314429e-07,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 3.87355684774845,
+        "vin_at_peak_gain_v": 0.8100000000000005,
+        "vout_at_peak_gain_v": 0.40363962764047173,
+        "static_current_a": 4.777986478459638e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.9264418441719187,
+        "vin_at_peak_gain_v": 0.8400000000000005,
+        "vout_at_peak_gain_v": 0.48406700162652444,
+        "static_current_a": 7.127020455655818e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.2194635767486304,
+        "vin_at_peak_gain_v": 0.8500000000000005,
+        "vout_at_peak_gain_v": 0.5858162299225642,
+        "static_current_a": 8.263713061106628e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.6503544237992998,
+        "vin_at_peak_gain_v": 0.8500000000000005,
+        "vout_at_peak_gain_v": 0.6843994453498056,
+        "static_current_a": 8.547697697626445e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4383533433347253,
+        "vin_at_peak_gain_v": 0.5000000000000002,
+        "vout_at_peak_gain_v": 1.20690946796067,
+        "static_current_a": 1.603687999836638e-07,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 4.0,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.4182409196047843,
+        "vin_at_peak_gain_v": 0.5100000000000002,
+        "vout_at_peak_gain_v": 1.2234948023275645,
+        "static_current_a": 2.0586821163579648e-07,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 0.36
+      },
+      "metrics": {
+        "converged": false,
+        "peak_gain_v_per_v": NaN,
+        "vin_at_peak_gain_v": NaN,
+        "vout_at_peak_gain_v": NaN,
+        "static_current_a": NaN,
+        "settling_time_s": NaN
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 0.7
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 4.562955640419792,
+        "vin_at_peak_gain_v": 0.7900000000000005,
+        "vout_at_peak_gain_v": 0.35715105281262494,
+        "static_current_a": 5.429032747996742e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 1.4
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 3.5659601077447505,
+        "vin_at_peak_gain_v": 0.8200000000000005,
+        "vout_at_peak_gain_v": 0.43071998780396786,
+        "static_current_a": 8.467957829479642e-05,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 2.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.754041361068605,
+        "vin_at_peak_gain_v": 0.8400000000000005,
+        "vout_at_peak_gain_v": 0.51225624706331,
+        "static_current_a": 0.00011122912922989666,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 4.5
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 2.0519031123665847,
+        "vin_at_peak_gain_v": 0.8500000000000005,
+        "vout_at_peak_gain_v": 0.6089407918164571,
+        "static_current_a": 0.00012850328834028494,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 8.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.5456743331783755,
+        "vin_at_peak_gain_v": 0.8400000000000005,
+        "vout_at_peak_gain_v": 0.7192197849010926,
+        "static_current_a": 0.00011936820979351688,
+        "settling_time_s": 0.0
+      }
+    },
+    {
+      "point": {
+        "nfet_w_um": 6.0,
+        "pfet_w_um": 14.0
+      },
+      "metrics": {
+        "converged": true,
+        "peak_gain_v_per_v": 1.3866875419752844,
+        "vin_at_peak_gain_v": 0.5000000000000002,
+        "vout_at_peak_gain_v": 1.2091458160968076,
+        "static_current_a": 2.595795346275232e-07,
+        "settling_time_s": 0.0
+      }
+    }
+  ]
+}
