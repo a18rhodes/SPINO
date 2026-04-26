@@ -9,7 +9,7 @@ DC sweep analyses.
 from dataclasses import dataclass
 from typing import ClassVar, Protocol
 
-__all__ = ["Circuit", "MosfetInstance", "SpiceDevice", "VoltageSource"]
+__all__ = ["Capacitor", "Circuit", "MosfetInstance", "SpiceDevice", "VoltageSource"]
 
 
 def _validate_required_net_keys(owner_name: str, nets: dict[str, str], required_keys: tuple[str, ...]) -> None:
@@ -72,6 +72,36 @@ class MosfetInstance:
         """
         nodes = " ".join(self.nets[p] for p in self.PORTS)
         return f"{self.name} {nodes} {self.model_name} w={self.width_um} l={self.length_um}"
+
+
+@dataclass(frozen=True, slots=True)
+class Capacitor:
+    """
+    Two-terminal linear capacitor.
+
+    Used in transient analyses to introduce a meaningful output time scale at
+    nodes whose intrinsic device capacitance would otherwise settle inside one
+    SPICE timestep. Has no effect on DC analyses (``.op``, ``.dc``).
+
+    :param name: SPICE instance identifier (e.g., "CL"). Must begin with "C"
+        for SPICE to recognise the primitive.
+    :param positive_node: Positive terminal node.
+    :param negative_node: Negative terminal node.
+    :param capacitance_f: Capacitance in farads.
+    """
+
+    name: str
+    positive_node: str
+    negative_node: str
+    capacitance_f: float
+
+    def to_spice(self) -> str:
+        """
+        Renders this capacitor as a single SPICE instance line.
+
+        :return: SPICE instance string.
+        """
+        return f"{self.name} {self.positive_node} {self.negative_node} {self.capacitance_f}"
 
 
 @dataclass(frozen=True, slots=True)

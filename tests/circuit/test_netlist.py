@@ -2,7 +2,7 @@
 
 import pytest
 
-from spino.circuit.netlist import Circuit, MosfetInstance, VoltageSource
+from spino.circuit.netlist import Capacitor, Circuit, MosfetInstance, VoltageSource
 
 _DUMMY_LIB = "/fake/pdk/sky130.lib.spice"
 
@@ -87,6 +87,19 @@ class TestVoltageSource:
         assert src.to_spice_tran() == "VDD vdd 0 DC 1.8"
 
 
+class TestCapacitor:
+    """Validates two-terminal linear capacitor SPICE formatting."""
+
+    def test_to_spice_emits_three_tokens_plus_value(self):
+        cap = Capacitor(name="CL", positive_node="out", negative_node="0", capacitance_f=1e-12)
+        assert cap.to_spice() == "CL out 0 1e-12"
+
+    def test_immutable(self):
+        cap = Capacitor(name="CL", positive_node="out", negative_node="0", capacitance_f=1e-12)
+        with pytest.raises((AttributeError, TypeError)):
+            cap.capacitance_f = 2e-12
+
+
 def _make_two_device_circuit() -> Circuit:
     """Builds a minimal two-device circuit for deck generation tests."""
     nfet = MosfetInstance(
@@ -163,8 +176,6 @@ class TestCircuit:
             length_um=0.18,
             nets={"drain": "d", "gate": "g", "source": "s", "bulk": "b"},
         )
-        circuit = Circuit(
-            name="Corner Test", devices=(dev,), sources=(), lib_path=_DUMMY_LIB, lib_corner="ss"
-        )
+        circuit = Circuit(name="Corner Test", devices=(dev,), sources=(), lib_path=_DUMMY_LIB, lib_corner="ss")
         deck = circuit.build_deck(".op")
         assert ".lib '/fake/pdk/sky130.lib.spice' ss" in deck

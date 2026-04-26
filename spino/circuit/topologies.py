@@ -7,7 +7,7 @@ blocks using Sky130 device models.
 
 from pathlib import Path
 
-from spino.circuit.netlist import Circuit, MosfetInstance, VoltageSource
+from spino.circuit.netlist import Capacitor, Circuit, MosfetInstance, SpiceDevice, VoltageSource
 
 __all__ = ["build_cs_amp_active_load"]
 
@@ -39,6 +39,7 @@ def build_cs_amp_active_load(
     vdd: float = 1.8,
     vin_dc: float = 0.9,
     vin_tran: str = "",
+    c_load_f: float = 0.0,
     pdk_root: str = _DEFAULT_PDK_ROOT,
     corner: str = "tt",
 ) -> Circuit:
@@ -64,6 +65,9 @@ def build_cs_amp_active_load(
     :param vdd: Supply voltage in volts.
     :param vin_dc: Input DC bias voltage in volts.
     :param vin_tran: Transient input stimulus (e.g., "PWL(0 0.9 1n 1.0)").
+    :param c_load_f: Optional explicit output load capacitance in farads. When
+        zero (default) only intrinsic device capacitance loads the output.
+        Affects transient analyses only; DC analyses are unchanged.
     :param pdk_root: Path to the Sky130 PDK installation.
     :param corner: Process corner (e.g., "tt", "ss", "ff").
     :return: Configured Circuit object ready for simulation.
@@ -84,12 +88,13 @@ def build_cs_amp_active_load(
         nets={"drain": "out", "gate": "out", "source": "vdd", "bulk": "vdd"},
     )
     v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=vdd)
-    v_input = VoltageSource(
-        name="Vin", positive_node="in", negative_node="0", dc_value=vin_dc, tran_value=vin_tran
-    )
+    v_input = VoltageSource(name="Vin", positive_node="in", negative_node="0", dc_value=vin_dc, tran_value=vin_tran)
+    devices: tuple[SpiceDevice, ...] = (nfet, pfet)
+    if c_load_f > 0.0:
+        devices = devices + (Capacitor(name="CL", positive_node="out", negative_node="0", capacitance_f=c_load_f),)
     return Circuit(
         name=f"CS Amp Active Load (NFET {nfet_w}/{nfet_l}, PFET {pfet_w}/{pfet_l})",
-        devices=(nfet, pfet),
+        devices=devices,
         sources=(v_supply, v_input),
         lib_path=lib_path,
         lib_corner=corner,
