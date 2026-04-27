@@ -7,13 +7,14 @@ Does not modify any single-device simulation infrastructure.
 """
 
 import logging
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 
 import numpy as np
 from numpy.typing import NDArray
 
 from spino.circuit.netlist import Circuit
-from spino.spice import OutputMode, run_ngspice
+from spino.spice import OutputMode, run_ngspice, run_ngspice_capture_log
 
 __all__ = [
     "DCSweepResult",
@@ -30,6 +31,8 @@ _DEFAULT_TIMEOUT = 120.0
 _OP_OPTIONS = ("savecurrents",)
 _TRAN_OPTIONS = ("savecurrents", "strict_errorhandling=0")
 _DC_OPTIONS = ("savecurrents",)
+_ACCT_OPTION = "acct"
+_TOTAL_ITERATIONS_RE = re.compile(r"Total iterations\s*=\s*(\d+)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -41,9 +44,13 @@ class OperatingPoint:
     DC bias condition of the circuit.
 
     :param variables: Maps NGSpice variable name to its DC value (V or A).
+    :param iter_count: NGSpice ``.option acct`` iteration count, or
+        ``None`` when accounting was disabled or the line could not be
+        parsed.
     """
 
     variables: dict[str, float]
+    iter_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -56,10 +63,14 @@ class TransientResult:
 
     :param time: Simulation time points in seconds.
     :param variables: Maps NGSpice variable name to time-series array.
+    :param iter_count: NGSpice ``.option acct`` iteration count, or
+        ``None`` when accounting was disabled or the line could not be
+        parsed.
     """
 
     time: NDArray[np.float64]
     variables: dict[str, NDArray[np.float64]]
+    iter_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -72,29 +83,80 @@ class DCSweepResult:
     :param sweep_param: Name of the swept variable as reported by NGSpice.
     :param sweep_values: Array of swept parameter values.
     :param variables: Maps variable name to output array at each sweep point.
+    :param iter_count: NGSpice ``.option acct`` iteration count, or
+        ``None`` when accounting was disabled or the line could not be
+        parsed.
     """
 
     sweep_param: str
     sweep_values: NDArray[np.float64]
-    variables: dict[str, NDArray[np.float64]]
+    variables: dict[str, NDArray[np.float64]] = field(default_factory=dict)
+    iter_count: int | None = None
 
 
-def run_operating_point(circuit: Circuit, timeout: float = _DEFAULT_TIMEOUT) -> OperatingPoint | None:
+def _maybe_with_acct(options: tuple[str, ...], capture_iters: bool) -> tuple[str, ...]:
+    """
+    Appends the ``acct`` option when iteration counts are requested.
+
+    :param options: Existing ``.option`` tuple for the analysis.
+    :param capture_iters: Whether to enable accounting.
+    :return: Possibly-extended option tuple.
+    """
+    if not capture_iters or _ACCT_OPTION in options:
+        return options
+    return options + (_ACCT_OPTION,)
+
+
+def _parse_iter_count(stdout: str) -> int | None:
+    """
+    Extracts the ``Total iterations`` value from NGSpice ``.option acct``.
+
+    NGSpice prints multiple analysis sub-blocks; the last match is taken
+    so that combined runs report the latest analysis count.
+
+    :param stdout: Captured stdout text from the NGSpice subprocess.
+    :return: Parsed iteration count, or ``None`` when the line is absent.
+    """
+    if not stdout:
+        return None
+    matches = _TOTAL_ITERATIONS_RE.findall(stdout)
+    if not matches:
+        return None
+    return int(matches[-1])
+
+
+def run_operating_point(
+    circuit: Circuit,
+    timeout: float = _DEFAULT_TIMEOUT,
+    capture_iters: bool = False,
+) -> OperatingPoint | None:
     """
     Runs DC operating point analysis on the circuit.
 
     :param circuit: Circuit topology to simulate.
     :param timeout: NGSpice subprocess timeout in seconds.
-    :return: Operating point with all node voltages and branch currents, or None on failure.
+    :param capture_iters: When True, enables ``.option acct`` and returns
+        the parsed ``Total iterations`` count alongside the variables.
+    :return: Operating point with all node voltages and branch currents,
+        or None on failure.
     """
-    deck = circuit.build_deck(".op", options=_OP_OPTIONS)
-    success, parsed = run_ngspice(
-        deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_op.spice", timeout=timeout
-    )
+    options = _maybe_with_acct(_OP_OPTIONS, capture_iters)
+    deck = circuit.build_deck(".op", options=options)
+    if capture_iters:
+        success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_op.spice", timeout=timeout)
+        iter_count = _parse_iter_count(stdout)
+    else:
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_op.spice", timeout=timeout
+        )
+        iter_count = None
     if not success or parsed is None:
         logger.error("Operating point analysis failed for circuit: %s", circuit.name)
         return None
-    return OperatingPoint(variables={name: float(data[0]) for name, data in parsed["nodes"].items()})
+    return OperatingPoint(
+        variables={name: float(data[0]) for name, data in parsed["nodes"].items()},
+        iter_count=iter_count,
+    )
 
 
 def run_transient(
@@ -102,6 +164,7 @@ def run_transient(
     t_step: float,
     t_end: float,
     timeout: float = _DEFAULT_TIMEOUT,
+    capture_iters: bool = False,
 ) -> TransientResult | None:
     """
     Runs transient analysis on the circuit.
@@ -110,19 +173,28 @@ def run_transient(
     :param t_step: Maximum simulation timestep in seconds.
     :param t_end: Simulation end time in seconds.
     :param timeout: NGSpice subprocess timeout in seconds.
-    :return: Time-series result with all node voltages and currents, or None on failure.
+    :param capture_iters: When True, enables ``.option acct`` and returns
+        the parsed ``Total iterations`` count alongside the variables.
+    :return: Time-series result with all node voltages and currents, or
+        None on failure.
     """
-    deck = circuit.build_deck(f".tran {t_step} {t_end}", options=_TRAN_OPTIONS)
-    success, parsed = run_ngspice(
-        deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_tran.spice", timeout=timeout
-    )
+    options = _maybe_with_acct(_TRAN_OPTIONS, capture_iters)
+    deck = circuit.build_deck(f".tran {t_step} {t_end}", options=options)
+    if capture_iters:
+        success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_tran.spice", timeout=timeout)
+        iter_count = _parse_iter_count(stdout)
+    else:
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_tran.spice", timeout=timeout
+        )
+        iter_count = None
     if not success or parsed is None:
         logger.error("Transient analysis failed for circuit: %s", circuit.name)
         return None
     if parsed["time"] is None:
         logger.error("Transient result missing time vector for circuit: %s", circuit.name)
         return None
-    return TransientResult(time=parsed["time"], variables=dict(parsed["nodes"]))
+    return TransientResult(time=parsed["time"], variables=dict(parsed["nodes"]), iter_count=iter_count)
 
 
 def run_dc_sweep(
@@ -132,6 +204,7 @@ def run_dc_sweep(
     stop: float,
     step: float,
     timeout: float = _DEFAULT_TIMEOUT,
+    capture_iters: bool = False,
 ) -> DCSweepResult | None:
     """
     Runs DC sweep analysis on the circuit.
@@ -145,21 +218,33 @@ def run_dc_sweep(
     :param stop: Sweep stop voltage in volts.
     :param step: Sweep step size in volts.
     :param timeout: NGSpice subprocess timeout in seconds.
+    :param capture_iters: When True, enables ``.option acct`` and returns
+        the parsed ``Total iterations`` count alongside the variables.
     :return: Sweep result with VTC data, or None on failure.
     """
-    deck = circuit.build_deck(f".dc {source_name} {start} {stop} {step}", options=_DC_OPTIONS)
-    success, parsed = run_ngspice(
-        deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_dc.spice", timeout=timeout
-    )
+    options = _maybe_with_acct(_DC_OPTIONS, capture_iters)
+    deck = circuit.build_deck(f".dc {source_name} {start} {stop} {step}", options=options)
+    if capture_iters:
+        success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_dc.spice", timeout=timeout)
+        iter_count = _parse_iter_count(stdout)
+    else:
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_dc.spice", timeout=timeout
+        )
+        iter_count = None
     if not success or parsed is None:
         logger.error("DC sweep analysis failed for circuit: %s", circuit.name)
         return None
     nodes = dict(parsed["nodes"])
     if (sweep_key := _find_sweep_variable(nodes, source_name)) is not None:
         sweep_values = nodes.pop(sweep_key)
-        return DCSweepResult(sweep_param=sweep_key, sweep_values=sweep_values, variables=nodes)
+        return DCSweepResult(
+            sweep_param=sweep_key, sweep_values=sweep_values, variables=nodes, iter_count=iter_count
+        )
     if parsed["time"] is not None:
-        return DCSweepResult(sweep_param=source_name.lower(), sweep_values=parsed["time"], variables=nodes)
+        return DCSweepResult(
+            sweep_param=source_name.lower(), sweep_values=parsed["time"], variables=nodes, iter_count=iter_count
+        )
     logger.error("Could not identify sweep variable in DC results for circuit: %s", circuit.name)
     return None
 

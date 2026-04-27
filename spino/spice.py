@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-__all__ = ["parse_ngspice_raw", "run_ngspice", "spice_temp_workspace", "OutputMode"]
+__all__ = ["parse_ngspice_raw", "run_ngspice", "run_ngspice_capture_log", "spice_temp_workspace", "OutputMode"]
 
 logger = logging.getLogger(__name__)
 
@@ -160,13 +160,57 @@ def _run_raw_file_mode(spice_file: Path, workspace: Path, timeout: float) -> tup
     :param timeout: Subprocess timeout in seconds.
     :return: Tuple of (success, parsed_data).
     """
+    success, parsed, _ = _run_raw_file_mode_with_log(spice_file, workspace, timeout)
+    return success, parsed
+
+
+def _run_raw_file_mode_with_log(
+    spice_file: Path, workspace: Path, timeout: float
+) -> tuple[bool, dict | None, str]:
+    """
+    Executes NGSpice in raw-file mode and returns the captured stdout.
+
+    Used by accounting-aware callers that need to scrape ``.option acct``
+    diagnostics (iteration counts, analysis wall time) which NGSpice emits
+    to stdout rather than the binary raw file.
+
+    :param spice_file: Path to the SPICE deck.
+    :param workspace: Temporary directory for output file.
+    :param timeout: Subprocess timeout in seconds.
+    :return: Tuple of (success, parsed_data, stdout_text).
+    """
     raw_file = workspace / f"{spice_file.stem}.raw"
-    if _execute_ngspice([_NGSPICE_BIN, "-b", "-r", str(raw_file), str(spice_file)], timeout) is None:
-        return False, None
+    result = _execute_ngspice([_NGSPICE_BIN, "-b", "-r", str(raw_file), str(spice_file)], timeout)
+    if result is None:
+        return False, None, ""
+    stdout = result.stdout or ""
     if not raw_file.exists():
         logger.error("NGSpice did not produce expected raw file: %s", raw_file)
-        return False, None
-    return True, parse_ngspice_raw(raw_file)
+        return False, None, stdout
+    return True, parse_ngspice_raw(raw_file), stdout
+
+
+def run_ngspice_capture_log(
+    deck_content: str,
+    spice_filename: str = "sim.spice",
+    timeout: float = _DEFAULT_TIMEOUT_SECONDS,
+) -> tuple[bool, dict | None, str]:
+    """
+    Executes NGSpice in raw-file mode and returns parsed data plus stdout.
+
+    Mirrors :func:`run_ngspice` for the raw-file mode but additionally
+    surfaces the captured stdout so callers can scrape ``.option acct``
+    diagnostics.
+
+    :param deck_content: Complete SPICE netlist string including ``.end``.
+    :param spice_filename: Name for the temporary SPICE file (aids debugging).
+    :param timeout: Maximum execution time in seconds before termination.
+    :return: Tuple of (success, parsed_data, stdout_text).
+    """
+    with spice_temp_workspace() as workspace:
+        spice_file = workspace / spice_filename
+        spice_file.write_text(deck_content, encoding="utf-8")
+        return _run_raw_file_mode_with_log(spice_file, workspace, timeout)
 
 
 def parse_ngspice_raw(file_path: Path) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]] | None:
