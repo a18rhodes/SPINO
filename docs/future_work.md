@@ -55,13 +55,7 @@ or a single training run.
 - Cross-hardware reproducibility envelopes (CPU vendor, GPU generation,
   precision mode).
 
-### C. Error budgeting at system level
-
-- Decompose end-to-end composition error into device-fit, solver, and
-  initialization components.
-- Provide uncertainty ranges for key result tables, not just point estimates.
-
-### D. Publication packaging
+### C. Publication packaging
 
 - Converge on a stable methods/results narrative with explicit scope limits.
 - Keep stress-track and showcase-track evidence side-by-side to avoid
