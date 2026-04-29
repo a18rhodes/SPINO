@@ -23,8 +23,16 @@ Four device operators have been trained and validated against NGSPICE ground tru
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | ~522× | [PFET](docs/pfet.md) |
 
-A **composed-circuit NGSpice reference** (common-source amplifier, active PMOS load) is
-the first composition-validation milestone: methodology, sweep, and figures are in
+A composed-circuit CS amplifier is the first system-level validation milestone.
+The work is split into three paper-style documents:
+
+- [Neural composition: CS amplifier method](docs/composition.md) — KCL assembly,
+  Newton-Raphson solvers, autograd Jacobians, and damping policy.
+- [CS amplifier composition results](docs/results.md) — SPICE baselines,
+  composed-fidelity metrics, and runtime tables (CPU/CUDA context).
+- [Future work](docs/future_work.md) — global roadmap beyond active lab trackers.
+
+SPICE-only characterization methodology and selected design points are documented in
 [CS amplifier characterization](docs/cs_amp.md).
 
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
@@ -132,6 +140,8 @@ and sweeps gate/drain downward.
 | sky130 PMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9965 | -- |
 | sky130 PMOS | Output (W=1 µm, L=0.18 µm) | 0.9656 | -- |
 | sky130 PMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9523 | -- |
+| CS amp composition (L=0.18, CUDA) | Transient vs SPICE | 0.99748 (Pearson r) | Max \|ΔV\| = 25.78 mV |
+| CS amp composition (L=0.40, CUDA) | Transient vs SPICE | 0.99981 (Pearson r) | Max \|ΔV\| = 2.392 mV |
 
 ### Throughput
 
@@ -141,6 +151,10 @@ and sweeps gate/drain downward.
 | sky130 NMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~1300×** | Sustained throughput |
 | sky130 NMOS (cold) | NGSPICE `.tran` | First call (incl. JIT) | **~21×** | One-time compilation cost |
 | sky130 PMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~522×** | Sustained throughput |
+| CS amp composition (L=0.18, CUDA warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~4.83×** | Cross-bin stress point |
+| CS amp composition (L=0.40, CUDA warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~7.31×** | In-bin showcase point |
+| CS amp composition (L=0.18, CPU warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~0.50×** | CPU bottleneck vs optimized NGSPICE |
+| CS amp composition (L=0.40, CPU warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~0.62×** | Same bottleneck; slightly better ratio at showcase geometry |
 | Linear RC | ODE loop < 1 ms | FNO ~96 ms | **< 1×** | Value is generalization, not speed |
 
 ---
@@ -189,46 +203,48 @@ MOSFET, the physics is algebraic, and the VCFiLM architecture exploits this auto
 
 ---
 
-## Future Work: Neural Newton-Raphson Composition
+## Composition Method
 
-The trained device operators are fully differentiable. The planned composition layer exploits
-this property to assemble multi-device circuits without hand-derived conductance equations.
+The composition layer is now implemented for the CS amplifier. It constructs a
+single-node KCL residual from NFET and PFET operator outputs and solves DC and
+whole-window transient trajectories with damped Newton-Raphson. Jacobians are
+computed directly through autograd, with Armijo backtracking plus voltage-step
+safeguards.
 
-Given a circuit with node voltage vector $`\mathbf{V}`$, Kirchhoff's Current Law (KCL) requires:
+Method details are in [Neural composition: CS amplifier method](docs/composition.md).
 
-$$\mathbf{R}(\mathbf{V}) = \sum_k \mathbf{I}_k(\mathbf{V}) = \mathbf{0}$$
+## Composition Results
 
-At each Newton iteration, PyTorch autograd computes the exact Jacobian
-$`\frac{\partial \mathbf{I}}{\partial \mathbf{V}}`$ through the FNO stack — the same
-information SPICE derives analytically from BSIM model cards, obtained here from backprop
-at no additional implementation cost. The Newton system scales with the number of **interface
-nodes** (typically $`O(10)`$), not the internal complexity of each device block.
+The current CS amplifier suite includes:
 
-### Composition Validation Plan
+- SPICE characterization at `L=0.18` and `L=0.40` with independently selected
+  `(Wn, Wp, Vin*)` points.
+- CUDA composition runs against both references.
+- CPU composition at `L=0.18` (stress) and `L=0.40` (showcase) to make platform bottlenecks explicit.
 
-Composition is validated against NGSPICE on three topologies of increasing depth, chosen so
-the analog and digital application classes are each represented and so the question of
-*how surrogate error compounds with depth* is answered empirically rather than asserted.
+Headline composition outcomes:
 
-| Topology | Class | Devices | Primary metrics |
-|---|---|---|---|
-| Common-source amplifier (NFET driver + PFET active load) | Analog | 2 | DC bias, peak gain, settling time ([SPICE reference](docs/cs_amp.md)) |
-| CMOS inverter | Digital | 2 | $`V_M`$, $`t_{pHL}`$, $`t_{pLH}`$, rise/fall time |
-| Inverter chain, $`N \in \{1, 2, 4, 8, 16\}`$ | Digital | up to 32 | Per-stage R², end-to-end delay error |
+- Cross-bin stress point (`L=0.18`, tiny-length-band with wide-width pairing):
+  transient Pearson `r = 0.99748`, max `|ΔV| = 25.78 mV`.
+- In-bin showcase point (`L=0.40`, small-length-band selection):
+  transient Pearson `r = 0.99981`, max `|ΔV| = 2.392 mV`.
+- Warm runtime speedup (SPICE/FNO): `4.83x` at `L=0.18` (CUDA) and `7.31x`
+  at `L=0.40` (CUDA); on CPU the same headline pair is `0.50x` and `0.62x`
+  (NGSpice still wins on wall time).
 
-The analog target is exercised in two halves: a SPICE-only reference establishes a
-defended sizing point and the canonical traces; the FNO-composed counterpart then
-replaces NGSPICE device evaluations with the trained operators inside a Newton-Raphson
-loop and is required to reproduce the reference behaviour. The digital target is
-exercised the same way on a CMOS inverter, then extended to an inverter chain of
-increasing depth — the **compounding-error study**. At the measured per-device
-accuracies (R² ≈ 0.999 NMOS, R² ≈ 0.997 PMOS), naïve multiplicative propagation across
-an $`N`$-stage chain implies a $`\approx (1 - \epsilon)^N`$ degradation, but the
-propagation may also be sublinear or saturating depending on whether per-device errors
-are correlated. We characterize this empirically, fit a scaling model, and report the
-depth at which end-to-end fidelity drops below the standard $`R^2 \geq 0.95`$ threshold.
-This experiment directly addresses the most likely reviewer concern about SPINO's
-applicability to large netlists.
+Full tables, figures, and interpretation are in
+[CS amplifier composition results](docs/results.md).
+
+## Future Work
+
+The global forward roadmap is consolidated in [Future work](docs/future_work.md),
+organized around:
+
+1. Better model accuracy in weak-inversion / low-bias regions.
+2. Larger architecture evaluation (including differential-pair-scale analog and
+   deeper digital topologies).
+3. Cross-cutting investigations beyond daily status trackers (runtime
+   decomposition, reproducibility envelopes, and system-level error budgeting).
 
 ---
 
