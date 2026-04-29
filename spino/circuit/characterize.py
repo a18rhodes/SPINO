@@ -7,9 +7,12 @@ summary suitable for archival in the project repository.
 
 Invocation::
 
-    python -m spino.circuit.characterize \\
-        --output-dir docs/assets/cs_amp \\
-        --summary-path docs/assets/cs_amp/summary.json
+    python -m spino.circuit.characterize --output-dir docs/assets/cs_amp
+
+The :math:`(W_n, W_p)` search is :func:`~spino.circuit.tuning.sweep_design_space`
+at fixed L. Set ``L`` to match your MOSFET geometry-bin story
+(``spino/mosfet/gen_data.py::GEOMETRY_BINS``) via ``--nfet-l`` and ``--pfet-l``;
+defaults match the original 0.18 um 3a run.
 """
 
 from __future__ import annotations
@@ -86,7 +89,7 @@ def _serialise_sweep(sweep: SweepResult) -> list[dict]:
     return [{"point": asdict(point), "metrics": asdict(metrics)} for point, metrics in zip(sweep.points, sweep.metrics)]
 
 
-def _write_summary(
+def _write_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     summary_path: Path,
     sweep: SweepResult,
     selected_point: DesignPoint,
@@ -208,15 +211,31 @@ def _generate_design_plots(
 @click.option("--vout-max", type=float, default=1.2, show_default=True, help="Selection rule upper bound (V).")
 @click.option("--vdd", type=float, default=_DEFAULT_VDD, show_default=True, help="Supply voltage in volts.")
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
-def main(output_dir: Path, vout_min: float, vout_max: float, vdd: float, pdk_root: str | None) -> None:
+@click.option(
+    "--nfet-l",
+    type=float,
+    default=_DEFAULT_NFET_L,
+    show_default=True,
+    help="NFET L (um); the (W_n, W_p) search uses this length.",
+)
+@click.option(
+    "--pfet-l",
+    type=float,
+    default=_DEFAULT_PFET_L,
+    show_default=True,
+    help="PFET L (um); the (W_n, W_p) search uses this length.",
+)
+def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    output_dir: Path, vout_min: float, vout_max: float, vdd: float, pdk_root: str | None, nfet_l: float, pfet_l: float
+) -> None:
     """Runs the CS amplifier characterization sweep and writes artefacts."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     config = {
         "nfet_widths_um": list(_DEFAULT_NFET_WIDTHS),
         "pfet_widths_um": list(_DEFAULT_PFET_WIDTHS),
         "vdd": vdd,
-        "nfet_l_um": _DEFAULT_NFET_L,
-        "pfet_l_um": _DEFAULT_PFET_L,
+        "nfet_l_um": nfet_l,
+        "pfet_l_um": pfet_l,
         "vtc_step_v": _DEFAULT_VTC_STEP,
         "vin_step_amplitude": _DEFAULT_VIN_STEP_AMP,
         "t_step_start": _DEFAULT_T_STEP_START,
@@ -236,8 +255,8 @@ def main(output_dir: Path, vout_min: float, vout_max: float, vdd: float, pdk_roo
         _DEFAULT_NFET_WIDTHS,
         _DEFAULT_PFET_WIDTHS,
         vdd=vdd,
-        nfet_l_um=_DEFAULT_NFET_L,
-        pfet_l_um=_DEFAULT_PFET_L,
+        nfet_l_um=nfet_l,
+        pfet_l_um=pfet_l,
         pdk_root=pdk_root,
         progress=_log_progress,
     )

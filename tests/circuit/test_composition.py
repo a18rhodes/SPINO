@@ -437,6 +437,7 @@ class TestNgspiceIterParser:
         assert _maybe_with_acct(options, capture_iters=True) == options
 
 
+@pytest.mark.e2e_spice
 @pytest.mark.skipif(
     not _INTEGRATION_READY,
     reason="Production checkpoints/datasets or NGSpice unavailable",

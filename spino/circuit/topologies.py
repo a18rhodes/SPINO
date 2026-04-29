@@ -31,13 +31,13 @@ def _resolve_lib_path(pdk_root: str = _DEFAULT_PDK_ROOT) -> str:
     return str(lib_path.absolute())
 
 
-def build_cs_amp_active_load(
-    nfet_w: float = 6.0,
-    nfet_l: float = 0.18,
-    pfet_w: float = 4.5,
-    pfet_l: float = 0.18,
+def build_cs_amp_active_load(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    nfet_w: float = 1.6,
+    nfet_l: float = 0.4,
+    pfet_w: float = 2.5,
+    pfet_l: float = 0.4,
     vdd: float = 1.8,
-    vin_dc: float = 0.85,
+    vin_dc: float = 0.81,
     vin_tran: str = "",
     c_load_f: float = 0.0,
     pdk_root: str = _DEFAULT_PDK_ROOT,
@@ -58,8 +58,9 @@ def build_cs_amp_active_load(
                |
               GND
 
-    Default widths and input bias correspond to the operating point selected
-    by the NGSpice sizing sweep documented in ``docs/cs_amp.md`` (tt corner).
+    Default widths, lengths, and input bias follow the 3a sweep in
+    ``docs/assets/cs_amp_l040/summary.json`` (L = 0.4 um, tt corner) unless
+    overridden.
 
     :param nfet_w: NFET channel width in microns.
     :param nfet_l: NFET channel length in microns.

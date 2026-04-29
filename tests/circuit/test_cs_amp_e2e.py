@@ -23,10 +23,13 @@ import pytest
 
 _NGSPICE_AVAILABLE = shutil.which("ngspice") is not None
 _PDK_AVAILABLE = os.path.exists("/app/sky130_volare/sky130A/libs.tech/ngspice/sky130.lib.spice")
-pytestmark = pytest.mark.skipif(
-    not (_NGSPICE_AVAILABLE and _PDK_AVAILABLE),
-    reason="ngspice or Sky130 PDK not available",
-)
+pytestmark = [
+    pytest.mark.e2e_spice,
+    pytest.mark.skipif(
+        not (_NGSPICE_AVAILABLE and _PDK_AVAILABLE),
+        reason="ngspice or Sky130 PDK not available",
+    ),
+]
 
 from spino.circuit import build_cs_amp_active_load
 from spino.circuit.simulation import run_dc_sweep, run_operating_point, run_transient
