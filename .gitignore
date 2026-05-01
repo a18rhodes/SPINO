@@ -31,10 +31,11 @@ venv/
 
 # --- Project Artifacts (Crucial) ---
 # Do not commit large binary models or logs
-*/models/
-*/figures/
-*/runs/
-*/mlruns/
+# Note: `*/runs/` does NOT match repo-root `runs/`; use basename patterns.
+models/
+figures/
+runs/
+mlruns/
 *.pt
 figures/*.png
 
