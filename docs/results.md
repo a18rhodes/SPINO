@@ -94,16 +94,39 @@ track.
 
 ```text
 # SPICE references
-python -m spino.circuit.characterize --output-dir docs/assets/cs_amp
-python -m spino.circuit.characterize --nfet-l 0.4 --pfet-l 0.4 --output-dir docs/assets/cs_amp_l040
+python -m spino.circuit.characterize \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp
+
+python -m spino.circuit.characterize \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_l040
 
 # Composition (CUDA)
-python -m spino.circuit.compose --device cuda --output-dir docs/assets/cs_amp_fno_exp2
-python -m spino.circuit.compose --device cuda --output-dir docs/assets/cs_amp_fno_l040_exp2
+python -m spino.circuit.compose \
+    --device cuda \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp_fno_exp2
 
-# Composition (CPU; geometry flags match the CUDA rows above)
-python -m spino.circuit.compose --device cpu --output-dir docs/assets/cs_amp_fno \\
-    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 --vin-bias 0.85
-python -m spino.circuit.compose --device cpu --output-dir docs/assets/cs_amp_fno_l040 \\
-    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 --vin-bias 0.81
+python -m spino.circuit.compose \
+    --device cuda \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_fno_l040_exp2
+
+# Composition (CPU)
+python -m spino.circuit.compose \
+    --device cpu \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp_fno
+
+python -m spino.circuit.compose \
+    --device cpu \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_fno_l040
 ```
