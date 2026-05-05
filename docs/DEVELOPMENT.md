@@ -165,10 +165,3 @@ pytest --cov=. --cov-fail-under=100
 ```
 
 ---
-
-## Experiment Logs
-
-Detailed experiment histories, ablation results, and architectural decisions are documented in:
-
-- [spino/mosfet/CURRENT_STATUS.md](../spino/mosfet/CURRENT_STATUS.md) — chronological experiment log
-- [spino/mosfet/NEXT_STEPS.md](../spino/mosfet/NEXT_STEPS.md) — design rationale and future plans
