@@ -44,6 +44,7 @@ __all__ = [
     "DcSolution",
     "TransientSolver",
     "TransientSolution",
+    "transient_kcl_residual_waveform",
 ]
 
 logger = logging.getLogger(__name__)
@@ -670,3 +671,48 @@ class TransientSolver:
         """
         with torch.no_grad():
             return _inf_norm(self._residual_fn(v_out, vin_t, v_out_dc, dt))
+
+    def eval_residual_trajectory(
+        self,
+        v_out: Tensor,
+        vin_t: Tensor,
+        v_out_dc: float,
+        dt: Tensor,
+    ) -> Tensor:
+        """
+        Evaluates the whole-window transient residual ``R(V_out)`` without Newton.
+
+        Row ``0`` pins the initial condition; rows ``1..T-1`` enforce KCL with
+        backward-Euler capacitor discretisation. Used by attribution probes that
+        pin ``V_out`` to SPICE or FNO trajectories.
+
+        :param v_out: Candidate ``V_out(t)`` of shape ``(T,)``.
+        :param vin_t: Forced ``V_in(t)`` of shape ``(T,)``.
+        :param v_out_dc: Initial-condition voltage in volts.
+        :param dt: Per-step time deltas of shape ``(T-1,)``.
+        :return: Residual vector of shape ``(T,)``.
+        """
+        return self._residual_fn(v_out, vin_t, v_out_dc, dt)
+
+
+def transient_kcl_residual_waveform(
+    solver: TransientSolver,
+    v_out: Tensor,
+    vin_t: Tensor,
+    v_out_dc: float,
+    dt: Tensor,
+) -> Tensor:
+    """
+    Pointwise transient KCL residual for a pinned ``V_out`` trajectory.
+
+    Delegates to :meth:`TransientSolver.eval_residual_trajectory` so probe code
+    does not reach into private residual assembly.
+
+    :param solver: Transient solver (device currents and load capacitance).
+    :param v_out: Trajectory tensor ``(T,)``.
+    :param vin_t: Input trajectory ``(T,)``.
+    :param v_out_dc: Initial-condition voltage passed to row ``0``.
+    :param dt: Per-step deltas ``(T-1,)``.
+    :return: Residual vector ``(T,)`` matching the solver's Newton definition.
+    """
+    return solver.eval_residual_trajectory(v_out, vin_t, v_out_dc, dt)

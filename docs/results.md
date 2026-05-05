@@ -76,6 +76,31 @@ re-establishes the expected speed advantage.
 
 ![Newton convergence, CUDA `L=0.40` showcase run](assets/cs_amp_fno_l040_exp2/convergence.png)
 
+## Error attribution (`L=0.18` stress geometry)
+
+The `L=0.18` CUDA stress run shows the largest composition gaps (see **Core fidelity
+metrics** above). Those gaps were causally decomposed into two separable mechanisms
+via a four-probe isolation sequence: a **nominal-bias transient IV-surface** error
+and a **weak-inversion / near-off VTC** failure that the step stimulus does not
+traverse. Full method, figures, reproduction, and artefact layout are in
+[Error attribution: L=0.18 CUDA stress geometry](attribution.md).
+
+| Domain | Probe | Quantity | Value |
+|---|---|---|---:|
+| Transient | KCL residual (probe 2) | At pinned SPICE `V_out` (max) | 19.6 uA |
+| Transient | KCL residual (probe 2) | At pinned FNO `V_out` (max) | 73 nA |
+| Transient | KCL residual (probe 2) | SPICE/FNO ratio | 268x |
+| Transient | NR diagnostics (probe 4) | Iterations / max Jacobian diag ratio / line-search `alpha` | 3 / 616 / 1.0 |
+| VTC | IV error (probe 1) | NFET bad/good rel. error ratio | 4501x |
+| VTC | IV error (probe 1) | PFET bad/good rel. error ratio | 3710x |
+| VTC | IV error (probe 1) | PFET FNO vs SPICE at `V_in` ~ 0.25 V | 13.7 A vs 785 pA |
+| VTC | Substitution | `V_out` collapse, bad region (`V_in` < 0.5 V) | 176 mV -> 4.4 mV (97.5%) |
+| VTC | Substitution | `V_out` collapse, good region (`V_in` >= 0.5 V) | 6.5 mV -> 6.5 mV (0.0%) |
+
+In short: the transient mismatch is driven by FNO IV error at `V_gs` ~ 0.85-0.90 V
+with a healthy Newton loop; the VTC mismatch is driven by weak-inversion IV error
+at `V_in` < 0.5 V. That split matches the cross-bin stress narrative below.
+
 ## Interpretation
 
 The `L=0.40` showcase run materially improves both DC and transient agreement.

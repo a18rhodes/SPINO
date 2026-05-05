@@ -1,0 +1,14 @@
+{
+  "baseline_summary": "runs/attribution/cs_amp_fno_exp2/baseline/summary.json",
+  "probe_1_transient_iv_error": "runs/attribution/cs_amp_fno_exp2/baseline/attribution/probe1_iv_error.npz",
+  "probe_1_transient_summary": "runs/attribution/cs_amp_fno_exp2/baseline/attribution/probe1_iv_error_summary.json",
+  "probe_2_kcl_residual": "runs/attribution/cs_amp_fno_exp2/baseline/attribution/probe2_kcl_residual.json",
+  "probe_4_nr_diagnostics": "runs/attribution/cs_amp_fno_exp2/nr_diag/attribution/nr_newton_diagnostics.json",
+  "vtc_probe_1_iv_error": "runs/attribution/cs_amp_fno_exp2/vtc_probe1_iv_error.npz",
+  "vtc_substitution": "runs/attribution/cs_amp_fno_exp2/vtc_substitution.npz",
+  "vtc_probe1_figure": "docs/assets/cs_amp_fno_exp2/attribution/vtc_probe1_iv_error.png",
+  "vtc_substitution_figure": "docs/assets/cs_amp_fno_exp2/attribution/vtc_attribution_summary.png",
+  "probe3_hybrid_summary": "runs/attribution/cs_amp_fno_exp2/hybrid/summary.json",
+  "probe3_full_spice_summary": "runs/attribution/cs_amp_fno_exp2/full_spice_iv/summary.json",
+  "attribution_result": "docs/assets/cs_amp_fno_exp2/attribution/attribution_result.json"
+}

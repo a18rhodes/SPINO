@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "geometry": "L=0.18 CUDA stress",
+    "nfet_w_um": 6.0,
+    "nfet_l_um": 0.18,
+    "pfet_w_um": 4.5,
+    "pfet_l_um": 0.18,
+    "vdd_v": 1.8,
+    "vin_bias_v": 0.85,
+    "device": "cuda",
+    "baseline_run": "runs/attribution/cs_amp_fno_exp2/baseline/summary.json"
+  },
+  "baseline_metrics": {
+    "dc_rel_error_vdd": 0.009208794054400683,
+    "transient_pearson_r": 0.9974814397819356,
+    "transient_max_dv_mv": 25.781721653403867,
+    "transient_r2": -2.659531458063605,
+    "vtc_pearson_r": 0.9929450590266838,
+    "vtc_max_abs_error_mv": 379.73294879718344
+  },
+  "transient_attribution": {
+    "probe_1_iv_error": {
+      "isolates": "FNO vs SPICE drain current along transient trajectory (Vgs=0.85-0.90V)",
+      "mean_nfet_err_a": 5.071053516859751e-06,
+      "max_nfet_err_a": 6.586317743278433e-06,
+      "mean_pfet_err_a": 1.3463835265262486e-05,
+      "max_pfet_err_a": 1.4419525590242388e-05,
+      "note": "Transient Vgs=0.85-0.90V; weak-inversion locus not traversed by step stimulus"
+    },
+    "probe_2_kcl_residual": {
+      "isolates": "KCL imbalance at pinned SPICE V_out vs pinned FNO V_out",
+      "spice_pinned_max_a": 1.963172690011561e-05,
+      "spice_pinned_rms_a": 1.8544826161814854e-05,
+      "fno_pinned_max_a": 7.325267858959705e-08,
+      "fno_pinned_rms_a": 1.5938697472961394e-08,
+      "ratio_spice_over_fno": 268.0
+    },
+    "probe_3_substitution": {
+      "outcome": "Not executable",
+      "reason": "Transient Vgs=0.85-0.90V throughout; narrow threshold (0.50V) never triggers. Broad threshold causes NR divergence: FNO Jacobian and SPICE current values are inconsistent when all timesteps route to cache. Probe 2 KCL ratio (268x) is the causal evidence."
+    },
+    "probe_4_nr_diagnostics": {
+      "iterations": 3,
+      "max_diag_ratio": 616.5169067382812,
+      "min_solve_residual": 4.1060800592962465e-12,
+      "alpha_always_1": true,
+      "alpha_min": 0.001
+    },
+    "conclusion": "Solver is healthy (diag ratio ~616, alpha=1.0 all iterations, 3 NR iterations). 19.6uA KCL imbalance at SPICE V_out vs 73nA at FNO V_out (268x ratio). FNO converges correctly to wrong IV surface at nominal bias (Vgs~0.85V). Numerics do not contribute."
+  },
+  "vtc_attribution": {
+    "probe_1_iv_error": {
+      "isolates": "FNO vs SPICE drain current at each VTC bias point (fixed SPICE terminals)",
+      "nfet_ratio_bad_over_good": 4551.5,
+      "pfet_ratio_bad_over_good": 3709.9,
+      "pfet_spike_note": "At Vin~0.25V (VSG~0.33V) FNO predicts ~13.7A vs SPICE 785pA \u2014 catastrophic near-off failure"
+    },
+    "substitution": {
+      "isolates": "brentq KCL solve on SPICE IV cache in bad region; FNO in good region",
+      "threshold_vin_v": 0.5,
+      "fno_mean_err_bad_mv": 176.01508889101405,
+      "hybrid_mean_err_bad_mv": 4.3531966905065556,
+      "collapse_fraction_bad": 0.975,
+      "fno_mean_err_good_mv": 6.529137554165242,
+      "hybrid_mean_err_good_mv": 6.529137554165242,
+      "collapse_fraction_good": 0.0
+    },
+    "conclusion": "97.5% V_out error collapse in bad region (Vin < 0.5V) with 0.0% effect on good region. Weak-inversion IV error is causal for VTC failure with strong specificity. Both NFET (~4500x relative error ratio) and PFET (~3700x capped) fail in same bias region."
+  }
+}
