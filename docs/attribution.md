@@ -17,15 +17,21 @@ substitution experiments, and Newton diagnostics are not conflated.
 1. **Probe 1 (transient):** FNO vs SPICE drain current along the converged transient
    trajectory (nominal strong-inversion `V_gs` window).
 2. **Probe 2 (transient):** KCL residual waveforms with `V_out` pinned to the
-   SPICE-converged value vs the FNO-converged value. Large imbalance at the SPICE
-   pin with negligible imbalance at the FNO pin isolates wrong branch currents,
-   not a broken global Newton loop.
+   SPICE-converged value vs the FNO-converged value. The whole-window residual vector
+   stores row `0` as the IC clamp `V_out[0] - v_out_dc` in **volts** and rows `1..T-1`
+   as KCL imbalance in **amperes**; published headline numbers use **KCL-only** maxima
+   (`kcl_max_a`) after separating that row. Large imbalance at the SPICE pin with
+   negligible imbalance at the FNO pin isolates wrong branch currents, not a broken
+   global Newton loop.
 3. **Probe 3 (transient):** Hybrid / full-SPICE substitution runs. With the
    current implicit NR + whole-window routing, transient substitution causal
-   closure is **not executable** (see Open items).
+   closure is **not executable** (see Open items). The published VTC substitution
+   uses scalar `brentq` on the SPICE IV cache directly (Stage 7), not the
+   `HybridMosfetDevice` wrapper class (that class is scaffolding for a future
+   transient-substitution attempt).
 4. **Probe 4 (transient):** Per-iteration Newton diagnostics (Jacobian diagonal
-   ratio, linear solve residual, line-search `alpha`). Healthy numbers here rule
-   out numerical pathology as the primary driver.
+   ratio, linear solve residual, line-search `alpha`). Together with stable
+   convergence, these rule out numerical pathology as the primary driver.
 
 A parallel **VTC** track repeats Probe 1 on a DC sweep and performs a **region-wise
 IV substitution** (SPICE IV cache in the bad `V_in` band, FNO elsewhere) with
@@ -42,14 +48,18 @@ Raw probe arrays, IV caches, and full compose-run trees live under
 Baseline composition metrics for this geometry match the published stress run
 (`transient` Pearson `r`, max `|Delta V|`, `R^2`, etc.; see `results.md`).
 
-**Conclusion:** The transient Newton solver is well-behaved: three iterations,
-Jacobian diagonal ratio near `616` (well below a practical ill-conditioning
-threshold at `1e6` used in the notebook), full Newton step (`alpha = 1.0`) every
-iteration. The dominant effect is **FNO IV error at the nominal bias** (`V_gs`
-roughly `0.85`–`0.90` V along the step): at the SPICE-pinned `V_out`, the KCL
-residual peaks near **19.6 uA** vs **73 nA** at the FNO-pinned `V_out` (ratio
-**268x**). The solver converges to a **wrong IV surface**, not a numerically
-unstable solve.
+**Conclusion:** NR on this trajectory is stable: **three** outer iterations with
+**`alpha = 1.0`** accepted every iteration. The Stage-5 plot in
+[`spino/attribution.ipynb`](../spino/attribution.ipynb) tracks a **cheap Jacobian
+diagonal ratio** `max(|diag|) / min(|diag|)` (~`616` here), **not** `cond(J)`; the
+`1e6` line on that plot is a notebook heuristic from the float32 conditioning
+story and does **not** transfer literally to this ratio (which is bounded above by
+`kappa(J)` but is generally much smaller). The "solver healthy" claim rests on
+**`alpha` and iteration count**, not on the diagonal ratio alone. The dominant
+effect is **FNO IV error at the nominal bias** (`V_gs` roughly `0.85`–`0.90` V along
+the step): at the SPICE-pinned `V_out`, the **KCL** residual peaks near **19.6 uA**
+vs **73 nA** at the FNO-pinned `V_out` (ratio **268x**). The solver converges to a
+**wrong IV surface**, not a numerically unstable solve.
 
 ![Transient IV error along trajectory](assets/cs_amp_fno_exp2/attribution/probe1_iv_error.png)
 
@@ -63,14 +73,37 @@ unstable solve.
 
 **Conclusion:** VTC error is concentrated where both devices operate in weak
 inversion / near-off (`V_in < 0.5` V in this sweep). Relative IV error ratios
-(bad region vs good region) reach roughly **4500x** (NFET) and **3700x** (PFET,
-with per-point capping in the analysis). At `V_in ~ 0.25` V the PFET exhibits a
-catastrophic near-off spike: FNO on the order of **13.7 A** vs SPICE **785 pA**.
-A **brentq** KCL solve using the SPICE IV cache in the bad region (FNO retained
-elsewhere) collapses mean `V_out` error in that band from **176 mV** to **4.4 mV**
-(**97.5%** reduction) with **no** measurable effect in the good region
-(**0.0%** collapse). That closes causality on weak-inversion IV mismatch with
-strong regional specificity.
+(bad region vs good region) reach roughly **4500x** (NFET, uncapped mean-of-ratio).
+For the PFET, the arithmetic mean of per-point relative `|Delta I_D| / max(|I_D,SPICE|, 1e-12)`
+in the bad band is dominated by the near-off spike at `V_in ~ 0.30` V (the same
+locus as the headline **379.7 mV** `V_out` error). The notebook therefore caps
+per-point PFET relative error at **1000x** before averaging so the reported **~3700x**
+"capped mean ratio" is a **robust-by-truncation** summary, not an arbitrary
+editorial. **Uncapped** mean bad/mean good is **~3.0e10** (uninformative). **Median**
+bad/median good is **~266x**; ratio of geometric means of per-point relative errors
+is **~1157x** — both agree the bad band is catastrophically worse without the spike
+single-handedly defining the printed scalar.
+
+At `V_in ~ 0.25` V the PFET exhibits a catastrophic near-off spike: FNO on the order
+of **13.7 A** vs SPICE **785 pA** (evaluated at the **SPICE-converged** terminal
+voltages on the VTC grid; the value at the FNO self-consistent operating point
+differs, but the IV surface is uniformly bad in this band).
+
+A **brentq** KCL solve using the SPICE IV cache in the bad region (pure FNO held
+above `V_in = 0.5` V by construction) collapses **mean** `|V_out,FNO - V_out,SPICE|`
+in that band from **176 mV** to **4.4 mV** (**97.5%** reduction). In the same band,
+**max** `|V_out,FNO - V_out,SPICE|` falls from **379.7 mV** to **18.7 mV**. The
+good-region row in [`docs/results.md`](results.md) is a **gating invariant**: the
+hybrid curve is **identical to FNO** for `V_in >= 0.5` V by code construction, so
+"0.0% collapse" there is a sanity check that the bad-region `brentq` substitution
+does not leak into the good band — not evidence that SPICE IV was applied in the
+good band and had no effect.
+
+The archived `summary.json` does not record per-sweep-point DC Newton iteration
+histograms for the VTC curve; at this geometry scalar DC OP for each `V_in` is the
+same code path as the published composition DC solve and shows no pathology in the
+stress run's nominal/off bias reports. A full per-point iteration export would be
+straightforward instrumentation if a reviewer requires it.
 
 ![VTC IV error vs Vin](assets/cs_amp_fno_exp2/attribution/vtc_probe1_iv_error.png)
 
@@ -85,7 +118,8 @@ strong regional specificity.
    the entire implicit window to the SPICE cache and drives NR divergence because
    the FNO Jacobian is inconsistent with cached branch currents. **Probe 2**
    remains the causal evidence for the transient; substitution is blocked on the
-   current whole-window NR architecture.
+   current whole-window NR architecture. The `HybridMosfetDevice` class in the repo
+   targets this future path; it is **not** on the published VTC `brentq` path above.
 2. **Residual ~4.4 mV** after VTC substitution in the bad band is unexplained
    (likely cache interpolation or a secondary residual). It is small relative to
    the original **176 mV** gap and does not weaken the attribution claim.

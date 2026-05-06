@@ -145,7 +145,11 @@ def probe2_kcl_residual_bundle(
     :param v_out_fno: FNO ``v(out)`` tensor ``(T,)``.
     :param vin_t: Input trajectory tensor ``(T,)``.
     :param time_s: Time grid ``(T,)``.
-    :return: Dict with max/RMS stats and serialised waveforms.
+    :return: Dict with per-pin blocks. Row ``0`` of the underlying whole-window
+        residual is the IC clamp ``V_out[0] - v_out_dc`` in **volts**; rows ``1..T-1``
+        are KCL residuals in **amperes**. Returned ``ic_residual_v`` is row ``0``;
+        ``kcl_max_a``, ``kcl_rms_a``, and ``waveform_a`` use **only** the KCL tail
+        (rows ``1..T-1``), all in amperes.
     """
     dt = time_s[1:] - time_s[:-1]
     device = v_out_fno.device
@@ -155,18 +159,20 @@ def probe2_kcl_residual_bundle(
     r_fn = transient_kcl_residual_waveform(solver, v_out_fno, vin_t, float(v_out_dc_spice), dt)
     r_sp_np = r_sp.detach().cpu().numpy()
     r_fn_np = r_fn.detach().cpu().numpy()
-    kcl = r_sp_np[1:]
+    kcl_sp = r_sp_np[1:]
+    kcl_fn = r_fn_np[1:]
     return {
         "pinned_spice_vout": {
-            "residual_max_a": float(np.max(np.abs(r_sp_np))),
-            "residual_rms_a": float(np.sqrt(np.mean(r_sp_np**2))),
-            "kcl_tail_max_a": float(np.max(np.abs(kcl))),
-            "waveform_a": r_sp_np.tolist(),
+            "ic_residual_v": float(r_sp_np[0]),
+            "kcl_max_a": float(np.max(np.abs(kcl_sp))),
+            "kcl_rms_a": float(np.sqrt(np.mean(kcl_sp**2))),
+            "waveform_a": kcl_sp.tolist(),
         },
         "pinned_fno_vout": {
-            "residual_max_a": float(np.max(np.abs(r_fn_np))),
-            "residual_rms_a": float(np.sqrt(np.mean(r_fn_np**2))),
-            "waveform_a": r_fn_np.tolist(),
+            "ic_residual_v": float(r_fn_np[0]),
+            "kcl_max_a": float(np.max(np.abs(kcl_fn))),
+            "kcl_rms_a": float(np.sqrt(np.mean(kcl_fn**2))),
+            "waveform_a": kcl_fn.tolist(),
         },
     }
 

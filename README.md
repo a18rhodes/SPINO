@@ -234,6 +234,9 @@ Headline composition outcomes:
 
 Full tables, figures, and interpretation are in
 [CS amplifier composition results](docs/results.md).
+The `L=0.18` stress gap (including transient `R^2 < 0` next to high Pearson `r`) is
+causally decomposed in
+[Error attribution: L=0.18 CUDA stress geometry](docs/attribution.md).
 
 ## Future Work
 

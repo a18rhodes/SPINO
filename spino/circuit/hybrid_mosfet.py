@@ -4,6 +4,10 @@ Hybrid FNO / tabulated SPICE-IV MOSFET wrapper for composition experiments.
 When terminal voltages fall in a *bad* region, drain current is taken from a
 pre-computed NGSpice IV cache (``npz``); otherwise the production FNO is used.
 Gradients through the tabulated path are zero by design.
+
+The class is **scaffolding** for a future whole-window transient substitution
+(Probe 3) path; the published L=0.18 VTC attribution uses scalar ``brentq`` on the
+IV cache directly in ``spino/attribution.ipynb`` Stage 7, not this wrapper.
 """
 
 from __future__ import annotations

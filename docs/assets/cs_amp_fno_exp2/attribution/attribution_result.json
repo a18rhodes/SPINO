@@ -29,11 +29,11 @@
     },
     "probe_2_kcl_residual": {
       "isolates": "KCL imbalance at pinned SPICE V_out vs pinned FNO V_out",
-      "spice_pinned_max_a": 1.963172690011561e-05,
-      "spice_pinned_rms_a": 1.8544826161814854e-05,
-      "fno_pinned_max_a": 7.325267858959705e-08,
-      "fno_pinned_rms_a": 1.5938697472961394e-08,
-      "ratio_spice_over_fno": 268.0
+      "ratio_spice_over_fno": 268.0,
+      "spice_pinned_kcl_max_a": 1.963172690011561e-05,
+      "spice_pinned_kcl_rms_a": 1.8544826161814854e-05,
+      "fno_pinned_kcl_max_a": 7.325267858959705e-08,
+      "fno_pinned_kcl_rms_a": 1.5938697472961394e-08
     },
     "probe_3_substitution": {
       "outcome": "Not executable",
@@ -46,7 +46,7 @@
       "alpha_always_1": true,
       "alpha_min": 0.001
     },
-    "conclusion": "Solver is healthy (diag ratio ~616, alpha=1.0 all iterations, 3 NR iterations). 19.6uA KCL imbalance at SPICE V_out vs 73nA at FNO V_out (268x ratio). FNO converges correctly to wrong IV surface at nominal bias (Vgs~0.85V). Numerics do not contribute."
+    "conclusion": "NR is stable on this trajectory (alpha=1.0 every iteration, 3 iterations). The Stage-5 Jacobian diag ratio (~616) is a cheap max(|diag|)/min(|diag|) proxy, not cond(J); the healthy-solver claim rests on alpha and iteration count, not that ratio alone. 19.6uA KCL imbalance at SPICE V_out vs 73nA at FNO V_out (268x ratio). FNO converges correctly to wrong IV surface at nominal bias (Vgs~0.85V). Numerics do not contribute."
   },
   "vtc_attribution": {
     "probe_1_iv_error": {
@@ -65,6 +65,6 @@
       "hybrid_mean_err_good_mv": 6.529137554165242,
       "collapse_fraction_good": 0.0
     },
-    "conclusion": "97.5% V_out error collapse in bad region (Vin < 0.5V) with 0.0% effect on good region. Weak-inversion IV error is causal for VTC failure with strong specificity. Both NFET (~4500x relative error ratio) and PFET (~3700x capped) fail in same bias region."
+    "conclusion": "97.5% mean V_out error collapse in bad region (Vin < 0.5V); good region uses pure FNO above the threshold by construction (gating invariant). Weak-inversion IV error is causal for VTC failure with strong specificity. Both NFET (~4500x relative error ratio) and PFET (~3700x capped mean ratio; uncapped mean ratio dominated by the Vin~0.30 V spike) fail in the same bias region."
   }
 }

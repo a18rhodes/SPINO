@@ -87,15 +87,18 @@ traverse. Full method, figures, reproduction, and artefact layout are in
 
 | Domain | Probe | Quantity | Value |
 |---|---|---|---:|
-| Transient | KCL residual (probe 2) | At pinned SPICE `V_out` (max) | 19.6 uA |
-| Transient | KCL residual (probe 2) | At pinned FNO `V_out` (max) | 73 nA |
-| Transient | KCL residual (probe 2) | SPICE/FNO ratio | 268x |
+| Transient | KCL residual (probe 2) | KCL max `|i|` at pinned SPICE `V_out` | 19.6 uA |
+| Transient | KCL residual (probe 2) | KCL max `|i|` at pinned FNO `V_out` | 73 nA |
+| Transient | KCL residual (probe 2) | SPICE/FNO KCL-max ratio | 268x |
 | Transient | NR diagnostics (probe 4) | Iterations / max Jacobian diag ratio / line-search `alpha` | 3 / 616 / 1.0 |
 | VTC | IV error (probe 1) | NFET bad/good rel. error ratio | 4501x |
-| VTC | IV error (probe 1) | PFET bad/good rel. error ratio | 3710x |
-| VTC | IV error (probe 1) | PFET FNO vs SPICE at `V_in` ~ 0.25 V | 13.7 A vs 785 pA |
-| VTC | Substitution | `V_out` collapse, bad region (`V_in` < 0.5 V) | 176 mV -> 4.4 mV (97.5%) |
-| VTC | Substitution | `V_out` collapse, good region (`V_in` >= 0.5 V) | 6.5 mV -> 6.5 mV (0.0%) |
+| VTC | IV error (probe 1) | PFET bad/good rel. error ratio (1000x cap on each point before mean) | 3710x |
+| VTC | IV error (probe 1) | PFET FNO vs SPICE at `V_in` ~ 0.25 V (SPICE-converged pins) | 13.7 A vs 785 pA |
+| VTC | Substitution | Mean `|Delta V_out|` in bad region (`V_in` < 0.5 V) | 176 mV -> 4.4 mV (97.5%) |
+| VTC | Substitution | Max `|Delta V_out|` in bad region (`V_in` < 0.5 V) | 379.7 mV -> 18.7 mV |
+| VTC | Substitution | Good region (`V_in` >= 0.5 V): hybrid == FNO by gate | means unchanged (0.0%) |
+
+_PFET ratio row_: uncapped mean bad/mean good ~`3.0e10` (dominated by the `V_in ~ 0.30` V spike); median ratio ~`266x`; geometric-mean ratio ~`1157x`. Definitions in [attribution.md](attribution.md).
 
 In short: the transient mismatch is driven by FNO IV error at `V_gs` ~ 0.85-0.90 V
 with a healthy Newton loop; the VTC mismatch is driven by weak-inversion IV error
@@ -111,9 +114,10 @@ This is consistent with the geometry regime shift relative to training bins:
 - The `L=0.40` case moves length to the `small` length range, with a selected
   width pair that is less stressed for the current operators.
 
-The remaining low-`Vin` VTC mismatch is expected and consistent with known
-model-level weak-inversion / near-off fidelity limits documented in the MOSFET
-track.
+For the `L=0.18` stress geometry, the low-`Vin` VTC gap is not a vague "MOSFET-track
+limit" footnote: it is one of two **causally separated** mechanisms (nominal-bias
+transient IV error vs weak-inversion VTC failure) documented with probes and
+figures in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
 
 ## Reproduction commands
 

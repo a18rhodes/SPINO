@@ -14,15 +14,22 @@ from spino.circuit.composition import TransientSolver, transient_kcl_residual_wa
 from spino.circuit.error_attribution import mosfet_id_key_for_instance, probe2_kcl_residual_bundle
 
 
-def test_mosfet_id_key_discovery() -> None:
+@pytest.mark.parametrize(
+    ("instance", "kind"),
+    [
+        ("XM1", "nfet"),
+        ("XM2", "pfet"),
+    ],
+)
+def test_mosfet_id_key_discovery(instance: str, kind: str) -> None:
     """Drain-current keys follow NGSpice hierarchical naming."""
     variables = {
         "v(out)": np.array([0.0]),
         "i(@m.xm1.msky130_fd_pr__nfet_01v8[id])": np.array([1e-6]),
         "i(@m.xm2.msky130_fd_pr__pfet_01v8[id])": np.array([-1e-6]),
     }
-    k = mosfet_id_key_for_instance(variables, "XM1")
-    assert "nfet" in k.lower() and "[id]" in k.lower()
+    k = mosfet_id_key_for_instance(variables, instance)
+    assert kind in k.lower() and "[id]" in k.lower()
 
 
 def _flat_currents(_self, v_out: torch.Tensor, _vin_t: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -73,4 +80,7 @@ def test_probe2_bundle_keys(monkeypatch: pytest.MonkeyPatch) -> None:
         time_s=time_s,
     )
     assert set(out.keys()) == {"pinned_spice_vout", "pinned_fno_vout"}
-    assert len(out["pinned_spice_vout"]["waveform_a"]) == t
+    for pin in ("pinned_spice_vout", "pinned_fno_vout"):
+        blk = out[pin]
+        assert set(blk.keys()) == {"ic_residual_v", "kcl_max_a", "kcl_rms_a", "waveform_a"}
+        assert len(blk["waveform_a"]) == t - 1
