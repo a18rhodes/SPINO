@@ -2,6 +2,7 @@
 
 import logging
 import multiprocessing as mp
+import os
 import queue
 import shutil
 import sys
@@ -1244,6 +1245,7 @@ def generate_offline_dataset(
 
     def worker_generate(worker_id: int, num_samples_worker: int, temp_file: str, progress_queue):
         """Worker process that generates samples and writes to temp HDF5."""
+        os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
         try:
             dataset = InfiniteSpiceMosfetDataset(
                 strategy_name=strategy_name,

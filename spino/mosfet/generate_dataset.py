@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from spino.mosfet.device_strategy import DeviceStrategy
 from spino.mosfet.gen_data import GEOMETRY_BINS, generate_offline_dataset, merge_geometry_bins
 
 logging.basicConfig(
@@ -31,6 +32,8 @@ def main():
     parser.add_argument("--workers", "-j", type=int, default=16, help="Number of parallel workers (16 recommended)")
     parser.add_argument("--gate-max", type=float, default=1.8, help="Maximum gate voltage")
     parser.add_argument("--drain-max", type=float, default=1.8, help="Maximum drain voltage")
+    parser.add_argument("--source-min", type=float, default=None, help="Minimum source voltage (overrides strategy default)")
+    parser.add_argument("--source-max", type=float, default=None, help="Maximum source voltage (overrides strategy default)")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing file (default: append)")
     parser.add_argument(
         "--waveform-mode",
@@ -83,6 +86,11 @@ def main():
         "gate_range": (0.0, args.gate_max),
         "drain_range": (0.0, args.drain_max),
     }
+    if args.source_min is not None or args.source_max is not None:
+        strat = DeviceStrategy.create(args.strategy)
+        s_lo = args.source_min if args.source_min is not None else strat.source_range[0]
+        s_hi = args.source_max if args.source_max is not None else strat.source_range[1]
+        strategy_config["source_range"] = (s_lo, s_hi)
     if args.w_bin and args.l_bin:
         bin_info = f" [cross-bin W={args.w_bin}, L={args.l_bin}]"
     elif args.geometry_bin:
