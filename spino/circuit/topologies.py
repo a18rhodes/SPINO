@@ -9,7 +9,7 @@ from pathlib import Path
 
 from spino.circuit.netlist import Capacitor, Circuit, MosfetInstance, SpiceDevice, VoltageSource
 
-__all__ = ["build_cs_amp_active_load"]
+__all__ = ["build_cmos_inverter", "build_cs_amp_active_load", "build_inverter_chain"]
 
 _SKY130_LIB_RELATIVE = "sky130A/libs.tech/ngspice/sky130.lib.spice"
 _SKY130_NMOS_MODEL = "sky130_fd_pr__nfet_01v8"
@@ -99,6 +99,118 @@ def build_cs_amp_active_load(  # pylint: disable=too-many-arguments,too-many-pos
     return Circuit(
         name=f"CS Amp Active Load (NFET {nfet_w}/{nfet_l}, PFET {pfet_w}/{pfet_l})",
         devices=devices,
+        sources=(v_supply, v_input),
+        lib_path=lib_path,
+        lib_corner=corner,
+    )
+
+
+def build_cmos_inverter(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    nfet_w: float = 0.82,
+    nfet_l: float = 0.18,
+    pfet_w: float = 2.05,
+    pfet_l: float = 0.18,
+    vdd: float = 1.8,
+    vin_dc: float = 0.0,
+    vin_tran: str = "",
+    pdk_root: str = _DEFAULT_PDK_ROOT,
+    corner: str = "tt",
+) -> Circuit:
+    """
+    Builds a matched sky130 CMOS inverter (NFET + PFET).
+
+    Output node ``n1``; input ``nin`` driven by ``Vin``.
+
+    :param nfet_w: NFET width in microns.
+    :param nfet_l: NFET length in microns.
+    :param pfet_w: PFET width in microns.
+    :param pfet_l: PFET length in microns.
+    :param vdd: Supply voltage.
+    :param vin_dc: DC bias on the input (when ``vin_tran`` empty).
+    :param vin_tran: Transient stimulus for ``Vin``.
+    :param pdk_root: PDK root path.
+    :param corner: Process corner.
+    :return: Single-stage inverter circuit.
+    """
+    return build_inverter_chain(
+        n_stages=1,
+        nfet_w=nfet_w,
+        nfet_l=nfet_l,
+        pfet_w=pfet_w,
+        pfet_l=pfet_l,
+        vdd=vdd,
+        vin_dc=vin_dc,
+        vin_tran=vin_tran,
+        c_load_f=0.0,
+        pdk_root=pdk_root,
+        corner=corner,
+    )
+
+
+def build_inverter_chain(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    n_stages: int,
+    nfet_w: float = 0.82,
+    nfet_l: float = 0.18,
+    pfet_w: float = 2.05,
+    pfet_l: float = 0.18,
+    vdd: float = 1.8,
+    vin_dc: float = 0.0,
+    vin_tran: str = "",
+    c_load_f: float = 0.0,
+    pdk_root: str = _DEFAULT_PDK_ROOT,
+    corner: str = "tt",
+) -> Circuit:
+    """
+    Builds a chain of ``n_stages`` matched CMOS inverters.
+
+    Node ``nin`` is the primary input; ``n{k}`` is the output of stage ``k``.
+    The final output is ``n{n_stages}``.
+
+    :param n_stages: Number of inverters (>= 1).
+    :param nfet_w: NFET width per stage (µm).
+    :param nfet_l: NFET length (µm).
+    :param pfet_w: PFET width per stage (µm).
+    :param pfet_l: PFET length (µm).
+    :param vdd: Supply voltage.
+    :param vin_dc: Input DC voltage at ``nin``.
+    :param vin_tran: Optional transient waveform for ``Vin``.
+    :param c_load_f: Optional linear load on the **final** output to ground (F).
+    :param pdk_root: Sky130 PDK root.
+    :param corner: Spice corner label.
+    :return: Completed :class:`~spino.circuit.netlist.Circuit`.
+    """
+    if n_stages < 1:
+        raise ValueError(f"n_stages must be >= 1, got {n_stages}")
+    lib_path = _resolve_lib_path(pdk_root)
+    devices_list: list[SpiceDevice] = []
+    for k in range(1, n_stages + 1):
+        gate_net = "nin" if k == 1 else f"n{k - 1}"
+        drain_net = f"n{k}"
+        devices_list.append(
+            MosfetInstance(
+                name=f"XN{k}",
+                model_name=_SKY130_NMOS_MODEL,
+                width_um=nfet_w,
+                length_um=nfet_l,
+                nets={"drain": drain_net, "gate": gate_net, "source": "0", "bulk": "0"},
+            ),
+        )
+        devices_list.append(
+            MosfetInstance(
+                name=f"XP{k}",
+                model_name=_SKY130_PMOS_MODEL,
+                width_um=pfet_w,
+                length_um=pfet_l,
+                nets={"drain": drain_net, "gate": gate_net, "source": "vdd", "bulk": "vdd"},
+            ),
+        )
+    if c_load_f > 0.0:
+        devices_list.append(Capacitor(name="CL", positive_node=f"n{n_stages}", negative_node="0", capacitance_f=c_load_f))
+    v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=vdd)
+    v_input = VoltageSource(name="Vin", positive_node="nin", negative_node="0", dc_value=vin_dc, tran_value=vin_tran)
+    return Circuit(
+        name=f"Inverter chain x{n_stages} (Wn={nfet_w} Ln={nfet_l} Wp={pfet_w} Lp={pfet_l})",
+        devices=tuple(devices_list),
         sources=(v_supply, v_input),
         lib_path=lib_path,
         lib_corner=corner,

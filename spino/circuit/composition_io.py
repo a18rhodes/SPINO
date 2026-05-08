@@ -34,6 +34,7 @@ __all__ = [
     "ModelArchitecture",
     "load_cs_amp_devices",
     "load_fno_device",
+    "load_inverter_chain_devices",
 ]
 
 DEFAULT_NFET_CHECKPOINT = Path("/app/spino/models/mosfet/mosfet_vcfilm_exp19b_full_finetune_wtmjf8yn.pt")
@@ -249,3 +250,60 @@ def load_cs_amp_devices(  # pylint: disable=too-many-arguments
     nfet_device = load_fno_device(nfet_spec, architecture=architecture, map_location=map_location)
     pfet_device = load_fno_device(pfet_spec, architecture=architecture, map_location=map_location)
     return nfet_device, pfet_device
+
+
+def load_inverter_chain_devices(
+    *,
+    n_stages: int,
+    nfet_w_um: float,
+    nfet_l_um: float,
+    pfet_w_um: float,
+    pfet_l_um: float,
+    nfet_checkpoint: Path = DEFAULT_NFET_CHECKPOINT,
+    pfet_checkpoint: Path = DEFAULT_PFET_CHECKPOINT,
+    nfet_dataset: Path = DEFAULT_NFET_DATASET,
+    pfet_dataset: Path = DEFAULT_PFET_DATASET,
+    architecture: ModelArchitecture | None = None,
+    map_location: str | torch.device = "cpu",
+) -> tuple[tuple[FnoMosfetDevice, ...], tuple[FnoMosfetDevice, ...]]:
+    """
+    Loads ``N`` NFET and ``N`` PFET FNO wrappers for a matched inverter chain.
+
+    Every stage reuses the same ``(W,L)`` sizing; each device is an independent
+    :class:`~spino.circuit.devices.FnoMosfetDevice` instance (no weight sharing).
+
+    :param n_stages: Number of series inverters (>= 1).
+    :param nfet_w_um: NFET width shared by all stages.
+    :param nfet_l_um: NFET length.
+    :param pfet_w_um: PFET width.
+    :param pfet_l_um: PFET length.
+    :param nfet_checkpoint: NFET ``.pt``.
+    :param pfet_checkpoint: PFET ``.pt``.
+    :param nfet_dataset: NFET HDF5 normalisation file.
+    :param pfet_dataset: PFET HDF5 normalisation file.
+    :param architecture: Optional FNO hyperparameter override.
+    :param map_location: Torch device placement.
+    :return: Tuple ``(nfets, pfets)`` each of length ``n_stages``.
+    """
+    if n_stages < 1:
+        raise ValueError("n_stages must be >= 1")
+    nfets_list: list[FnoMosfetDevice] = []
+    pfets_list: list[FnoMosfetDevice] = []
+    for idx in range(n_stages):
+        n_dev, p_dev = load_cs_amp_devices(
+            nfet_w_um=nfet_w_um,
+            nfet_l_um=nfet_l_um,
+            pfet_w_um=pfet_w_um,
+            pfet_l_um=pfet_l_um,
+            nfet_checkpoint=nfet_checkpoint,
+            pfet_checkpoint=pfet_checkpoint,
+            nfet_dataset=nfet_dataset,
+            pfet_dataset=pfet_dataset,
+            architecture=architecture,
+            map_location=map_location,
+        )
+        n_dev.label = f"NFET_XN{idx + 1}"
+        p_dev.label = f"PFET_XP{idx + 1}"
+        nfets_list.append(n_dev)
+        pfets_list.append(p_dev)
+    return tuple(nfets_list), tuple(pfets_list)
