@@ -5,6 +5,9 @@ using two SPICE-characterized amplifier references and their corresponding
 composition runs.
 
 Method details are documented in [Neural composition: CS amplifier method](composition.md).
+The CS amplifier is the primary system-level result for the differentiable
+composition method. Digital inverter chains are included below only as a known
+limitation and regime-boundary result.
 
 ## Experimental context
 
@@ -46,25 +49,25 @@ the `small` length range and correspondingly selected widths.
 | Transient settling (FNO / SPICE) | 30 ns / 25 ns | 210 ns / 195 ns |
 | NR iterations (DC / transient) | 5 / 3 | 5 / 2 |
 
-## Runtime and speedup
+## Runtime context
 
 ### CUDA composition vs SPICE
 
-| Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) | Warm speedup (SPICE/FNO) |
-|---|---:|---:|---:|---:|---:|
-| `L=0.18` stress CUDA | 2873.77 | 2697.09 | 13335.72 | 13031.04 | 4.83x |
-| `L=0.40` showcase CUDA | 1757.65 | 1733.18 | 12528.74 | 12677.87 | 7.31x |
+| Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) |
+|---|---:|---:|---:|---:|
+| `L=0.18` stress CUDA | 2873.77 | 2697.09 | 13335.72 | 13031.04 |
+| `L=0.40` showcase CUDA | 1757.65 | 1733.18 | 12528.74 | 12677.87 |
 
 ### CPU composition vs SPICE
 
-| Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) | Warm speedup (SPICE/FNO) |
-|---|---:|---:|---:|---:|---:|
-| `L=0.18` stress CPU | 26091.39 | 25852.92 | 13077.73 | 13018.72 | 0.50x |
-| `L=0.40` showcase CPU | 19410.45 | 20193.68 | 12621.42 | 12482.44 | 0.62x |
+| Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) |
+|---|---:|---:|---:|---:|
+| `L=0.18` stress CPU | 26091.39 | 25852.92 | 13077.73 | 13018.72 |
+| `L=0.40` showcase CPU | 19410.45 | 20193.68 | 12621.42 | 12482.44 |
 
-On this stack, NGSpice is heavily optimized on CPU and remains faster than the
-dense-autograd composition path at both archived geometries, while CUDA
-re-establishes the expected speed advantage.
+These numbers are reported for reproducibility and engineering context. The
+scientific claim is differentiable composition in the analog regime, not raw
+wall-clock superiority over NGSpice.
 
 ## Figure set (showcase run)
 
@@ -118,6 +121,35 @@ For the `L=0.18` stress geometry, the low-`Vin` VTC gap is not a vague "MOSFET-t
 limit" footnote: it is one of two **causally separated** mechanisms (nominal-bias
 transient IV error vs weak-inversion VTC failure) documented with probes and
 figures in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
+
+## Digital circuits: known limitation
+
+The inverter-chain composition path was evaluated as a digital extension using
+1-, 2-, and 4-stage CMOS chains. SPICE converges for these circuits. The
+FNO-composed transient solver does not converge to acceptance-quality outputs,
+so its waveforms, delay metrics, and parity statistics are diagnostic only.
+
+Measured transient timing is not evidence of a usable digital accelerator:
+relative FNO/SPICE transient time was approximately `0.77x` at `N=1`,
+`2.8x` at `N=2`, and `10.5x` at `N=4`, while the FNO transient failed to
+converge. Those timings are therefore a negative result, not a performance
+claim.
+
+The root cause is structural. The MOSFET is quasi-static, so physical conductive
+sensitivity should be local in time: $`dI[t] / dV[t'] = 0`$ for $`t \ne t'`$.
+The FNO is a temporal operator with spectral convolutions across the whole
+window, so autograd produces a dense $`(N \cdot T) \times (N \cdot T)`$
+Jacobian containing off-diagonal temporal couplings. In the CS amplifier's
+analog gain region, the physical conductive diagonal is large enough to dominate
+those artifacts. In the inverter's digital saturation plateau, the physical
+$`dI/dV_{DS}`$ term collapses, the spurious off-diagonal terms dominate
+`linalg.solve(J, -R)`, and Newton steps oscillate into non-physical trajectories.
+
+The training data reinforces this boundary: the current
+`sky130_nmos_61k_plus_shortch_supp8k.h5` corpus is biased toward dynamic
+analog-style waveforms with gate and drain varying together. It does not include
+quasi-static fixed-gate drain sweeps or digital step families sufficient to teach
+clean conductive Jacobians at fixed bias.
 
 ## Reproduction commands
 

@@ -1,4 +1,4 @@
-# SPINO: Universal Parametric Neural Operators for Accelerated Circuit Simulation
+# SPINO: Universal Parametric Neural Operators for Differentiable Analog Circuit Simulation
 
 > **Disclaimer:** Experiments and results are verified by the author. References and citations
 > have *not* been independently verified. All code and experiments are original work by the
@@ -8,41 +8,50 @@
 
 ## Abstract
 
-The verification of modern integrated circuits is bottlenecked by SPICE's super-linear
-scaling with circuit size ($`O(N^{1.2})`$ to $`O(N^2)`$). **SPINO** (SPICE Neural Operator)
-applies Fourier Neural Operators (FNOs) to learn continuous operator mappings from terminal
-voltage waveforms and device parameters to node current, replacing the inner-loop SPICE
-device evaluation with a single differentiable forward pass.
+**SPINO** (SPICE Neural Operator) studies whether Fourier Neural Operator
+(FNO) device surrogates can be composed inside Newton-Raphson circuit solvers
+while preserving end-to-end differentiability. The scientific contribution is
+not a blanket replacement for SPICE. It is a differentiable analog-circuit
+simulation path: MOSFET operators map terminal voltage waveforms and device
+parameters to drain current, then autograd supplies Jacobians for KCL-based
+composition.
+
+The strongest system-level result is the single-stage common-source amplifier.
+DC and transient solves converge, parity with NGSPICE is good, and the
+differentiable formulation is well matched to analog operating regions where
+conductive Jacobians keep the residual well conditioned. This makes the method
+most relevant for rapid device sizing, parameter sweeps, and gradient-based
+topology search during analog design.
 
 Four device operators have been trained and validated against NGSPICE ground truth:
 
-| Operator | Conditioning | Peak R² | Speedup | Documentation |
-|---|---|---|---|---|
-| Linear RC | Dimensionless $`\lambda`$ | 0.9999 | < 1× | [RC Circuit](docs/rc.md) |
-| Shockley Diode | Dimensionless $`\lambda`$ + direct injection | 0.9999 | ~66× | [Diode](docs/diode.md) |
-| sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | ~1300× | [NFET](docs/nfet.md) |
-| sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | ~522× | [PFET](docs/pfet.md) |
+| Operator | Conditioning | Peak R² | Documentation |
+|---|---|---|---|
+| Linear RC | Dimensionless $`\lambda`$ | 0.9999 | [RC Circuit](docs/rc.md) |
+| Shockley Diode | Dimensionless $`\lambda`$ + direct injection | 0.9999 | [Diode](docs/diode.md) |
+| sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | [NFET](docs/nfet.md) |
+| sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | [PFET](docs/pfet.md) |
 
-A composed-circuit CS amplifier is the first system-level validation milestone.
+The composed-circuit CS amplifier is the primary validation milestone.
 The work is split into three paper-style documents:
 
 - [Neural composition: CS amplifier method](docs/composition.md) — KCL assembly,
   Newton-Raphson solvers, autograd Jacobians, and damping policy.
 - [CS amplifier composition results](docs/results.md) — SPICE baselines,
-  composed-fidelity metrics, and runtime tables (CPU/CUDA context).
+  composed-fidelity metrics, runtime context, and documented limitations.
 - [Future work](docs/future_work.md) — global roadmap beyond active lab trackers.
 
 SPICE-only characterization methodology and selected design points are documented in
 [CS amplifier characterization](docs/cs_amp.md).
 
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
-(W = 1.0 µm, L = 0.18 µm), with warm-inference throughput approximately 1300× that of NGSPICE.
+(W = 1.0 µm, L = 0.18 µm).
 The PMOS operator uses the same VCFiLM-FNO architecture trained on a sweep-augmented dataset
 (40 K random PWL + 4 K deterministic sweeps), achieving transfer R² = 0.9965 and sweep R² >
-0.99 across all tested geometries at ~522× NGSPICE speed.
+0.99 across all tested geometries.
 The diode operator extends the RC dimensionless framework to the nonlinear Shockley equation,
-achieving R² = 0.9994 on a standard rectifier and R² = 0.9999 on adversarial samples at ~66×
-NGSpice speed — with validated resolution invariance ($`\Delta R^2 < 0.0001`$ at 1024/2048/4096
+achieving R² = 0.9994 on a standard rectifier and R² = 0.9999 on adversarial samples,
+with validated resolution invariance ($`\Delta R^2 < 0.0001`$ at 1024/2048/4096
 steps) and time-scale invariance (R² ≥ 0.997 across $`T_{end}`$ spanning 100 µs to 10 ms).
 The RC operator demonstrates that a single trained FNO generalises across the full stiffness
 ratio spectrum without per-circuit solver configuration.
@@ -100,8 +109,7 @@ stiffness ratio $`\lambda = RC/T_{end}`$ injected as a constant channel. This ma
 operator invariant to simulation window and grid resolution. Five circuit parameters
 ($`\lambda`$, $`R`$, $`C`$, $`I_S`$, $`N`$) are injected directly as constant-valued channels
 alongside the normalised current waveform. Log-encoding of parameters spanning 15 orders of
-magnitude ($`I_S`$) prevents gradient instability. The FNO replaces NGSpice's inner-loop
-Newton–Raphson solver with a single forward pass, achieving ~66× speedup.
+magnitude ($`I_S`$) prevents gradient instability.
 
 ### 3. sky130 NMOS (VCFiLM-FNO)
 
@@ -143,23 +151,33 @@ and sweeps gate/drain downward.
 | CS amp composition (L=0.18, CUDA) | Transient vs SPICE | 0.99748 (Pearson r) | Max \|ΔV\| = 25.78 mV |
 | CS amp composition (L=0.40, CUDA) | Transient vs SPICE | 0.99981 (Pearson r) | Max \|ΔV\| = 2.392 mV |
 
-### Throughput
+### Runtime context
 
-| Operator | Baseline | FNO | Speedup | Notes |
-|---|---|---|---|---|
-| Shockley diode | NGSPICE ~264 ms | ~4 ms | **~66×** | Single 2048-step transient |
-| sky130 NMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~1300×** | Sustained throughput |
-| sky130 NMOS (cold) | NGSPICE `.tran` | First call (incl. JIT) | **~21×** | One-time compilation cost |
-| sky130 PMOS (warm) | NGSPICE `.tran` | JIT-compiled pass | **~522×** | Sustained throughput |
-| CS amp composition (L=0.18, CUDA warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~4.83×** | Cross-bin stress point |
-| CS amp composition (L=0.40, CUDA warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~7.31×** | In-bin showcase point |
-| CS amp composition (L=0.18, CPU warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~0.50×** | CPU bottleneck vs optimized NGSPICE |
-| CS amp composition (L=0.40, CPU warm) | NGSPICE `.op + .tran` | FNO-KCL warm solve | **~0.62×** | Same bottleneck; slightly better ratio at showcase geometry |
-| Linear RC | ODE loop < 1 ms | FNO ~96 ms | **< 1×** | Value is generalization, not speed |
+Runtime is measured and archived, but it is not the central claim. The useful
+property of the composed MOSFET flow is differentiability through the circuit
+residual, which is the missing primitive for gradient-based analog sizing and
+topology search. Circuit-level wall time depends strongly on hardware, dense
+autograd Jacobian assembly, and linear-solve cost.
 
 ---
 
 ## Known Limitations
+
+### Digital switching circuits
+
+The inverter-chain extension is a documented negative result and marks the
+current regime boundary. The whole-window FNO formulation does not converge to
+acceptance-quality digital trajectories for 1-, 2-, or 4-stage CMOS inverter
+chains. The cause is structural rather than a solver-tuning defect: temporal
+spectral convolutions produce off-diagonal autograd Jacobian terms
+$`dI[t] / dV[t']`$ that have no quasi-static MOSFET interpretation. In analog
+gain regions, large conductive diagonals dominate those artifacts. In digital
+saturation plateaus, the physical $`dI/dV_{DS}`$ diagonal collapses and the
+spurious temporal coupling dominates Newton steps.
+
+The inverter-chain code, tests, and CLI remain in the repository as a
+regime-boundary artifact. They characterize where this FNO-composed formulation
+currently stops being valid; they are not an active convergence TODO.
 
 ### Temporal and Resolution Invariance (MOSFET)
 
@@ -228,9 +246,7 @@ Headline composition outcomes:
   transient Pearson `r = 0.99748`, max `|ΔV| = 25.78 mV`.
 - In-bin showcase point (`L=0.40`, small-length-band selection):
   transient Pearson `r = 0.99981`, max `|ΔV| = 2.392 mV`.
-- Warm runtime speedup (SPICE/FNO): `4.83x` at `L=0.18` (CUDA) and `7.31x`
-  at `L=0.40` (CUDA); on CPU the same headline pair is `0.50x` and `0.62x`
-  (NGSpice still wins on wall time).
+- Runtime tables are reported as experimental context, not as the contribution.
 
 Full tables, figures, and interpretation are in
 [CS amplifier composition results](docs/results.md).
@@ -244,8 +260,8 @@ The global forward roadmap is consolidated in [Future work](docs/future_work.md)
 organized around:
 
 1. Better model accuracy in weak-inversion / low-bias regions.
-2. Larger architecture evaluation (including differential-pair-scale analog and
-   deeper digital topologies).
+2. Larger analog architecture evaluation, including differential-pair-scale
+   circuits and feedback variants.
 3. Cross-cutting investigations beyond daily status trackers (runtime
    decomposition, reproducibility envelopes, and system-level error budgeting).
 
