@@ -6,6 +6,7 @@ import os
 import queue
 import shutil
 import sys
+import uuid
 from pathlib import Path
 
 import h5py
@@ -1240,7 +1241,7 @@ def generate_offline_dataset(
     logger.info(
         "Generating %d samples with %d workers (%d samples/worker)", num_samples, num_workers, samples_per_worker
     )
-    temp_dir = Path(output_path).parent / "temp_generation"
+    temp_dir = Path(output_path).parent / f"temp_generation_{uuid.uuid4().hex[:8]}"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
     def worker_generate(worker_id: int, num_samples_worker: int, temp_file: str, progress_queue):
