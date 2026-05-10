@@ -37,9 +37,9 @@ __all__ = [
     "load_inverter_chain_devices",
 ]
 
-DEFAULT_NFET_CHECKPOINT = Path("/app/spino/models/mosfet/mosfet_vcfilm_exp19b_full_finetune_wtmjf8yn.pt")
+DEFAULT_NFET_CHECKPOINT = Path("/app/spino/models/mosfet/nfet/mosfet_vcfilm_exp20_float_src_68SXXICB.pt")
 DEFAULT_PFET_CHECKPOINT = Path("/app/spino/models/mosfet/pfet/mosfet_pmos_exp06_sweep_aug_CzBVmMi4.pt")
-DEFAULT_NFET_DATASET = Path("/app/datasets/sky130_nmos_61k_plus_shortch_supp8k.h5")
+DEFAULT_NFET_DATASET = Path("/app/datasets/sky130_nmos_v2_76k_float_src.h5")
 DEFAULT_PFET_DATASET = Path("/app/datasets/sky130_pmos_48k_sweep_aug.h5")
 
 
