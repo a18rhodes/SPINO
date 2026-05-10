@@ -7,9 +7,15 @@ blocks using Sky130 device models.
 
 from pathlib import Path
 
-from spino.circuit.netlist import Capacitor, Circuit, MosfetInstance, SpiceDevice, VoltageSource
+from spino.circuit.netlist import (
+    Capacitor,
+    Circuit,
+    MosfetInstance,
+    SpiceDevice,
+    VoltageSource,
+)
 
-__all__ = ["build_cmos_inverter", "build_cs_amp_active_load", "build_inverter_chain"]
+__all__ = ["build_cmos_inverter", "build_cs_amp_active_load", "build_inverter_chain", "build_ota_5t"]
 
 _SKY130_LIB_RELATIVE = "sky130A/libs.tech/ngspice/sky130.lib.spice"
 _SKY130_NMOS_MODEL = "sky130_fd_pr__nfet_01v8"
@@ -205,13 +211,126 @@ def build_inverter_chain(  # pylint: disable=too-many-arguments,too-many-positio
             ),
         )
     if c_load_f > 0.0:
-        devices_list.append(Capacitor(name="CL", positive_node=f"n{n_stages}", negative_node="0", capacitance_f=c_load_f))
+        devices_list.append(
+            Capacitor(name="CL", positive_node=f"n{n_stages}", negative_node="0", capacitance_f=c_load_f)
+        )
     v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=vdd)
     v_input = VoltageSource(name="Vin", positive_node="nin", negative_node="0", dc_value=vin_dc, tran_value=vin_tran)
     return Circuit(
         name=f"Inverter chain x{n_stages} (Wn={nfet_w} Ln={nfet_l} Wp={pfet_w} Lp={pfet_l})",
         devices=tuple(devices_list),
         sources=(v_supply, v_input),
+        lib_path=lib_path,
+        lib_corner=corner,
+    )
+
+
+def build_ota_5t(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+    *,
+    diff_w_um: float,
+    diff_l_um: float,
+    mirror_w_um: float,
+    mirror_l_um: float,
+    tail_w_um: float,
+    tail_l_um: float,
+    vdd: float = 1.8,
+    vbias_v: float = 1.2,
+    vcm_v: float = 0.9,
+    vinp_tran: str = "",
+    vinn_tran: str = "",
+    c_load_f: float = 0.0,
+    pdk_root: str = _DEFAULT_PDK_ROOT,
+    corner: str = "tt",
+) -> Circuit:
+    """
+    Builds a five-transistor OTA with NFET differential pair and PFET current-mirror load.
+
+    Topology::
+
+                         VDD (1.8 V)
+                  ┌────┐    ┌────┐
+                  │ M3 │    │ M4 │   (PFET mirror; M3 diode-connected)
+                  └─┬──┘    └─┬──┘
+           n_left ──┤        ├── n_out  ← single-ended output
+                  ┌─┴──┐    ┌─┴──┐
+       Vinp ──── G│ M1 │    │ M2 │G ──── Vinn
+                  └─┬──┘    └─┬──┘
+                    └────┬────┘
+                         ├── n_tail
+                       ┌─┴──┐
+                Vbias─G│ M5 │       (NFET tail current source)
+                       └─┴──┘
+                        GND
+
+    Internal nodes (KCL unknowns for FNO composition): ``n_tail``, ``n_left``, ``n_out``.
+
+    :param diff_w_um: Differential-pair MOSFET width (M1, M2) in microns.
+    :param diff_l_um: Differential-pair channel length in microns.
+    :param mirror_w_um: Current-mirror MOSFET width (M3, M4) in microns.
+    :param mirror_l_um: Current-mirror channel length in microns.
+    :param tail_w_um: Tail current-source width (M5) in microns.
+    :param tail_l_um: Tail current-source channel length in microns.
+    :param vdd: Supply voltage in volts (default 1.8 V).
+    :param vbias_v: DC gate bias for the tail current source (M5).
+    :param vcm_v: Input common-mode DC voltage for both Vinp and Vinn.
+    :param vinp_tran: Transient stimulus string for Vinp (e.g., "PWL(...)").
+        When empty the source holds ``vcm_v`` throughout.
+    :param vinn_tran: Transient stimulus string for Vinn.
+    :param c_load_f: Optional linear load capacitance at ``n_out`` to ground (F).
+    :param pdk_root: Sky130 PDK root directory.
+    :param corner: Process corner (e.g., "tt").
+    :return: Configured Circuit ready for SPICE simulation.
+    """
+    lib_path = _resolve_lib_path(pdk_root)
+    m1 = MosfetInstance(
+        name="XM1",
+        model_name=_SKY130_NMOS_MODEL,
+        width_um=diff_w_um,
+        length_um=diff_l_um,
+        nets={"drain": "n_left", "gate": "vinp", "source": "n_tail", "bulk": "0"},
+    )
+    m2 = MosfetInstance(
+        name="XM2",
+        model_name=_SKY130_NMOS_MODEL,
+        width_um=diff_w_um,
+        length_um=diff_l_um,
+        nets={"drain": "n_out", "gate": "vinn", "source": "n_tail", "bulk": "0"},
+    )
+    m3 = MosfetInstance(
+        name="XM3",
+        model_name=_SKY130_PMOS_MODEL,
+        width_um=mirror_w_um,
+        length_um=mirror_l_um,
+        nets={"drain": "n_left", "gate": "n_left", "source": "vdd", "bulk": "vdd"},
+    )
+    m4 = MosfetInstance(
+        name="XM4",
+        model_name=_SKY130_PMOS_MODEL,
+        width_um=mirror_w_um,
+        length_um=mirror_l_um,
+        nets={"drain": "n_out", "gate": "n_left", "source": "vdd", "bulk": "vdd"},
+    )
+    m5 = MosfetInstance(
+        name="XM5",
+        model_name=_SKY130_NMOS_MODEL,
+        width_um=tail_w_um,
+        length_um=tail_l_um,
+        nets={"drain": "n_tail", "gate": "vbias", "source": "0", "bulk": "0"},
+    )
+    v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=vdd)
+    v_bias = VoltageSource(name="Vbias", positive_node="vbias", negative_node="0", dc_value=vbias_v)
+    v_inp = VoltageSource(name="Vinp", positive_node="vinp", negative_node="0", dc_value=vcm_v, tran_value=vinp_tran)
+    v_inn = VoltageSource(name="Vinn", positive_node="vinn", negative_node="0", dc_value=vcm_v, tran_value=vinn_tran)
+    devices: tuple[SpiceDevice, ...] = (m1, m2, m3, m4, m5)
+    if c_load_f > 0.0:
+        devices = devices + (Capacitor(name="CL", positive_node="n_out", negative_node="0", capacitance_f=c_load_f),)
+    return Circuit(
+        name=(
+            f"5T OTA (Wdiff={diff_w_um}/{diff_l_um} µm, Wmirror={mirror_w_um}/{mirror_l_um} µm,"
+            f" Wtail={tail_w_um}/{tail_l_um} µm)"
+        ),
+        devices=devices,
+        sources=(v_supply, v_bias, v_inp, v_inn),
         lib_path=lib_path,
         lib_corner=corner,
     )

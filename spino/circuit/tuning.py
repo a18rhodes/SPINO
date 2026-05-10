@@ -30,18 +30,31 @@ from spino.circuit.simulation import (
     run_operating_point,
     run_transient,
 )
-from spino.circuit.topologies import build_cs_amp_active_load
+from spino.circuit.topologies import build_cs_amp_active_load, build_ota_5t
+
+# pylint: disable=too-many-lines
+
 
 __all__ = [
     "DesignPoint",
     "Metrics",
+    "OtaDesignPoint",
+    "OtaMetrics",
+    "OtaSelectionRule",
+    "OtaSweepResult",
     "SelectionRule",
     "SweepResult",
+    "extract_dc_gain",
     "extract_peak_gain",
     "extract_settling_time",
+    "extract_slew_rate",
+    "extract_slew_time",
     "select_design_point",
+    "select_ota_design_point",
     "simulate_design_point",
+    "simulate_ota_design_point",
     "sweep_design_space",
+    "sweep_ota_design_space",
 ]
 
 logger = logging.getLogger(__name__)
@@ -222,7 +235,7 @@ def extract_settling_time(tran: TransientResult, *, t_step_start: float, settle_
     return max(float(time[last_outside + 1]) - t_step_start, 0.0)
 
 
-def _build(
+def _build(  # pylint: disable=too-many-arguments
     point: DesignPoint,
     *,
     vdd: float,
@@ -258,7 +271,7 @@ def _build(
     return build_cs_amp_active_load(**kwargs)
 
 
-def _vtc(
+def _vtc(  # pylint: disable=too-many-arguments
     point: DesignPoint, *, vdd: float, nfet_l_um: float, pfet_l_um: float, pdk_root: str | None, step_v: float
 ) -> DCSweepResult | None:
     """
@@ -276,7 +289,7 @@ def _vtc(
     return run_dc_sweep(circuit, source_name="Vin", start=0.0, stop=vdd, step=step_v)
 
 
-def _operating_point(
+def _operating_point(  # pylint: disable=too-many-arguments
     point: DesignPoint,
     *,
     vdd: float,
@@ -300,7 +313,7 @@ def _operating_point(
     return run_operating_point(circuit)
 
 
-def _step_response(
+def _step_response(  # pylint: disable=too-many-arguments
     point: DesignPoint,
     *,
     vdd: float,
@@ -345,7 +358,7 @@ def _step_response(
     return run_transient(circuit, t_step=t_step, t_end=t_end)
 
 
-def simulate_design_point(
+def simulate_design_point(  # pylint: disable=too-many-arguments,too-many-locals
     point: DesignPoint,
     *,
     vdd: float = 1.8,
@@ -419,7 +432,7 @@ def simulate_design_point(
     )
 
 
-def sweep_design_space(
+def sweep_design_space(  # pylint: disable=too-many-arguments
     nfet_widths_um: tuple[float, ...],
     pfet_widths_um: tuple[float, ...],
     *,
@@ -469,4 +482,568 @@ def select_design_point(sweep: SweepResult, rule: SelectionRule) -> tuple[Design
     if not feasible:
         raise ValueError("No design point in the sweep satisfies the selection rule.")
     feasible.sort(key=lambda pm: (-abs(pm[1].peak_gain_v_per_v), pm[1].static_current_a))
+    return feasible[0]
+
+
+# ---------------------------------------------------------------------------
+# 5T OTA characterization harness
+# ---------------------------------------------------------------------------
+
+_OTA_OUTPUT_NODE = "v(n_out)"
+_OTA_SUPPLY_CURRENT = "i(vdd)"
+
+
+@dataclass(frozen=True, slots=True)
+class OtaDesignPoint:
+    """
+    A single ``(W_diff, W_mirror)`` sizing in microns at fixed channel lengths.
+
+    :param diff_w_um: Differential-pair MOSFET width (M1, M2) in microns.
+    :param mirror_w_um: Current-mirror MOSFET width (M3, M4) in microns.
+    """
+
+    diff_w_um: float
+    mirror_w_um: float
+
+
+@dataclass(frozen=True, slots=True)
+class OtaMetrics:
+    """
+    Extracted large-signal performance metrics for one OTA sizing.
+
+    Failed simulations are encoded with ``converged=False`` and ``NaN`` fields.
+
+    :param converged: True when the transient simulation succeeded.
+    :param slew_rate_v_per_us: Peak :math:`|dV_{out}/dt|` after the step (V/µs).
+    :param slew_time_ns: 10–90 % of output swing duration (ns).
+    :param peak_swing_v: Total output voltage swing observed post-step (V).
+    :param static_current_a: Quiescent supply current magnitude (A).
+    :param dc_gain_v_per_v: Small-signal open-loop gain from DC sweep (V/V).
+        Reported for information only; not used by the selection rule.
+    :param quiescent_n_out_v: Quiescent output node voltage (V).
+    """
+
+    converged: bool
+    slew_rate_v_per_us: float
+    slew_time_ns: float
+    peak_swing_v: float
+    static_current_a: float
+    dc_gain_v_per_v: float
+    quiescent_n_out_v: float
+
+    @classmethod
+    def failed(cls) -> "OtaMetrics":
+        """Returns a sentinel instance for designs that did not converge."""
+        nan = float("nan")
+        return cls(False, nan, nan, nan, nan, nan, nan)
+
+
+@dataclass(frozen=True, slots=True)
+class OtaSelectionRule:
+    """
+    Pre-registered selection rule for the 5T OTA sweep.
+
+    Feasibility requires both conditions; ranking is by descending slew rate
+    with ascending slew time as the tiebreaker.
+
+    :param slew_min_v_per_us: Minimum acceptable slew rate (V/µs).
+    :param slew_time_max_ns: Maximum acceptable 10–90 % slew duration (ns).
+    """
+
+    slew_min_v_per_us: float = 5.0
+    slew_time_max_ns: float = 500.0
+
+    def admits(self, metrics: OtaMetrics) -> bool:
+        """
+        Tests whether a metrics set is feasible under this rule.
+
+        :param metrics: Extracted metrics for one design point.
+        :return: True when the design converged and both slew criteria are met.
+        """
+        if not metrics.converged:
+            return False
+        return metrics.slew_rate_v_per_us >= self.slew_min_v_per_us and metrics.slew_time_ns <= self.slew_time_max_ns
+
+
+@dataclass(frozen=True, slots=True)
+class OtaSweepResult:
+    """
+    Full design-space sweep over :math:`W_{diff} \\times W_{mirror}`.
+
+    :param points: Design points evaluated, in row-major order.
+    :param metrics: Metrics aligned 1:1 with ``points``.
+    """
+
+    points: tuple[OtaDesignPoint, ...]
+    metrics: tuple[OtaMetrics, ...]
+
+    def slew_grid(self) -> NDArray[np.float64]:
+        """
+        Reshapes per-point slew rate into a 2D grid for plotting.
+
+        :return: Array of shape ``(len(unique W_diff), len(unique W_mirror))``
+            with slew rate in V/µs; ``NaN`` for failed points.
+        """
+        diff_axis = sorted({p.diff_w_um for p in self.points})
+        mirror_axis = sorted({p.mirror_w_um for p in self.points})
+        grid = np.full((len(diff_axis), len(mirror_axis)), np.nan, dtype=np.float64)
+        for point, metric in zip(self.points, self.metrics):
+            i = diff_axis.index(point.diff_w_um)
+            j = mirror_axis.index(point.mirror_w_um)
+            grid[i, j] = metric.slew_rate_v_per_us if metric.converged else np.nan
+        return grid
+
+    def slew_time_grid(self) -> NDArray[np.float64]:
+        """
+        Reshapes per-point slew time into a 2D grid for plotting.
+
+        :return: Array of shape ``(len(unique W_diff), len(unique W_mirror))``
+            with slew time in ns; ``NaN`` for failed points.
+        """
+        diff_axis = sorted({p.diff_w_um for p in self.points})
+        mirror_axis = sorted({p.mirror_w_um for p in self.points})
+        grid = np.full((len(diff_axis), len(mirror_axis)), np.nan, dtype=np.float64)
+        for point, metric in zip(self.points, self.metrics):
+            i = diff_axis.index(point.diff_w_um)
+            j = mirror_axis.index(point.mirror_w_um)
+            grid[i, j] = metric.slew_time_ns if metric.converged else np.nan
+        return grid
+
+    def axes(self) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+        """
+        Returns the unique W_diff and W_mirror axis values in ascending order.
+
+        :return: Tuple of ``(diff_w_axis, mirror_w_axis)`` arrays in microns.
+        """
+        diff_axis = np.array(sorted({p.diff_w_um for p in self.points}), dtype=np.float64)
+        mirror_axis = np.array(sorted({p.mirror_w_um for p in self.points}), dtype=np.float64)
+        return diff_axis, mirror_axis
+
+
+def extract_slew_rate(
+    tran: TransientResult,
+    *,
+    t_step_start: float,
+    output_node: str = _OTA_OUTPUT_NODE,
+) -> float:
+    """
+    Computes the peak slew rate of the OTA output after a large-signal step.
+
+    Uses a centred finite difference (``np.gradient``) on the post-step region
+    to find the peak :math:`|dV_{out}/dt|`.
+
+    :param tran: Transient simulation result.
+    :param t_step_start: Time at which the step occurs (seconds).
+    :param output_node: Variable name for the output node (default ``v(n_out)``).
+    :return: Peak slew rate in V/µs; ``NaN`` if the post-step region is empty.
+    """
+    time = tran.time
+    vout = tran.variables[output_node]
+    mask = time >= t_step_start
+    if not mask.any() or mask.sum() < 2:
+        return float("nan")
+    t_post = time[mask]
+    v_post = vout[mask]
+    dv_dt = np.gradient(v_post, t_post)  # V/s
+    return float(np.max(np.abs(dv_dt))) * 1e-6  # V/µs
+
+
+def extract_slew_time(  # pylint: disable=too-many-locals
+    tran: TransientResult,
+    *,
+    t_step_start: float,
+    output_node: str = _OTA_OUTPUT_NODE,
+) -> float:
+    """
+    Computes the 10–90 % slew time of the OTA output after a large-signal step.
+
+    The swing is measured between the mean of the first 5 % and the mean of
+    the last 5 % of post-step samples. The 10 % and 90 % threshold crossings
+    are located as the first samples that exceed the respective threshold in the
+    direction of the step.
+
+    :param tran: Transient simulation result.
+    :param t_step_start: Time at which the step occurs (seconds).
+    :param output_node: Variable name for the output node.
+    :return: 10–90 % slew time in nanoseconds; ``NaN`` when the swing is
+        negligible or the thresholds are not crossed.
+    """
+    time = tran.time
+    vout = tran.variables[output_node]
+    mask = time >= t_step_start
+    if not mask.any() or mask.sum() < 4:
+        return float("nan")
+    t_post = time[mask]
+    v_post = vout[mask]
+    # v_post[0] is at t=t_step_start where the PWL is still at quiescent (ramp not yet started)
+    v_initial = float(v_post[0])
+    tail = max(1, len(v_post) // 20)
+    v_final = float(v_post[-tail:].mean())
+    swing = abs(v_final - v_initial)
+    if swing < 1e-3:
+        return float("nan")
+    rising = v_final > v_initial
+    direction = 1.0 if rising else -1.0
+    v10 = v_initial + direction * 0.1 * swing
+    v90 = v_initial + direction * 0.9 * swing
+    if rising:
+        above10 = v_post >= v10
+        above90 = v_post >= v90
+    else:
+        above10 = v_post <= v10
+        above90 = v_post <= v90
+    if not above10.any() or not above90.any():
+        return float("nan")
+    idx10 = int(np.argmax(above10))
+    idx90 = int(np.argmax(above90))
+    if idx90 <= idx10:
+        return float("nan")
+    return max((float(t_post[idx90]) - float(t_post[idx10])) * 1e9, 0.0)
+
+
+def extract_dc_gain(dc_result: DCSweepResult, *, output_node: str = _OTA_OUTPUT_NODE) -> float:
+    """
+    Extracts the peak small-signal open-loop gain from an OTA DC sweep.
+
+    Sweeps Vinp with Vinn fixed at Vcm. The gain is computed as
+    :math:`|dV_{out}/dV_{inp}|` via ``np.gradient``.
+
+    :param dc_result: DC sweep result (Vinp as the swept source).
+    :param output_node: Variable name for the output node.
+    :return: Peak gain magnitude in V/V.
+    """
+    vinp = dc_result.sweep_values
+    vout = dc_result.variables[output_node]
+    gain = np.gradient(vout, vinp)
+    return float(np.max(np.abs(gain)))
+
+
+def _ota_differential_step_pwl_strings(
+    *,
+    vcm_v: float,
+    t_step_start: float,
+    rise_time_s: float,
+    t_end: float,
+    step_amp_v: float,
+) -> tuple[str, str]:
+    """
+    Builds Vinp/Vinn piecewise-linear sources for the registered differential step.
+
+    :param vcm_v: Input common-mode voltage.
+    :param t_step_start: Step onset time (s).
+    :param rise_time_s: Input rise duration (s).
+    :param t_end: Simulation end time (s).
+    :param step_amp_v: Differential half-amplitude (V).
+    :return: ``(vinp_pwl, vinn_pwl)`` SPICE PWL strings.
+    """
+    t_rise_end = t_step_start + rise_time_s
+    vinp_pwl = (
+        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v + step_amp_v} {t_end} {vcm_v + step_amp_v})"
+    )
+    vinn_pwl = (
+        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v - step_amp_v} {t_end} {vcm_v - step_amp_v})"
+    )
+    return vinp_pwl, vinn_pwl
+
+
+def _ota_op(  # pylint: disable=too-many-arguments
+    point: OtaDesignPoint,
+    *,
+    vdd: float,
+    vcm_v: float,
+    diff_l_um: float,
+    mirror_l_um: float,
+    tail_w_um: float,
+    tail_l_um: float,
+    vbias_v: float,
+    pdk_root: str | None,
+) -> OperatingPoint | None:
+    """Runs a DC operating point for the OTA at the quiescent bias."""
+    kwargs = {
+        "diff_w_um": point.diff_w_um,
+        "diff_l_um": diff_l_um,
+        "mirror_w_um": point.mirror_w_um,
+        "mirror_l_um": mirror_l_um,
+        "tail_w_um": tail_w_um,
+        "tail_l_um": tail_l_um,
+        "vdd": vdd,
+        "vbias_v": vbias_v,
+        "vcm_v": vcm_v,
+    }
+    if pdk_root is not None:
+        kwargs["pdk_root"] = pdk_root
+    return run_operating_point(build_ota_5t(**kwargs))
+
+
+def _ota_tran(  # pylint: disable=too-many-arguments,too-many-locals
+    point: OtaDesignPoint,
+    *,
+    vdd: float,
+    vcm_v: float,
+    step_amp_v: float,
+    rise_time_s: float,
+    diff_l_um: float,
+    mirror_l_um: float,
+    tail_w_um: float,
+    tail_l_um: float,
+    vbias_v: float,
+    t_step_start: float,
+    t_end: float,
+    t_step: float,
+    pdk_root: str | None,
+) -> TransientResult | None:
+    """Runs the large-signal differential-step transient for one OTA design."""
+    vinp_pwl, vinn_pwl = _ota_differential_step_pwl_strings(
+        vcm_v=vcm_v,
+        t_step_start=t_step_start,
+        rise_time_s=rise_time_s,
+        t_end=t_end,
+        step_amp_v=step_amp_v,
+    )
+    kwargs = {
+        "diff_w_um": point.diff_w_um,
+        "diff_l_um": diff_l_um,
+        "mirror_w_um": point.mirror_w_um,
+        "mirror_l_um": mirror_l_um,
+        "tail_w_um": tail_w_um,
+        "tail_l_um": tail_l_um,
+        "vdd": vdd,
+        "vbias_v": vbias_v,
+        "vcm_v": vcm_v,
+        "vinp_tran": vinp_pwl,
+        "vinn_tran": vinn_pwl,
+    }
+    if pdk_root is not None:
+        kwargs["pdk_root"] = pdk_root
+    return run_transient(build_ota_5t(**kwargs), t_step=t_step, t_end=t_end)
+
+
+def _ota_dc_gain_sweep(  # pylint: disable=too-many-arguments
+    point: OtaDesignPoint,
+    *,
+    vdd: float,
+    vcm_v: float,
+    diff_l_um: float,
+    mirror_l_um: float,
+    tail_w_um: float,
+    tail_l_um: float,
+    vbias_v: float,
+    dc_sweep_amp_v: float,
+    dc_sweep_step_v: float,
+    pdk_root: str | None,
+) -> DCSweepResult | None:
+    """Runs a small-signal DC sweep of Vinp (±dc_sweep_amp_v) with Vinn at Vcm."""
+    kwargs = {
+        "diff_w_um": point.diff_w_um,
+        "diff_l_um": diff_l_um,
+        "mirror_w_um": point.mirror_w_um,
+        "mirror_l_um": mirror_l_um,
+        "tail_w_um": tail_w_um,
+        "tail_l_um": tail_l_um,
+        "vdd": vdd,
+        "vbias_v": vbias_v,
+        "vcm_v": vcm_v,
+    }
+    if pdk_root is not None:
+        kwargs["pdk_root"] = pdk_root
+    circuit = build_ota_5t(**kwargs)
+    return run_dc_sweep(
+        circuit,
+        source_name="Vinp",
+        start=vcm_v - dc_sweep_amp_v,
+        stop=vcm_v + dc_sweep_amp_v,
+        step=dc_sweep_step_v,
+    )
+
+
+def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+    point: OtaDesignPoint,
+    *,
+    vdd: float = 1.8,
+    vcm_v: float = 0.9,
+    step_amp_v: float = 0.25,
+    rise_time_s: float = 5e-9,
+    diff_l_um: float = 0.40,
+    mirror_l_um: float = 0.40,
+    tail_w_um: float = 2.0,
+    tail_l_um: float = 0.40,
+    vbias_v: float = 1.2,
+    t_step_start: float = 100e-9,
+    t_end: float = 5e-6,
+    t_step: float = 10e-9,
+    dc_sweep_amp_v: float = 0.02,
+    dc_sweep_step_v: float = 0.001,
+    pdk_root: str | None = None,
+) -> OtaMetrics:
+    """
+    Runs the full OTA characterization sequence for one ``(W_diff, W_mirror)`` design.
+
+    Three SPICE analyses are executed in sequence:
+
+    1. DC operating point — quiescent supply current and output bias.
+    2. Large-signal differential-step transient — slew rate, slew time, peak swing.
+    3. Small-signal Vinp DC sweep — open-loop gain (reported only, not gated).
+
+    Any transient failure short-circuits to ``OtaMetrics.failed()``. DC OP and
+    gain-sweep failures produce ``NaN`` for the affected fields while
+    ``converged`` remains ``True``.
+
+    :param point: Sizing under test.
+    :param vdd: Supply voltage.
+    :param vcm_v: Input common-mode voltage.
+    :param step_amp_v: Differential step half-amplitude (each input steps ±this).
+    :param rise_time_s: Input step rise time in seconds (pre-registered: 5 ns).
+    :param diff_l_um: Differential-pair channel length.
+    :param mirror_l_um: Mirror channel length.
+    :param tail_w_um: Tail current-source width.
+    :param tail_l_um: Tail current-source length.
+    :param vbias_v: Tail gate bias voltage.
+    :param t_step_start: Step onset time in seconds.
+    :param t_end: Total simulation window in seconds.
+    :param t_step: SPICE maximum timestep.
+    :param dc_sweep_amp_v: Half-range of the gain sweep (V).
+    :param dc_sweep_step_v: DC sweep resolution (V).
+    :param pdk_root: Optional PDK root override.
+    :return: Extracted metrics; ``converged`` reflects transient success.
+    """
+    shared = {
+        "vdd": vdd,
+        "vcm_v": vcm_v,
+        "diff_l_um": diff_l_um,
+        "mirror_l_um": mirror_l_um,
+        "tail_w_um": tail_w_um,
+        "tail_l_um": tail_l_um,
+        "vbias_v": vbias_v,
+        "pdk_root": pdk_root,
+    }
+
+    op = _ota_op(point, **shared)
+    if op is not None:
+        static_current = abs(float(op.variables.get(_OTA_SUPPLY_CURRENT, float("nan"))))
+        quiescent_n_out_v = float(op.variables.get(_OTA_OUTPUT_NODE, float("nan")))
+    else:
+        logger.warning("DC operating point failed for OTA %s", point)
+        static_current = float("nan")
+        quiescent_n_out_v = float("nan")
+
+    tran = _ota_tran(
+        point,
+        step_amp_v=step_amp_v,
+        rise_time_s=rise_time_s,
+        t_step_start=t_step_start,
+        t_end=t_end,
+        t_step=t_step,
+        **shared,
+    )
+    if tran is None:
+        logger.warning("Transient failed for OTA %s", point)
+        return OtaMetrics.failed()
+
+    slew_rate = extract_slew_rate(tran, t_step_start=t_step_start)
+    slew_time = extract_slew_time(tran, t_step_start=t_step_start)
+    vout_post = tran.variables[_OTA_OUTPUT_NODE][tran.time >= t_step_start]
+    head = max(1, len(vout_post) // 20)
+    tail = max(1, len(vout_post) // 20)
+    peak_swing = float(abs(vout_post[-tail:].mean() - vout_post[:head].mean())) if len(vout_post) >= 4 else float("nan")
+
+    dc_sweep = _ota_dc_gain_sweep(
+        point,
+        dc_sweep_amp_v=dc_sweep_amp_v,
+        dc_sweep_step_v=dc_sweep_step_v,
+        **shared,
+    )
+    dc_gain = extract_dc_gain(dc_sweep) if dc_sweep is not None else float("nan")
+
+    return OtaMetrics(
+        converged=True,
+        slew_rate_v_per_us=slew_rate,
+        slew_time_ns=slew_time,
+        peak_swing_v=peak_swing,
+        static_current_a=static_current,
+        dc_gain_v_per_v=dc_gain,
+        quiescent_n_out_v=quiescent_n_out_v,
+    )
+
+
+def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+    diff_widths_um: tuple[float, ...],
+    mirror_widths_um: tuple[float, ...],
+    *,
+    vdd: float = 1.8,
+    vcm_v: float = 0.9,
+    step_amp_v: float = 0.25,
+    rise_time_s: float = 5e-9,
+    diff_l_um: float = 0.40,
+    mirror_l_um: float = 0.40,
+    tail_w_um: float = 2.0,
+    tail_l_um: float = 0.40,
+    vbias_v: float = 1.2,
+    t_step_start: float = 100e-9,
+    t_end: float = 5e-6,
+    t_step: float = 10e-9,
+    pdk_root: str | None = None,
+    progress: Callable[[int, int, OtaDesignPoint, OtaMetrics], None] | None = None,
+) -> OtaSweepResult:
+    """
+    Evaluates ``simulate_ota_design_point`` over the Cartesian product of widths.
+
+    :param diff_widths_um: Differential-pair widths to sweep.
+    :param mirror_widths_um: Mirror widths to sweep.
+    :param vdd: Supply voltage.
+    :param vcm_v: Input common-mode voltage.
+    :param step_amp_v: Differential step half-amplitude.
+    :param rise_time_s: Input rise time.
+    :param diff_l_um: Differential-pair channel length.
+    :param mirror_l_um: Mirror channel length.
+    :param tail_w_um: Tail width (fixed across the sweep).
+    :param tail_l_um: Tail channel length.
+    :param vbias_v: Tail gate bias.
+    :param t_step_start: Step onset time.
+    :param t_end: Simulation window.
+    :param t_step: SPICE timestep.
+    :param pdk_root: Optional PDK root override.
+    :param progress: Optional callback ``(index, total, point, metrics)``.
+    :return: Completed sweep result.
+    """
+    points = tuple(OtaDesignPoint(diff_w_um=wd, mirror_w_um=wm) for wd in diff_widths_um for wm in mirror_widths_um)
+    total = len(points)
+    metrics_list: list[OtaMetrics] = []
+    for idx, point in enumerate(points):
+        result = simulate_ota_design_point(
+            point,
+            vdd=vdd,
+            vcm_v=vcm_v,
+            step_amp_v=step_amp_v,
+            rise_time_s=rise_time_s,
+            diff_l_um=diff_l_um,
+            mirror_l_um=mirror_l_um,
+            tail_w_um=tail_w_um,
+            tail_l_um=tail_l_um,
+            vbias_v=vbias_v,
+            t_step_start=t_step_start,
+            t_end=t_end,
+            t_step=t_step,
+            pdk_root=pdk_root,
+        )
+        metrics_list.append(result)
+        if progress is not None:
+            progress(idx, total, point, result)
+    return OtaSweepResult(points=points, metrics=tuple(metrics_list))
+
+
+def select_ota_design_point(sweep: OtaSweepResult, rule: OtaSelectionRule) -> tuple[OtaDesignPoint, OtaMetrics]:
+    """
+    Applies the OTA selection rule and returns the chosen design.
+
+    Primary objective: maximum slew rate. Tiebreaker: minimum slew time.
+
+    :param sweep: Completed OTA sweep result.
+    :param rule: Pre-registered feasibility predicate.
+    :return: Tuple ``(chosen point, chosen metrics)``.
+    :raises ValueError: When no point satisfies ``rule``.
+    """
+    feasible = [(p, m) for p, m in zip(sweep.points, sweep.metrics) if rule.admits(m)]
+    if not feasible:
+        raise ValueError("No OTA design point in the sweep satisfies the selection rule.")
+    feasible.sort(key=lambda pm: (-pm[1].slew_rate_v_per_us, pm[1].slew_time_ns))
     return feasible[0]

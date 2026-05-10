@@ -11,14 +11,31 @@ from pathlib import Path
 
 import matplotlib
 
-matplotlib.use("Agg")  # noqa: E402  # headless rendering before pyplot imports the backend
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
+# pylint: disable=wrong-import-position
 
-from spino.circuit.simulation import DCSweepResult, TransientResult  # noqa: E402
-from spino.circuit.tuning import DesignPoint, Metrics, SweepResult  # noqa: E402
 
-__all__ = ["plot_gain_heatmap", "plot_step_response", "plot_vtc"]
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+
+from spino.circuit.simulation import DCSweepResult, TransientResult
+from spino.circuit.tuning import (
+    DesignPoint,
+    Metrics,
+    OtaDesignPoint,
+    OtaMetrics,
+    OtaSweepResult,
+    SweepResult,
+)
+
+__all__ = [
+    "plot_gain_heatmap",
+    "plot_slew_heatmap",
+    "plot_slew_time_heatmap",
+    "plot_step_response",
+    "plot_step_response_ota",
+    "plot_vtc",
+]
 
 _FIGSIZE_HEATMAP = (7.0, 5.5)
 _FIGSIZE_TRACE = (6.5, 4.5)
@@ -118,7 +135,154 @@ def plot_vtc(vtc: DCSweepResult, output_path: str | Path, *, design: DesignPoint
     return target
 
 
-def plot_step_response(
+def plot_slew_heatmap(
+    sweep: OtaSweepResult,
+    output_path: str | Path,
+    *,
+    selected: OtaDesignPoint | None = None,
+) -> Path:
+    """
+    Renders the slew-rate heatmap over :math:`(W_{diff}, W_{mirror})`.
+
+    :param sweep: Completed OTA sweep result.
+    :param output_path: Destination file path (PNG).
+    :param selected: Optional design point to annotate with a red cross.
+    :return: The destination path actually written.
+    """
+    target = _ensure_parent(output_path)
+    diff_axis, mirror_axis = sweep.axes()
+    grid = sweep.slew_grid()
+    fig, ax = plt.subplots(figsize=_FIGSIZE_HEATMAP)
+    masked = np.ma.array(grid, mask=np.isnan(grid))
+    mesh = ax.pcolormesh(diff_axis, mirror_axis, masked.T, cmap="viridis", shading="auto")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"$W_{diff}$ ($\mu$m)")
+    ax.set_ylabel(r"$W_{mirror}$ ($\mu$m)")
+    ax.set_title("5T OTA slew rate over device sizing")
+    fig.colorbar(mesh, ax=ax, label="Slew rate (V/µs)")
+    if selected is not None:
+        ax.plot(
+            selected.diff_w_um,
+            selected.mirror_w_um,
+            marker="x",
+            color="red",
+            markersize=14,
+            markeredgewidth=2.5,
+            linestyle="None",
+            label="Selected",
+        )
+        ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(target, dpi=_DPI)
+    plt.close(fig)
+    return target
+
+
+def plot_slew_time_heatmap(
+    sweep: OtaSweepResult,
+    output_path: str | Path,
+    *,
+    selected: OtaDesignPoint | None = None,
+) -> Path:
+    """
+    Renders the 10–90 % slew-time heatmap over :math:`(W_{diff}, W_{mirror})`.
+
+    :param sweep: Completed OTA sweep result.
+    :param output_path: Destination file path (PNG).
+    :param selected: Optional design point to annotate with a red cross.
+    :return: The destination path actually written.
+    """
+    target = _ensure_parent(output_path)
+    diff_axis, mirror_axis = sweep.axes()
+    grid = sweep.slew_time_grid()
+    fig, ax = plt.subplots(figsize=_FIGSIZE_HEATMAP)
+    masked = np.ma.array(grid, mask=np.isnan(grid))
+    mesh = ax.pcolormesh(diff_axis, mirror_axis, masked.T, cmap="plasma_r", shading="auto")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"$W_{diff}$ ($\mu$m)")
+    ax.set_ylabel(r"$W_{mirror}$ ($\mu$m)")
+    ax.set_title("5T OTA 10–90 % slew time over device sizing")
+    fig.colorbar(mesh, ax=ax, label="Slew time (ns)")
+    if selected is not None:
+        ax.plot(
+            selected.diff_w_um,
+            selected.mirror_w_um,
+            marker="x",
+            color="red",
+            markersize=14,
+            markeredgewidth=2.5,
+            linestyle="None",
+            label="Selected",
+        )
+        ax.legend(loc="upper right")
+    fig.tight_layout()
+    fig.savefig(target, dpi=_DPI)
+    plt.close(fig)
+    return target
+
+
+def plot_step_response_ota(  # pylint: disable=too-many-arguments
+    tran: TransientResult,
+    output_path: str | Path,
+    *,
+    design: OtaDesignPoint,
+    metrics: OtaMetrics,
+    t_step_start: float,
+    t_window_s: float | None = None,
+    output_node: str = "v(n_out)",
+) -> Path:
+    """
+    Plots the OTA large-signal step response with slew-rate annotation.
+
+    :param tran: Transient result for the chosen design.
+    :param output_path: Destination file path (PNG).
+    :param design: Sizing label for the plot title.
+    :param metrics: Extracted metrics (used to annotate slew rate and time).
+    :param t_step_start: Time at which the differential step occurs (s).
+    :param t_window_s: Optional plot horizon measured from ``t_step_start``.
+    :param output_node: Variable name for the OTA output trace.
+    :return: The destination path actually written.
+    """
+    target = _ensure_parent(output_path)
+    time_us = tran.time * 1e6
+    vout = tran.variables[output_node]
+    fig, ax = plt.subplots(figsize=_FIGSIZE_TRACE)
+    ax.plot(time_us, vout, color="#0066cc", linewidth=1.4, label=r"$V_{out}$ (n\_out)")
+    ax.axvline(t_step_start * 1e6, color="#444444", linestyle=":", alpha=0.7, label="Step onset")
+    slew_label = (
+        rf"Slew rate = {metrics.slew_rate_v_per_us:.2f} V/µs, $t_{{10\text{{-}}90}}$ = {metrics.slew_time_ns:.0f} ns"
+        if np.isfinite(metrics.slew_rate_v_per_us)
+        else ""
+    )
+    if slew_label:
+        ax.text(
+            0.97,
+            0.05,
+            slew_label,
+            transform=ax.transAxes,
+            ha="right",
+            va="bottom",
+            fontsize=8,
+            color="#cc0000",
+        )
+    if t_window_s is not None:
+        ax.set_xlim(0.0, (t_step_start + t_window_s) * 1e6)
+    ax.set_xlabel(r"$t$ ($\mu$s)")
+    ax.set_ylabel(r"$V_{out}$ (V)")
+    ax.set_title(
+        f"OTA step response: $W_{{diff}} = {design.diff_w_um:g}$ µm," f" $W_{{mirror}} = {design.mirror_w_um:g}$ µm"
+    )
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper left")
+    fig.tight_layout()
+    fig.savefig(target, dpi=_DPI)
+    plt.close(fig)
+    return target
+
+
+def plot_step_response(  # pylint: disable=too-many-arguments
     tran: TransientResult,
     output_path: str | Path,
     *,
