@@ -35,6 +35,7 @@ __all__ = [
     "load_cs_amp_devices",
     "load_fno_device",
     "load_inverter_chain_devices",
+    "load_ota_5t_devices",
 ]
 
 DEFAULT_NFET_CHECKPOINT = Path("/app/spino/models/mosfet/nfet/mosfet_vcfilm_exp20_float_src_68SXXICB.pt")
@@ -307,3 +308,57 @@ def load_inverter_chain_devices(
         nfets_list.append(n_dev)
         pfets_list.append(p_dev)
     return tuple(nfets_list), tuple(pfets_list)
+
+
+def load_ota_5t_devices(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+    *,
+    diff_w_um: float,
+    diff_l_um: float,
+    mirror_w_um: float,
+    mirror_l_um: float,
+    tail_w_um: float,
+    tail_l_um: float,
+    nfet_checkpoint: Path = DEFAULT_NFET_CHECKPOINT,
+    pfet_checkpoint: Path = DEFAULT_PFET_CHECKPOINT,
+    nfet_dataset: Path = DEFAULT_NFET_DATASET,
+    pfet_dataset: Path = DEFAULT_PFET_DATASET,
+    architecture: ModelArchitecture | None = None,
+    map_location: str | torch.device = "cpu",
+) -> tuple[FnoMosfetDevice, FnoMosfetDevice, FnoMosfetDevice, FnoMosfetDevice, FnoMosfetDevice]:
+    """
+    Loads the five FNO device wrappers for a 5T OTA.
+
+    Returns independent :class:`FnoMosfetDevice` instances (no weight sharing)
+    for M1, M2 (NFET diff pair), M3, M4 (PFET current mirror), and M5
+    (NFET tail current source).
+
+    :param diff_w_um: Diff-pair width (M1, M2) in microns.
+    :param diff_l_um: Diff-pair channel length in microns.
+    :param mirror_w_um: Current-mirror width (M3, M4) in microns.
+    :param mirror_l_um: Current-mirror channel length in microns.
+    :param tail_w_um: Tail current-source width (M5) in microns.
+    :param tail_l_um: Tail current-source channel length in microns.
+    :param nfet_checkpoint: NFET ``.pt`` checkpoint (Exp 20 float-source by default).
+    :param pfet_checkpoint: PFET ``.pt`` checkpoint (Exp 06 by default).
+    :param nfet_dataset: NFET HDF5 dataset for normalization statistics.
+    :param pfet_dataset: PFET HDF5 dataset for normalization statistics.
+    :param architecture: Optional FNO architecture override.
+    :param map_location: Torch device placement.
+    :return: Tuple ``(M1, M2, M3, M4, M5)`` of :class:`FnoMosfetDevice`.
+    """
+
+    def _nfet(label: str, w: float, l: float) -> FnoMosfetDevice:
+        spec = DeviceCheckpoint("sky130_nmos", nfet_checkpoint, nfet_dataset, w, l, label)
+        return load_fno_device(spec, architecture=architecture, map_location=map_location)
+
+    def _pfet(label: str, w: float, l: float) -> FnoMosfetDevice:
+        spec = DeviceCheckpoint("sky130_pmos", pfet_checkpoint, pfet_dataset, w, l, label)
+        return load_fno_device(spec, architecture=architecture, map_location=map_location)
+
+    return (
+        _nfet("M1_nfet", diff_w_um, diff_l_um),
+        _nfet("M2_nfet", diff_w_um, diff_l_um),
+        _pfet("M3_pfet", mirror_w_um, mirror_l_um),
+        _pfet("M4_pfet", mirror_w_um, mirror_l_um),
+        _nfet("M5_nfet", tail_w_um, tail_l_um),
+    )
