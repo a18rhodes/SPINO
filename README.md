@@ -33,9 +33,7 @@ Four device operators have been trained and validated against NGSPICE ground tru
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | [PFET](docs/pfet.md) |
 
-Composed-circuit validation spans two analog topologies — the CS amplifier (single
-internal node) and the 5T OTA (three internal nodes). The work is documented in a
-set of paper-style notes:
+The work is documented in a set of paper-style notes:
 
 - [Neural composition: CS amplifier method](docs/composition.md) — KCL assembly,
   Newton-Raphson solvers, autograd Jacobians, and damping policy.
