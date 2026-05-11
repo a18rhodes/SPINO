@@ -16,12 +16,13 @@ simulation path: MOSFET operators map terminal voltage waveforms and device
 parameters to drain current, then autograd supplies Jacobians for KCL-based
 composition.
 
-The strongest system-level result is the single-stage common-source amplifier.
-DC and transient solves converge, parity with NGSPICE is good, and the
-differentiable formulation is well matched to analog operating regions where
-conductive Jacobians keep the residual well conditioned. This makes the method
-most relevant for rapid device sizing, parameter sweeps, and gradient-based
-topology search during analog design.
+Composed-circuit validation spans two analog topologies: the single-stage
+common-source amplifier (one internal node) and the 5T OTA (three internal nodes).
+Both converge reliably in the analog operating region where conductive Jacobians
+keep the residual well conditioned. The OTA result demonstrates that the method
+scales to multi-node analog circuits without structural changes to the Newton
+formulation. This makes the approach most relevant for rapid device sizing,
+parameter sweeps, and gradient-based topology search during analog design.
 
 Four device operators have been trained and validated against NGSPICE ground truth:
 
@@ -32,17 +33,21 @@ Four device operators have been trained and validated against NGSPICE ground tru
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | [PFET](docs/pfet.md) |
 
-The composed-circuit CS amplifier is the primary validation milestone.
-The work is split into three paper-style documents:
+Composed-circuit validation spans two analog topologies — the CS amplifier (single
+internal node) and the 5T OTA (three internal nodes). The work is documented in a
+set of paper-style notes:
 
 - [Neural composition: CS amplifier method](docs/composition.md) — KCL assembly,
   Newton-Raphson solvers, autograd Jacobians, and damping policy.
-- [CS amplifier composition results](docs/results.md) — SPICE baselines,
-  composed-fidelity metrics, runtime context, and documented limitations.
-- [Future work](docs/future_work.md) — global roadmap beyond active lab trackers.
+- [Neural composition: 5T OTA method](docs/ota_composition.md) — multi-node KCL
+  formulation, generalized source-terminal displacement, and pre-registered gates.
+- [Analog composition results](docs/results.md) — SPICE baselines, composed-fidelity
+  metrics, runtime context, attribution, and documented limitations.
+- [Future work](docs/future_work.md) — global forward roadmap.
 
-SPICE-only characterization methodology and selected design points are documented in
-[CS amplifier characterization](docs/cs_amp.md).
+SPICE-only characterization methodology is documented in
+[CS amplifier characterization](docs/cs_amp.md) and
+[5T OTA characterization](docs/ota_5t.md).
 
 The NMOS operator achieves transfer R² = 0.9995 and subthreshold R² = 0.9861 at core geometry
 (W = 1.0 µm, L = 0.18 µm).
@@ -150,6 +155,12 @@ and sweeps gate/drain downward.
 | sky130 PMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9523 | -- |
 | CS amp composition (L=0.18, CUDA) | Transient vs SPICE | 0.99748 (Pearson r) | Max \|ΔV\| = 25.78 mV |
 | CS amp composition (L=0.40, CUDA) | Transient vs SPICE | 0.99981 (Pearson r) | Max \|ΔV\| = 2.392 mV |
+| OTA composition (L=0.40, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.7 mV† |
+| OTA composition (L=0.50, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.9 mV† |
+
+†OTA max|ΔV| attributed to M4 PFET output mirror current error at Vds ≈ 0 (triode boundary);
+PFET training data underrepresents this regime. Pre-registered gate is ≤ 30 mV; failure
+is reported as a documented finding. See [Analog composition results](docs/results.md).
 
 ### Runtime context
 
@@ -223,47 +234,58 @@ MOSFET, the physics is algebraic, and the VCFiLM architecture exploits this auto
 
 ## Composition Method
 
-The composition layer is now implemented for the CS amplifier. It constructs a
-single-node KCL residual from NFET and PFET operator outputs and solves DC and
-whole-window transient trajectories with damped Newton-Raphson. Jacobians are
-computed directly through autograd, with Armijo backtracking plus voltage-step
+The composition layer assembles device FNO outputs into multi-node KCL residuals
+and solves DC and whole-window transient trajectories with damped Newton-Raphson.
+Jacobians are computed through autograd, with Armijo backtracking and voltage-step
 safeguards.
 
-Method details are in [Neural composition: CS amplifier method](docs/composition.md).
+Two analog topologies are implemented:
+- **CS amplifier** (single internal node): NFET + PFET in a single KCL residual.
+  Method details in [Neural composition: CS amplifier method](docs/composition.md).
+- **5T OTA** (three internal nodes — n_tail, n_left, n_out): differential pair with
+  floating source terminal, PFET current mirror, tail current source.
+  Method details in [Neural composition: 5T OTA method](docs/ota_composition.md).
 
 ## Composition Results
 
-The current CS amplifier suite includes:
+### CS amplifier
 
-- SPICE characterization at `L=0.18` and `L=0.40` with independently selected
-  `(Wn, Wp, Vin*)` points.
-- CUDA composition runs against both references.
-- CPU composition at `L=0.18` (stress) and `L=0.40` (showcase) to make platform bottlenecks explicit.
+- SPICE characterization at `L=0.18` (cross-bin stress) and `L=0.40` (in-bin showcase).
+- CUDA composition runs at both geometries.
 
-Headline composition outcomes:
+Headline outcomes:
+- Cross-bin stress (`L=0.18`): transient Pearson `r = 0.99748`, max `|ΔV| = 25.78 mV`.
+- In-bin showcase (`L=0.40`): transient Pearson `r = 0.99981`, max `|ΔV| = 2.392 mV`.
 
-- Cross-bin stress point (`L=0.18`, tiny-length-band with wide-width pairing):
-  transient Pearson `r = 0.99748`, max `|ΔV| = 25.78 mV`.
-- In-bin showcase point (`L=0.40`, small-length-band selection):
-  transient Pearson `r = 0.99981`, max `|ΔV| = 2.392 mV`.
-- Runtime tables are reported as experimental context, not as the contribution.
+The `L=0.18` stress gap is causally decomposed (transient IV surface error vs weak-inversion
+VTC failure) in [Error attribution: L=0.18 CUDA stress geometry](docs/attribution.md).
 
-Full tables, figures, and interpretation are in
-[CS amplifier composition results](docs/results.md).
-The `L=0.18` stress gap (including transient `R^2 < 0` next to high Pearson `r`) is
-causally decomposed in
-[Error attribution: L=0.18 CUDA stress geometry](docs/attribution.md).
+### 5T OTA
+
+- SPICE characterization sweep: 7×7 (W\_diff, W\_mirror) grid at L ∈ {0.40, 0.50} µm.
+  Selected design: W\_diff = W\_mirror = 8 µm at both L.
+- CUDA composition runs at both geometries.
+
+Headline outcomes:
+- `L=0.40`: transient Pearson `r = 0.9997`, slew rate within 1% of SPICE; max `|ΔV| = 68.7 mV`
+  (pre-registered gate ≤ 30 mV, fails; attributed to M4 PFET triode-boundary gap).
+- `L=0.50`: transient Pearson `r = 0.9997`, slew rate within 5% of SPICE; max `|ΔV| = 68.9 mV`
+  (same root cause).
+- Newton convergence in ≤ 12 iterations at both L (gate ≤ 25: pass).
+
+Full tables, figures, attribution, and reproduction commands are in
+[Analog composition results](docs/results.md).
 
 ## Future Work
 
 The global forward roadmap is consolidated in [Future work](docs/future_work.md),
 organized around:
 
-1. Better model accuracy in weak-inversion / low-bias regions.
-2. Larger analog architecture evaluation, including differential-pair-scale
-   circuits and feedback variants.
-3. Cross-cutting investigations beyond daily status trackers (runtime
-   decomposition, reproducibility envelopes, and system-level error budgeting).
+1. Improved model accuracy in weak-inversion and near-off regimes, with targeted
+   data work to close the PFET triode-boundary gap identified by OTA attribution.
+2. Multi-stage analog topologies — the two-stage Miller op-amp is the next queued target.
+3. Runtime studies: GPU-native Krylov linear solvers (PyTorch Arnoldi, queued post-publication),
+   cross-hardware reproducibility envelopes, and system-level error budgeting.
 
 ---
 

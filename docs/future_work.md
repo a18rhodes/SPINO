@@ -23,9 +23,18 @@ scope. It is intended to support paper planning and cross-track prioritization.
 
 ### A. Analog topologies
 
-- Differential pair as the next analog architecture-level target.
-- Follow with at least one load/feedback variant to test compositional
-  stability under additional internal nodes.
+The 5T OTA (differential pair with PFET current-mirror load, tail current source,
+three internal KCL nodes) has been validated. Both channel lengths pass Pearson r ≥ 0.999
+vs NGSpice; the pre-registered max|ΔV| gate fails at both L due to a triode-boundary gap
+in PFET training data — documented as a pre-registered finding in
+[Analog composition results](results.md).
+
+The root-cause fix (denser PFET training data near Vds ≈ 0) is a prerequisite for
+publication-quality voltage parity at the next topology.
+
+Next analog target: **two-stage Miller op-amp** (differential input pair + common-source
+second stage + Miller compensation capacitor). Introduces a second high-gain stage,
+frequency compensation node, and a new internal topology structure not covered by the OTA.
 
 ### B. Selection criteria for new topologies
 
@@ -80,18 +89,17 @@ or a single training run.
 
 ### A. Runtime architecture studies
 
-- CPU bottleneck decomposition: operator forward, Jacobian assembly, linear
-  solve, and line-search overhead.
-- Matrix-free Newton/Krylov experiments for larger analog windows.
+- GPU-native Krylov linear solver: scipy GMRES with per-JVP matvec was
+  investigated for the OTA and found ~7× slower than `jacobian(vectorize=True)`
+  on GPU (vmap batches all VJPs in one kernel; sequential scipy calls cannot
+  compete). The correct next step is a pure-PyTorch Arnoldi loop with
+  `torch.func.vmap` over the Krylov basis, keeping everything on-device.
+  Estimated ~150 lines; queued post-publication.
+- Cross-hardware reproducibility envelopes (CPU vendor, GPU generation, precision mode).
 
 ### B. Hardware portability and reproducibility
 
 - Cross-hardware reproducibility envelopes (CPU vendor, GPU generation,
   precision mode).
 
-### C. Publication packaging
-
-- Converge on a stable methods/results narrative with explicit scope limits.
-- Keep stress-track and showcase-track evidence side-by-side to avoid
-  overclaiming.
 

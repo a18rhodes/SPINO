@@ -1,13 +1,11 @@
-# CS amplifier composition results
+# Analog composition results
 
-This note reports the current CS amplifier composition results against NGSpice,
-using two SPICE-characterized amplifier references and their corresponding
-composition runs.
+This note reports composed-circuit validation results against NGSpice for two
+analog topologies: the single-stage CS amplifier and the 5T OTA.
 
-Method details are documented in [Neural composition: CS amplifier method](composition.md).
-The CS amplifier is the primary system-level result for the differentiable
-composition method. Digital inverter chains are included below only as a known
-limitation and regime-boundary result.
+Method details are documented in [Neural composition: CS amplifier method](composition.md)
+and [Neural composition: 5T OTA method](ota_composition.md). Digital inverter chains are
+included below only as a known limitation and regime-boundary result.
 
 ## Experimental context
 
@@ -121,6 +119,119 @@ For the `L=0.18` stress geometry, the low-`Vin` VTC gap is not a vague "MOSFET-t
 limit" footnote: it is one of two **causally separated** mechanisms (nominal-bias
 transient IV error vs weak-inversion VTC failure) documented with probes and
 figures in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
+
+---
+
+## 5T OTA: multi-node analog composition
+
+The 5T OTA is a single-stage operational transconductance amplifier with three
+internal KCL nodes (n_tail, n_left, n_out), a differential input pair (M1/M2),
+a PFET current-mirror load (M3/M4), and an NFET tail current source (M5). It is
+the multi-node scaling demonstration for the differentiable composition method.
+Full method documentation is in [Neural composition: 5T OTA method](ota_composition.md)
+and SPICE characterization methodology is in [5T OTA characterization](ota_5t.md).
+
+### SPICE-only reference summary (Phase 3a)
+
+Designs selected from a 7×7 (W\_diff, W\_mirror) sweep at each L; M5 fixed at
+W=2 µm, Vbias=1.2 V; stimulus ±50 mV differential step at Vcm=0.9 V, C\_load=1 pF.
+
+| L (µm) | W\_diff (µm) | W\_mirror (µm) | Slew rate (V/µs) | Slew time (ns) | I\_tail (µA) | DC gain (V/V) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.40 | 8.0 | 8.0 | 48.4 | 21.5 | 78.8 | 48.7 |
+| 0.50 | 8.0 | 8.0 | 40.5 | 25.8 | 66.0 | 64.0 |
+
+Sweep health: 49/49 converged at both L; 48/49 feasible at L=0.40, 41/49 at L=0.50.
+Artefacts: `docs/assets/ota_5t_l040/`, `docs/assets/ota_5t_l050/`.
+
+### Phase 3b gate outcomes (FNO composition vs SPICE)
+
+| Gate | Criterion | L=0.40 | L=0.50 |
+|---|---|---|---|
+| Pearson r | ≥ 0.99 | **PASS** (0.9997) | **PASS** (0.9997) |
+| max\|ΔV\| | ≤ 30 mV | **FAIL** (68.7 mV) | **FAIL** (68.9 mV) |
+| Slew rate relative error | ≤ 10% | **PASS** (1.0%) | **PASS** (5.0%) |
+| Slew time relative error | ≤ 10% | **FAIL** (16.3%) | **PASS** (8.5%) |
+| NR iterations (DC / transient) | ≤ 25 | **PASS** (5 / 11) | **PASS** (6 / 12) |
+
+The max|ΔV| and slew-time failures are pre-registered results (gate criteria locked
+before Phase 3b ran) and are fully attributed to a training-data gap, not solver
+tuning. See Attribution below.
+
+### Runtime context
+
+| | FNO GPU (s) | SPICE (s) |
+|---|---:|---:|
+| L=0.40 (CUDA) | 63.5 | 6.3 |
+| L=0.50 (CUDA) | 68.0 | 6.5 |
+
+The FNO runtime is dominated by dense 3×400-element Jacobian assembly via
+`jacobian(vectorize=True)` (vmap-batched VJPs). A GPU-native Krylov solver
+using `torch.func.vmap` over the Arnoldi basis is the queued speedup path;
+scipy GMRES was investigated and found ~7× slower on GPU due to sequential
+JVP calls with Python/numpy overhead defeating GPU batching.
+
+### Figure set (L=0.40 showcase)
+
+![Step response overlay, L=0.40](assets/ota_5t_fno_l040/step_response_overlay.png)
+
+![Newton convergence, L=0.40](assets/ota_5t_fno_l040/convergence.png)
+
+![Attribution Probe 1: per-device |ΔI|, L=0.40](assets/ota_5t_fno_l040/attribution/probe1_iv_errors.png)
+
+### Attribution (Probe 1 — IV branch errors at SPICE node voltages)
+
+For each device, the FNO is evaluated at the SPICE node voltage trajectories and
+the predicted drain current is compared to the SPICE branch current. A large error
+at a specific device localizes the composition error source.
+
+| Device | Role | max\|ΔI\| L=0.40 | max\|ΔI\| L=0.50 |
+|---|---|---:|---:|
+| M4 PFET mirror out | Dominant | **15.4 µA** | **9.2 µA** |
+| M3 PFET mirror diode | Secondary | 5.6 µA | 2.2 µA |
+| M2 NFET diff pair | Secondary | 4.8 µA | 3.1 µA |
+| M5 NFET tail | Negligible | 2.1 µA | 0.5 µA |
+| M1 NFET diff pair | Negligible | 2.8 µA | 1.3 µA |
+
+Root cause: when n_out slews near VDD, M4 exits saturation (Vds → 0). PFET training
+data underrepresents this triode-boundary regime, causing ~15 µA current overestimate
+at L=0.40 → ~70 mV voltage offset at the output plateau. The slew-time failure at
+L=0.40 is a downstream consequence: the 10–90% threshold shifts by ~3.5 ns.
+
+Artefacts: `docs/assets/ota_5t_fno_l040/attribution/`, `docs/assets/ota_5t_fno_l050/attribution/`.
+
+### Reproduction commands
+
+```text
+# SPICE characterization
+python -m spino.circuit.characterize_ota \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+    --output-dir docs/assets/ota_5t_l040
+
+python -m spino.circuit.characterize_ota \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+    --output-dir docs/assets/ota_5t_l050
+
+# FNO composition (CUDA)
+python -m spino.circuit.compose_ota \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+    --output-dir docs/assets/ota_5t_fno_l040
+
+python -m spino.circuit.compose_ota \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+    --output-dir docs/assets/ota_5t_fno_l050
+
+# Attribution (Probe 1)
+python -m spino.circuit.ota_attribution \
+    --run-dir docs/assets/ota_5t_fno_l040 \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40
+
+python -m spino.circuit.ota_attribution \
+    --run-dir docs/assets/ota_5t_fno_l050 \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50
+```
+
+---
 
 ## Digital circuits: known limitation
 
