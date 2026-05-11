@@ -7,38 +7,38 @@ Method details are documented in [Neural composition: CS amplifier method](compo
 and [Neural composition: 5T OTA method](ota_composition.md). Digital inverter chains are
 included below only as a known limitation and regime-boundary result.
 
-## Experimental context
+## CS amplifier
 
-Two SPICE characterization points are now in evidence:
+Method: [Neural composition: CS amplifier method](composition.md).
+Characterization: [CS amplifier characterization](cs_amp.md).
 
-1. **Cross-bin stress point** (`L = 0.18 um`): selected from
+### Characterization context
+
+Two geometry points are validated:
+
+1. **Cross-bin stress** (`L = 0.18 µm`): length in the `tiny` bin, widths in the
+   `large` bin — the worst cross-bin combination for VCFiLM. Artefacts in
    `docs/assets/cs_amp/summary.json`.
-2. **In-bin showcase point** (`L = 0.40 um`): selected from
-   `docs/assets/cs_amp_l040/summary.json`.
+2. **In-bin showcase** (`L = 0.40 µm`): length in the `small` bin with
+   correspondingly selected widths. Artefacts in `docs/assets/cs_amp_l040/summary.json`.
 
-The cross-bin stress point combines widths inside the `large` width range with
-length inside the `tiny` length range (`GEOMETRY_BINS` in
-`spino/mosfet/gen_data.py`). The VCFiLM models at this cross-bin had the worst
-performance. The `L=0.40 um` point shifts channel length into
-the `small` length range and correspondingly selected widths.
+### SPICE-only reference summary
 
-## SPICE-only reference summary (3a)
-
-| Reference | Wn (um) | Ln (um) | Wp (um) | Lp (um) | Vin* (V) | Vout* (V) | Peak \|gain\| (V/V) | Idd @ Vin* (A) | Loaded settling (s) |
+| Reference | Wn (µm) | Ln (µm) | Wp (µm) | Lp (µm) | Vin* (V) | Vout* (V) | Peak \|gain\| (V/V) | Idd @ Vin* (A) | Loaded settling (s) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | `docs/assets/cs_amp/summary.json` | 6.0 | 0.18 | 4.5 | 0.18 | 0.85 | 0.60894 | 2.0519 | 1.285e-4 | 2.50e-8 |
 | `docs/assets/cs_amp_l040/summary.json` | 1.6 | 0.40 | 2.5 | 0.40 | 0.81 | 0.60072 | 1.4167 | 1.565e-5 | 1.95e-7 |
 
-## Composition runs used for comparison
+### Composition runs
 
-- CUDA, `L=0.18` stress run: `docs/assets/cs_amp_fno_exp2/summary.json`
-- CUDA, `L=0.40` showcase run: `docs/assets/cs_amp_fno_l040_exp2/summary.json`
-- CPU, `L=0.18` stress run: `docs/assets/cs_amp_fno/summary.json`
-- CPU, `L=0.40` showcase run: `docs/assets/cs_amp_fno_l040/summary.json`
+- CUDA, `L=0.18` stress: `docs/assets/cs_amp_fno_exp2/summary.json`
+- CUDA, `L=0.40` showcase: `docs/assets/cs_amp_fno_l040_exp2/summary.json`
+- CPU, `L=0.18` stress: `docs/assets/cs_amp_fno/summary.json`
+- CPU, `L=0.40` showcase: `docs/assets/cs_amp_fno_l040/summary.json`
 
-## Core fidelity metrics (CUDA)
+### Core fidelity metrics (CUDA)
 
-| Metric | `L=0.18` stress (CUDA) | `L=0.40` showcase (CUDA) |
+| Metric | `L=0.18` stress | `L=0.40` showcase |
 |---|---:|---:|
 | DC nominal $\lvert \Delta V_\mathrm{out}\rvert / V_\mathrm{DD}$ | 0.9209% | 0.0492% |
 | Transient Pearson $r$ | 0.99748 | 0.99981 |
@@ -47,27 +47,19 @@ the `small` length range and correspondingly selected widths.
 | Transient settling (FNO / SPICE) | 30 ns / 25 ns | 210 ns / 195 ns |
 | NR iterations (DC / transient) | 5 / 3 | 5 / 2 |
 
-## Runtime context
-
-### CUDA composition vs SPICE
+### Runtime context
 
 | Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) |
 |---|---:|---:|---:|---:|
 | `L=0.18` stress CUDA | 2873.77 | 2697.09 | 13335.72 | 13031.04 |
 | `L=0.40` showcase CUDA | 1757.65 | 1733.18 | 12528.74 | 12677.87 |
-
-### CPU composition vs SPICE
-
-| Geometry/run | FNO cold (ms) | FNO warm (ms) | SPICE cold (ms) | SPICE warm (ms) |
-|---|---:|---:|---:|---:|
 | `L=0.18` stress CPU | 26091.39 | 25852.92 | 13077.73 | 13018.72 |
 | `L=0.40` showcase CPU | 19410.45 | 20193.68 | 12621.42 | 12482.44 |
 
-These numbers are reported for reproducibility and engineering context. The
-scientific claim is differentiable composition in the analog regime, not raw
-wall-clock superiority over NGSpice.
+Runtime is reported for reproducibility context; the scientific claim is
+differentiable composition in the analog regime, not wall-clock superiority over NGSpice.
 
-## Figure set (showcase run)
+### Figure set (L=0.40 showcase)
 
 ![VTC overlay, CUDA `L=0.40` showcase run](assets/cs_amp_fno_l040_exp2/vtc_overlay.png)
 
@@ -77,14 +69,13 @@ wall-clock superiority over NGSpice.
 
 ![Newton convergence, CUDA `L=0.40` showcase run](assets/cs_amp_fno_l040_exp2/convergence.png)
 
-## Error attribution (`L=0.18` stress geometry)
+### Error attribution (`L=0.18` stress geometry)
 
-The `L=0.18` CUDA stress run shows the largest composition gaps (see **Core fidelity
-metrics** above). Those gaps were causally decomposed into two separable mechanisms
-via a four-probe isolation sequence: a **nominal-bias transient IV-surface** error
-and a **weak-inversion / near-off VTC** failure that the step stimulus does not
-traverse. Full method, figures, reproduction, and artefact layout are in
-[Error attribution: L=0.18 CUDA stress geometry](attribution.md).
+The `L=0.18` CUDA stress run shows the largest composition gaps. Those gaps were
+causally decomposed into two separable mechanisms via a four-probe isolation sequence:
+a **nominal-bias transient IV-surface** error and a **weak-inversion / near-off VTC**
+failure that the step stimulus does not traverse. Full method, figures, and artefact
+layout are in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
 
 | Domain | Probe | Quantity | Value |
 |---|---|---|---:|
@@ -103,22 +94,58 @@ _PFET ratio row_: uncapped mean bad/mean good ~`3.0e10` (dominated by the `V_in 
 
 In short: the transient mismatch is driven by FNO IV error at `V_gs` ~ 0.85-0.90 V
 with a healthy Newton loop; the VTC mismatch is driven by weak-inversion IV error
-at `V_in` < 0.5 V. That split matches the cross-bin stress narrative below.
+at `V_in` < 0.5 V.
 
-## Interpretation
+### Interpretation
 
-The `L=0.40` showcase run materially improves both DC and transient agreement.
-This is consistent with the geometry regime shift relative to training bins:
+The `L=0.40` showcase run materially improves both DC and transient agreement,
+consistent with the geometry regime shift: `L=0.18` sits at the worst cross-bin
+combination while `L=0.40` moves into a better-conditioned training region.
 
-- The `L=0.18` stress case probes a cross-bin combination where length sits in
-  the `tiny` length range while widths are far beyond the `tiny` width range.
-- The `L=0.40` case moves length to the `small` length range, with a selected
-  width pair that is less stressed for the current operators.
+For the `L=0.18` stress geometry, the low-`Vin` VTC gap is one of two **causally
+separated** mechanisms documented with probes and figures in
+[Error attribution: L=0.18 CUDA stress geometry](attribution.md).
 
-For the `L=0.18` stress geometry, the low-`Vin` VTC gap is not a vague "MOSFET-track
-limit" footnote: it is one of two **causally separated** mechanisms (nominal-bias
-transient IV error vs weak-inversion VTC failure) documented with probes and
-figures in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
+### Reproduction commands
+
+```text
+# SPICE characterization
+python -m spino.circuit.characterize \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp
+
+python -m spino.circuit.characterize \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_l040
+
+# Composition (CUDA)
+python -m spino.circuit.compose \
+    --device cuda \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp_fno_exp2
+
+python -m spino.circuit.compose \
+    --device cuda \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_fno_l040_exp2
+
+# Composition (CPU)
+python -m spino.circuit.compose \
+    --device cpu \
+    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
+    --vin-bias 0.85 \
+    --output-dir docs/assets/cs_amp_fno
+
+python -m spino.circuit.compose \
+    --device cpu \
+    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
+    --vin-bias 0.81 \
+    --output-dir docs/assets/cs_amp_fno_l040
+```
 
 ---
 
@@ -262,43 +289,3 @@ analog-style waveforms with gate and drain varying together. It does not include
 quasi-static fixed-gate drain sweeps or digital step families sufficient to teach
 clean conductive Jacobians at fixed bias.
 
-## Reproduction commands
-
-```text
-# SPICE references
-python -m spino.circuit.characterize \
-    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
-    --vin-bias 0.85 \
-    --output-dir docs/assets/cs_amp
-
-python -m spino.circuit.characterize \
-    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
-    --vin-bias 0.81 \
-    --output-dir docs/assets/cs_amp_l040
-
-# Composition (CUDA)
-python -m spino.circuit.compose \
-    --device cuda \
-    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
-    --vin-bias 0.85 \
-    --output-dir docs/assets/cs_amp_fno_exp2
-
-python -m spino.circuit.compose \
-    --device cuda \
-    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
-    --vin-bias 0.81 \
-    --output-dir docs/assets/cs_amp_fno_l040_exp2
-
-# Composition (CPU)
-python -m spino.circuit.compose \
-    --device cpu \
-    --nfet-w 6.0 --nfet-l 0.18 --pfet-w 4.5 --pfet-l 0.18 \
-    --vin-bias 0.85 \
-    --output-dir docs/assets/cs_amp_fno
-
-python -m spino.circuit.compose \
-    --device cpu \
-    --nfet-w 1.6 --nfet-l 0.4 --pfet-w 2.5 --pfet-l 0.4 \
-    --vin-bias 0.81 \
-    --output-dir docs/assets/cs_amp_fno_l040
-```
