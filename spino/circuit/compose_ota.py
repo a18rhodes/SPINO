@@ -293,6 +293,61 @@ def _plot_step_response_overlay(
     plt.close(fig)
 
 
+def _plot_diagnostic_parity(
+    time_np: np.ndarray,
+    fno_v_tail: np.ndarray,
+    fno_v_left: np.ndarray,
+    fno_v_out: np.ndarray,
+    spice_tran: TransientResult,
+    output_path: Path,
+    *,
+    t_step_start: float,
+) -> None:
+    """3×2 panel: per-node time overlay (left column) and scatter parity (right column)."""
+    spice_v_tail = np.interp(time_np, spice_tran.time, spice_tran.variables["v(n_tail)"])
+    spice_v_left = np.interp(time_np, spice_tran.time, spice_tran.variables["v(n_left)"])
+    spice_v_out = np.interp(time_np, spice_tran.time, spice_tran.variables[_SPICE_OUTPUT_NODE])
+
+    # (node_key, ylabel, description, fno_array, spice_array)
+    nodes = [
+        ("n_tail", r"$V_\mathrm{tail}$ (V)", "M5 drain / diff-pair sources", fno_v_tail, spice_v_tail),
+        ("n_left", r"$V_\mathrm{left}$ (V)", "M3 diode drain / M4 gate",     fno_v_left, spice_v_left),
+        ("n_out",  r"$V_\mathrm{out}$ (V)",  "single-ended output",           fno_v_out,  spice_v_out),
+    ]
+
+    fig, axes = plt.subplots(3, 2, figsize=(12.0, 9.0))
+
+    for row, (name, ylabel, desc, fno_v, spice_v) in enumerate(nodes):
+        r = _pearson_r(spice_v, fno_v)
+
+        ax_t = axes[row, 0]
+        ax_t.plot(time_np * 1e6, spice_v, color="#0066cc", linewidth=1.4, label="SPICE")
+        ax_t.plot(time_np * 1e6, fno_v, color="#cc6600", linewidth=1.2, linestyle="--", label="FNO")
+        ax_t.axvline(t_step_start * 1e6, color="#444444", linestyle=":", alpha=0.6)
+        ax_t.set_xlabel(r"$t$ ($\mu$s)")
+        ax_t.set_ylabel(ylabel)
+        ax_t.set_title(f"{name}  ({desc})  |  r = {r:.4f}")
+        ax_t.grid(True, alpha=0.3)
+        if row == 0:
+            ax_t.legend(loc="best", fontsize=8)
+
+        ax_p = axes[row, 1]
+        ax_p.scatter(spice_v, fno_v, s=2, alpha=0.4, color="#cc6600", rasterized=True)
+        lo, hi = min(spice_v.min(), fno_v.min()), max(spice_v.max(), fno_v.max())
+        ax_p.plot([lo, hi], [lo, hi], color="#cc0000", linestyle="--", linewidth=1.2, alpha=0.7)
+        ax_p.set_xlabel(f"SPICE {name} (V)")
+        ax_p.set_ylabel(f"FNO {name} (V)")
+        ax_p.set_title(f"{name} parity  |  r = {r:.4f}")
+        ax_p.grid(True, alpha=0.3)
+        ax_p.set_aspect("equal", adjustable="box")
+
+    fig.suptitle("OTA FNO composition diagnostics", fontsize=14)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.97))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+
+
 def _plot_convergence(
     dc_history: tuple[float, ...],
     tran_history: tuple[float, ...],
@@ -496,6 +551,15 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
         dc_sol.report.residual_norm_history,
         fno_tran_report["report"]["residual_norm_history"],
         output_dir / "convergence.png",
+    )
+    _plot_diagnostic_parity(
+        fno_time_np,
+        fno_v_tail_np,
+        fno_v_left_np,
+        fno_v_out_np,
+        spice_tran,
+        output_dir / "diagnostic_parity.png",
+        t_step_start=t_step_start,
     )
 
     config = {

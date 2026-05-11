@@ -202,6 +202,13 @@ JVP calls with Python/numpy overhead defeating GPU batching.
 
 ![Step response overlay, L=0.40](assets/ota_5t_fno_l040/step_response_overlay.png)
 
+![Diagnostic parity: all three internal nodes, L=0.40](assets/ota_5t_fno_l040/diagnostic_parity.png)
+
+*Three-row parity panel: **n\_tail** (M5 drain, common source of diff pair), **n\_left** (M3
+diode drain and M4 gate — the mirror control node), and **n\_out** (single-ended output,
+M2/M4 drain junction). Left column: FNO vs SPICE time-domain overlay; right column:
+scatter parity with identity line.*
+
 ![Newton convergence, L=0.40](assets/ota_5t_fno_l040/convergence.png)
 
 ![Attribution Probe 1: per-device |ΔI|, L=0.40](assets/ota_5t_fno_l040/attribution/probe1_iv_errors.png)
