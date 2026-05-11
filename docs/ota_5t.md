@@ -127,28 +127,41 @@ reported as the result — not silently retuned.
 
 | Quantity | Value |
 |---|---|
-| W_diff (M1/M2) | — |
-| W_mirror (M3/M4) | — |
-| Slew rate | — |
-| Settling time (5% band) | — |
-| Quiescent I_tail | — |
-| Quiescent n_out | — |
+| W_diff (M1/M2) | 8.0 µm |
+| W_mirror (M3/M4) | 8.0 µm |
+| W_tail (M5) | 2.0 µm |
+| Vbias (M5 gate) | 1.2 V |
+| Slew rate | 48.4 V/µs |
+| Slew time (10–90%) | 21.5 ns |
+| Output swing | 0.951 V |
+| Quiescent I_tail | 78.8 µA |
+| Quiescent n_out | 0.616 V |
+| DC open-loop gain | 48.7 V/V |
 
 ### L = 0.50 µm — selected design
 
 | Quantity | Value |
 |---|---|
-| W_diff (M1/M2) | — |
-| W_mirror (M3/M4) | — |
-| Slew rate | — |
-| Settling time (5% band) | — |
-| Quiescent I_tail | — |
-| Quiescent n_out | — |
+| W_diff (M1/M2) | 8.0 µm |
+| W_mirror (M3/M4) | 8.0 µm |
+| W_tail (M5) | 2.0 µm |
+| Vbias (M5 gate) | 1.2 V |
+| Slew rate | 40.5 V/µs |
+| Slew time (10–90%) | 25.8 ns |
+| Output swing | 1.004 V |
+| Quiescent I_tail | 66.0 µA |
+| Quiescent n_out | 0.594 V |
+| DC open-loop gain | 64.0 V/V |
 
 ### Sweep health
 
-*To be filled: number of corners simulated, converged, and failed; reason for
-failures if any.*
+Both L values: 49/49 design points converged (7 × 7 grid, no SPICE failures).
+Feasible designs (slew rate ≥ 5 V/µs AND slew time ≤ 500 ns): 48/49 at
+L = 0.40 µm; 41/49 at L = 0.50 µm. The single infeasible point at L = 0.40 µm
+is the smallest diff-pair corner (W_diff = 0.5 µm, W_mirror = 0.5 µm), which
+produces a slew rate below the 5 V/µs gate due to insufficient tail current.
+The selection rule applied the pre-registered criterion; no post-hoc adjustment
+was made.
 
 ## Figures
 

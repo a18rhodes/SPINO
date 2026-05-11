@@ -11,11 +11,25 @@ characterisation inputs are defined in [5T OTA: NGSpice ground truth](ota_5t.md)
 ## Replication
 
 ```text
-python -m spino.circuit.compose_ota --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+python -m spino.circuit.compose_ota \
+    --diff-w 8.0 --mirror-w 8.0 --tail-w 2.0 \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+    --step-amp 0.05 --c-load 1e-12 --t-step 1e-9 --t-end 500e-9 \
     --output-dir docs/assets/ota_5t_fno_l040
 
-python -m spino.circuit.compose_ota --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+python -m spino.circuit.compose_ota \
+    --diff-w 8.0 --mirror-w 8.0 --tail-w 2.0 \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+    --step-amp 0.05 --c-load 1e-12 --t-step 1e-9 --t-end 500e-9 \
     --output-dir docs/assets/ota_5t_fno_l050
+
+python -m spino.circuit.ota_attribution \
+    --run-dir docs/assets/ota_5t_fno_l040 \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40
+
+python -m spino.circuit.ota_attribution \
+    --run-dir docs/assets/ota_5t_fno_l050 \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50
 ```
 
 Primary implementation files:
@@ -197,43 +211,130 @@ Solver knobs are not retuned retroactively to chase a passing grade.
 
 ## Results
 
-*This section will be filled after the composition validation runs complete.*
+Composition validation runs completed at the pre-registered stimulus parameters
+(step amplitude ±50 mV differential, C_load = 1 pF, t_step = 1 ns, t_end =
+500 ns). Gate outcomes follow the pre-registered table; no criterion was
+adjusted after the runs.
+
+DC operating points (from `OtaDcSolver`):
+
+| Node | L = 0.40 µm | L = 0.50 µm |
+|---|---|---|
+| V_tail | 0.136 V | 0.140 V |
+| V_left | 0.608 V | 0.587 V |
+| V_out  | 0.608 V | 0.587 V |
+
+Symmetry at DC (V_left ≈ V_out) is correct: with Vinp = Vinn = Vcm, the
+differential pair is balanced and both arms should converge to the same bias
+voltage.
 
 ### L = 0.40 µm
 
-| Metric | SPICE | FNO | Gate |
-|---|---|---|---|
-| Slew rate (V/µs) | — | — | (SPICE reference) |
-| Settling time (µs) | — | — | (SPICE reference) |
-| Pearson r | — | — | ≥ 0.99 |
-| Max \|ΔV\| (mV) | — | — | ≤ 30 |
-| Slew relative error | — | — | ≤ 10% |
-| Slew-time relative error | — | — | ≤ 10% |
-| NR iterations | — | — | ≤ 25 |
+| Metric | SPICE | FNO | Gate | Result |
+|---|---|---|---|---|
+| Slew rate (V/µs) | 48.41 | 47.92 | (reference) | — |
+| Slew time 10–90% (ns) | 21.5 | 25.0 | (reference) | — |
+| Pearson r | — | 0.9997 | ≥ 0.99 | **PASS** |
+| Max \|ΔV\| (mV) | — | 68.8 | ≤ 30 | **FAIL** |
+| Slew-rate relative error | — | 1.0% | ≤ 10% | **PASS** |
+| Slew-time relative error | — | 16.3% | ≤ 10% | **FAIL** |
+| NR transient iterations | — | 11 | ≤ 25 | **PASS** |
 
 ### L = 0.50 µm
 
-| Metric | SPICE | FNO | Gate |
+| Metric | SPICE | FNO | Gate | Result |
+|---|---|---|---|---|
+| Slew rate (V/µs) | 40.47 | 42.48 | (reference) | — |
+| Slew time 10–90% (ns) | 25.8 | 28.0 | (reference) | — |
+| Pearson r | — | 0.9997 | ≥ 0.99 | **PASS** |
+| Max \|ΔV\| (mV) | — | 68.8 | ≤ 30 | **FAIL** |
+| Slew-rate relative error | — | 5.0% | ≤ 10% | **PASS** |
+| Slew-time relative error | — | 8.5% | ≤ 10% | **PASS** |
+| NR transient iterations | — | 12 | ≤ 25 | **PASS** |
+
+### Gate summary and interpretation
+
+**Passes:** Pearson r (0.9997, both L), slew-rate error (1% and 5%), NR
+iteration count (11 and 12 of 25 budget), slew-time error at L = 0.50 µm (8.5%).
+
+**Failures:** max |ΔV| at both L values (~68.8 mV vs 30 mV gate); slew-time
+error at L = 0.40 µm (16.3%).
+
+### Attribution (Probe 1 — IV branch errors at SPICE node voltages)
+
+Probe 1 evaluates each FNO device at the SPICE node-voltage trajectories and
+compares the predicted drain current to the SPICE branch current. This localises
+which device contributes the observed output voltage error.
+
+| Device | L = 0.40 µm max|ΔI| | L = 0.50 µm max|ΔI| | Fraction of peak current |
 |---|---|---|---|
-| Slew rate (V/µs) | — | — | (SPICE reference) |
-| Settling time (µs) | — | — | (SPICE reference) |
-| Pearson r | — | — | ≥ 0.99 |
-| Max \|ΔV\| (mV) | — | — | ≤ 30 |
-| Slew relative error | — | — | ≤ 10% |
-| Slew-time relative error | — | — | ≤ 10% |
-| NR iterations | — | — | ≤ 25 |
+| M1 — NFET diff pair (left) | 2.8 µA | 1.3 µA | ~4% |
+| M2 — NFET diff pair (right) | 4.8 µA | 3.1 µA | ~9% |
+| M3 — PFET mirror (diode) | 5.6 µA | 2.2 µA | ~8% |
+| **M4 — PFET mirror (output)** | **15.4 µA** | **9.2 µA** | **~24%** |
+| M5 — NFET tail source | 2.1 µA | 0.5 µA | ~1% |
+
+M4 is the dominant error source — 3–10× larger current error than any other
+device at both L values.
+
+M4 is the single-ended output device (VDD → n_out). As n_out slews toward VDD
+during the large-signal step, M4 moves from saturation into the linear/triode
+regime (V_ds = VDD − V_n_out → 0). PFET training data is concentrated at
+V_ds values consistent with saturation (mid-supply range); the linear-regime
+boundary near VDD is underrepresented, causing a ~15 µA current
+overestimate at the saturation exit. This current error displaces n_out by
+~70 mV from the SPICE trajectory at the plateau.
+
+The waveform shape is reproduced faithfully (Pearson r = 0.9997) because the
+error is spatially concentrated near the VDD rail and does not affect the
+slewing trajectory itself. Only the final plateau level is shifted.
+
+These failures are reported as the pre-registered result. Both failures
+(max|ΔV| and slew-time at L = 0.40) trace to the same M4 linear-regime gap.
+Targeted PFET retraining with denser V_ds-near-zero samples would address this
+without changing the solver or selection criteria.
+
+### Runtime
+
+All FNO runs on a single CUDA GPU (same host as NGSpice).
+
+| L | SPICE wall time | FNO wall time | Ratio |
+|---|---|---|---|
+| 0.40 µm | 6.3 s | 63 s | × 0.10 (FNO is ~10× slower) |
+| 0.50 µm | 6.5 s | 68 s | × 0.10 (FNO is ~10× slower) |
+
+The FNO solver is slower than NGSpice for this circuit because: (a) the
+whole-window dense Jacobian is (3T × 3T) = (1500 × 1500) per Newton step;
+(b) NGSpice uses an adaptive timestep that converges in far fewer internal
+evaluations than the uniform T = 500 grid. The primary speedup lever is a
+Krylov-based inexact Newton update (avoiding the dense Jacobian solve) plus
+reducing T via adaptive timestepping, both deferred to future work.
 
 ## Figures
 
-*Figures will be embedded here after the composition validation runs complete.*
-
 ### n_out trajectory vs SPICE — L = 0.40 µm
 
-![OTA transient overlay L=0.40um](assets/ota_5t_fno_l040/transient_overlay.png)
+![OTA step response overlay L=0.40um](assets/ota_5t_fno_l040/step_response_overlay.png)
 
 ### n_out trajectory vs SPICE — L = 0.50 µm
 
-![OTA transient overlay L=0.50um](assets/ota_5t_fno_l050/transient_overlay.png)
+![OTA step response overlay L=0.50um](assets/ota_5t_fno_l050/step_response_overlay.png)
+
+### NR convergence — L = 0.40 µm
+
+![OTA NR convergence L=0.40um](assets/ota_5t_fno_l040/convergence.png)
+
+### NR convergence — L = 0.50 µm
+
+![OTA NR convergence L=0.50um](assets/ota_5t_fno_l050/convergence.png)
+
+### Attribution: per-device |ΔI| at SPICE node voltages — L = 0.40 µm
+
+![OTA attribution L=0.40um](assets/ota_5t_fno_l040/attribution/probe1_iv_errors.png)
+
+### Attribution: per-device |ΔI| at SPICE node voltages — L = 0.50 µm
+
+![OTA attribution L=0.50um](assets/ota_5t_fno_l050/attribution/probe1_iv_errors.png)
 
 ## Scope limits
 

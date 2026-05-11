@@ -2,6 +2,9 @@
 **/CURRENT_STATUS.md
 **/NEXT_STEPS.md
 
+# Local scratch — raw traces, intermediate outputs, experiment dumps
+scratch/
+
 # --- Python Standard ---
 __pycache__/
 *.py[cod]

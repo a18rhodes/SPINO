@@ -57,6 +57,8 @@ __all__ = ["main"]
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 _DEFAULT_DIFF_W = 2.0
 _DEFAULT_MIRROR_W = 2.0
 _DEFAULT_TAIL_W = 2.0
@@ -220,16 +222,18 @@ def _run_fno_transient(
     time_s: np.ndarray,
     vinp_np: np.ndarray,
     vinn_np: np.ndarray,
-) -> tuple[dict, np.ndarray, np.ndarray]:
-    """Runs the transient solver; returns report dict, time array, and v_out array."""
+) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Runs the transient solver; returns (report, time, v_out, v_tail, v_left)."""
     time_tensor = torch.from_numpy(time_s)
     vinp_tensor = torch.from_numpy(vinp_np)
     vinn_tensor = torch.from_numpy(vinn_np)
     sol = solver.solve(time_tensor, vinp_tensor, vinn_tensor, v_dc)
     time_np = sol.time_s.cpu().numpy()
     v_out_np = sol.v_out_v.cpu().numpy()
+    v_tail_np = sol.v_tail_v.cpu().numpy()
+    v_left_np = sol.v_left_v.cpu().numpy()
     report = {"report": _serialise_report(sol.report)}
-    return report, time_np, v_out_np
+    return report, time_np, v_out_np, v_tail_np, v_left_np
 
 
 # ---------------------------------------------------------------------------
@@ -323,6 +327,12 @@ def _plot_convergence(
     show_default=True,
     help="Directory for figures and summary.json.",
 )
+@click.option(
+    "--trace-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Directory for raw trace npz files (default: scratch/<output-dir-name>). Must be outside git tracking.",
+)
 @click.option("--diff-w", type=float, default=_DEFAULT_DIFF_W, show_default=True, help="Diff-pair width (µm).")
 @click.option("--mirror-w", type=float, default=_DEFAULT_MIRROR_W, show_default=True, help="Mirror width (µm).")
 @click.option("--tail-w", type=float, default=_DEFAULT_TAIL_W, show_default=True, help="Tail width (µm).")
@@ -343,7 +353,7 @@ def _plot_convergence(
     show_default=True,
     help="Load capacitance at n_out (F). Must match the value used in characterize_ota.",
 )
-@click.option("--device", type=str, default="cpu", show_default=True, help="Torch device (e.g. cuda).")
+@click.option("--device", type=str, default=_DEFAULT_DEVICE, show_default=True, help="Torch device (e.g. cuda or cpu).")
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
 @click.option("--nfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_NFET_CHECKPOINT, show_default=True)
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_PFET_CHECKPOINT, show_default=True)
@@ -351,6 +361,7 @@ def _plot_convergence(
 @click.option("--pfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_PFET_DATASET, show_default=True)
 def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
     output_dir: Path,
+    trace_dir: Path | None,
     diff_w: float,
     mirror_w: float,
     tail_w: float,
@@ -418,7 +429,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
 
     logger.info("Running FNO transient solver (T=%d timesteps)…", len(time_np))
     tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
-    fno_tran_report, fno_time_np, fno_v_out_np = _run_fno_transient(
+    fno_tran_report, fno_time_np, fno_v_out_np, fno_v_tail_np, fno_v_left_np = _run_fno_transient(
         tran_solver, v_dc, time_s=time_np, vinp_np=vinp_np, vinn_np=vinn_np
     )
     fno_metrics = _extract_ota_metrics(fno_time_np, fno_v_out_np, t_step_start=t_step_start)
@@ -522,6 +533,34 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     }
     summary_path = output_dir / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    # Save raw traces for offline attribution analysis.
+    _trace_root = trace_dir if trace_dir is not None else Path("scratch") / output_dir.name
+    _trace_root.mkdir(parents=True, exist_ok=True)
+    _id = lambda inst, dev: f"i(@m.{inst}.{dev}[id])"
+    np.savez_compressed(
+        _trace_root / "spice_traces.npz",
+        time_s=spice_tran.time,
+        v_n_out=spice_tran.variables["v(n_out)"],
+        v_n_left=spice_tran.variables["v(n_left)"],
+        v_n_tail=spice_tran.variables["v(n_tail)"],
+        v_vinp=spice_tran.variables["v(vinp)"],
+        v_vinn=spice_tran.variables["v(vinn)"],
+        id_m1=spice_tran.variables[_id("xm1", "msky130_fd_pr__nfet_01v8")],
+        id_m2=spice_tran.variables[_id("xm2", "msky130_fd_pr__nfet_01v8")],
+        id_m3=spice_tran.variables[_id("xm3", "msky130_fd_pr__pfet_01v8")],
+        id_m4=spice_tran.variables[_id("xm4", "msky130_fd_pr__pfet_01v8")],
+        id_m5=spice_tran.variables[_id("xm5", "msky130_fd_pr__nfet_01v8")],
+    )
+    np.savez_compressed(
+        _trace_root / "fno_traces.npz",
+        time_s=fno_time_np,
+        v_n_out=fno_v_out_np,
+        v_n_tail=fno_v_tail_np,
+        v_n_left=fno_v_left_np,
+        v_vinp=vinp_np,
+        v_vinn=vinn_np,
+    )
     logger.info("Wrote artefacts to %s", output_dir.resolve())
 
 

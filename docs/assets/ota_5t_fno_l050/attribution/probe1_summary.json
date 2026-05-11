@@ -1,0 +1,32 @@
+{
+  "M1_nfet_diffpair": {
+    "max_abs_error_a": 1.2784554551079175e-06,
+    "rms_error_a": 1.0124947331451155e-06,
+    "max_fno_a": 5.623247488983907e-05,
+    "max_spice_a": 5.502551194162987e-05
+  },
+  "M2_nfet_diffpair": {
+    "max_abs_error_a": 3.1465743600773958e-06,
+    "rms_error_a": 8.482364146351101e-07,
+    "max_fno_a": 3.194275632267818e-05,
+    "max_spice_a": 3.301036221870858e-05
+  },
+  "M3_pfet_mirror_diode": {
+    "max_abs_error_a": 2.2345822118925742e-06,
+    "rms_error_a": 2.041683079216989e-06,
+    "max_fno_a": 5.290402259561233e-05,
+    "max_spice_a": 5.492929903471317e-05
+  },
+  "M4_pfet_mirror_out": {
+    "max_abs_error_a": 9.21598148544153e-06,
+    "rms_error_a": 2.4267096262247233e-06,
+    "max_fno_a": 5.2235387556720525e-05,
+    "max_spice_a": 5.4249458604538265e-05
+  },
+  "M5_nfet_tail": {
+    "max_abs_error_a": 5.071139602558916e-07,
+    "rms_error_a": 4.4283115191076894e-07,
+    "max_fno_a": 6.857966945972294e-05,
+    "max_spice_a": 6.899227717053707e-05
+  }
+}

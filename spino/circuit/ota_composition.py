@@ -38,7 +38,11 @@ from dataclasses import dataclass
 
 import torch
 from torch import Tensor
+import numpy as np
+from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import gmres as scipy_gmres
 from torch.autograd.functional import jacobian
+from torch.autograd.functional import jvp as torch_jvp
 
 from spino.circuit.composition import ConvergenceReport, _backtrack, _cap_alpha, _inf_norm
 from spino.circuit.devices import FnoMosfetDevice
@@ -337,9 +341,17 @@ class OtaTransientSolver:
     State is flattened to ``(3T,)`` with layout
     ``[V_tail(0:T), V_left(T:2T), V_out(2T:3T)]``. The residual stacks an
     initial-condition row per node followed by KCL rows at ``t = 1 … T-1``.
-    The dense ``(3T, 3T)`` Jacobian is assembled via
-    ``torch.autograd.functional.jacobian``. Armijo backtracking and a
-    per-component voltage cap constrain each Newton step.
+    Two Newton-direction strategies are available via ``use_gmres``:
+
+    * ``False`` (default): dense ``(3T, 3T)`` Jacobian via
+      ``torch.autograd.functional.jacobian(vectorize=True)`` — uses vmap to run
+      all 3T VJPs as one batched GPU operation, then ``torch.linalg.solve``.
+      Fastest on GPU (~65 s for T=500 at CUDA).
+
+    * ``True``: GMRES with scipy matvec via ``torch.autograd.functional.jvp``.
+      Each GMRES iteration is one sequential JVP call + numpy↔torch round-trip.
+      Faster on CPU (avoids 3T sequential backward passes) but ~7× slower on GPU
+      because it cannot exploit vmap batching and pays scipy call overhead.
 
     Only ``n_out`` carries a lumped load capacitance ``c_load_f``.
     ``C_tail`` and ``C_left`` are zero in this implementation.
@@ -361,6 +373,8 @@ class OtaTransientSolver:
         v_step_cap: float = _DEFAULT_V_STEP_CAP,
         armijo_c: float = _DEFAULT_ARMIJO_C,
         alpha_min: float = _DEFAULT_ALPHA_MIN,
+        use_gmres: bool = False,
+        gmres_max_iter: int = 50,
     ) -> None:
         self.m1, self.m2, self.m3, self.m4, self.m5 = m1, m2, m3, m4, m5
         self.vdd = vdd
@@ -371,6 +385,8 @@ class OtaTransientSolver:
         self.v_step_cap = v_step_cap
         self.armijo_c = armijo_c
         self.alpha_min = alpha_min
+        self.use_gmres = use_gmres
+        self.gmres_max_iter = gmres_max_iter
         self._device = m1.v_mean.device
         self._dtype = m1.v_mean.dtype
 
@@ -422,6 +438,36 @@ class OtaTransientSolver:
         r_out = torch.cat([(v_out[0:1] - v_dc[2]).reshape(1), kcl_out])
         return torch.cat([r_tail, r_left, r_out])
 
+    def _gmres_direction(
+        self,
+        rfn: "Callable[[Tensor], Tensor]",  # type: ignore[name-defined]
+        v_flat: Tensor,
+        res_vec: Tensor,
+        rn: float,
+    ) -> Tensor:
+        """Newton direction via GMRES with JVP matvec (avoids dense Jacobian)."""
+        n = v_flat.shape[0]
+        dtype = v_flat.dtype
+        dev = v_flat.device
+        rhs = -res_vec.detach().cpu().to(torch.float64).numpy()
+
+        def _matvec(v_np: np.ndarray) -> np.ndarray:
+            v_t = torch.from_numpy(v_np.astype(np.float32)).to(device=dev, dtype=dtype)
+            _, jv = torch_jvp(rfn, (v_flat,), (v_t,), create_graph=False, strict=False)
+            return jv.detach().cpu().to(torch.float64).numpy()
+
+        A = LinearOperator((n, n), matvec=_matvec, dtype=np.float64)
+        # Inexact Newton tolerance: tighten as residual decreases.
+        gmres_tol = min(0.5, float(rn) ** 0.5) * max(1e-10, self.residual_tol) / max(rn, 1e-30)
+        gmres_tol = max(1e-10, min(0.5, gmres_tol))
+        direction_np, info = scipy_gmres(A, rhs, rtol=gmres_tol, maxiter=self.gmres_max_iter, atol=0.0)
+        if info != 0:
+            # Fall back to one Jacobian+direct solve if GMRES failed.
+            logger.debug("GMRES did not converge (info=%d); falling back to direct solve", info)
+            jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
+            return torch.linalg.solve(jac, -res_vec.detach())
+        return torch.from_numpy(direction_np.astype(np.float32)).to(device=dev, dtype=dtype)
+
     def solve(
         self,
         time_s: Tensor,
@@ -471,9 +517,12 @@ class OtaTransientSolver:
 
         while not converged and iters < self.max_iter:
             iters += 1
-            jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
             res_vec = rfn(v_flat)
-            direction = torch.linalg.solve(jac, -res_vec.detach())
+            if self.use_gmres:
+                direction = self._gmres_direction(rfn, v_flat, res_vec, rn)
+            else:
+                jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
+                direction = torch.linalg.solve(jac, -res_vec.detach())
             alpha, _ = _backtrack(
                 rfn,
                 v_flat.detach(),
