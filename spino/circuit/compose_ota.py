@@ -65,12 +65,13 @@ _DEFAULT_PFET_L = 0.40
 _DEFAULT_TAIL_L = 0.40
 _DEFAULT_VDD = 1.8
 _DEFAULT_VCM = 0.9
-_DEFAULT_STEP_AMP = 0.25
+_DEFAULT_STEP_AMP = 0.05  # ±50 mV — must match characterize_ota default
 _DEFAULT_VBIAS = 1.2
 _DEFAULT_RISE_TIME = 5e-9
 _DEFAULT_T_STEP_START = 100e-9
-_DEFAULT_T_END = 5e-6
-_DEFAULT_T_STEP = 10e-9
+_DEFAULT_T_END = 500e-9  # must match characterize_ota default
+_DEFAULT_T_STEP = 1e-9  # must match characterize_ota default
+_DEFAULT_C_LOAD = 1e-12  # must match characterize_ota default
 _SPICE_OUTPUT_NODE = "v(n_out)"
 _FNO_OUTPUT_NODE = "v(n_out)"
 
@@ -154,6 +155,7 @@ def _run_spice_transient(
     t_step_start: float,
     t_end: float,
     t_step: float,
+    c_load_f: float,
     pdk_root: str | None,
 ) -> tuple[TransientResult, float]:
     """
@@ -181,6 +183,7 @@ def _run_spice_transient(
         "vcm_v": vcm_v,
         "vinp_tran": vinp_pwl,
         "vinn_tran": vinn_pwl,
+        "c_load_f": c_load_f,
     }
     if pdk_root is not None:
         kw["pdk_root"] = pdk_root
@@ -333,6 +336,13 @@ def _plot_convergence(
 @click.option("--t-step-start", type=float, default=_DEFAULT_T_STEP_START, show_default=True, help="Step onset (s).")
 @click.option("--t-end", type=float, default=_DEFAULT_T_END, show_default=True, help="Simulation window (s).")
 @click.option("--t-step", type=float, default=_DEFAULT_T_STEP, show_default=True, help="Max timestep (s).")
+@click.option(
+    "--c-load",
+    type=float,
+    default=_DEFAULT_C_LOAD,
+    show_default=True,
+    help="Load capacitance at n_out (F). Must match the value used in characterize_ota.",
+)
 @click.option("--device", type=str, default="cpu", show_default=True, help="Torch device (e.g. cuda).")
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
 @click.option("--nfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_NFET_CHECKPOINT, show_default=True)
@@ -354,6 +364,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     t_step_start: float,
     t_end: float,
     t_step: float,
+    c_load: float,
     device: str,
     pdk_root: str | None,
     nfet_checkpoint: Path,
@@ -406,7 +417,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     )
 
     logger.info("Running FNO transient solver (T=%d timesteps)…", len(time_np))
-    tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias)
+    tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
     fno_tran_report, fno_time_np, fno_v_out_np = _run_fno_transient(
         tran_solver, v_dc, time_s=time_np, vinp_np=vinp_np, vinn_np=vinn_np
     )
@@ -434,6 +445,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
         t_step_start=t_step_start,
         t_end=t_end,
         t_step=t_step,
+        c_load_f=c_load,
         pdk_root=pdk_root,
     )
     spice_metrics = _extract_ota_metrics(

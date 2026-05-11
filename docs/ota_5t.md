@@ -13,10 +13,14 @@ set of traces; it makes no neural-network claims itself.
 ## Replication
 
 ```text
-python -m spino.circuit.characterize_ota --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+python -m spino.circuit.characterize_ota \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+    --step-amp 0.05 --c-load 1e-12 --t-step 1e-9 --t-end 500e-9 \
     --output-dir docs/assets/ota_5t_l040
 
-python -m spino.circuit.characterize_ota --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+python -m spino.circuit.characterize_ota \
+    --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50 \
+    --step-amp 0.05 --c-load 1e-12 --t-step 1e-9 --t-end 500e-9 \
     --output-dir docs/assets/ota_5t_l050
 ```
 
@@ -78,11 +82,12 @@ M1 and M2 are nominally matched (same W/L). M3 and M4 are nominally matched.
 | W_mirror grid (M3/M4) | 0.5, 0.8, 1.3, 2.0, 3.2, 5.0, 8.0 µm | 7 log-spaced points. |
 | M5 sizing | CLI flags `--tail-w`, `--vbias` | W_tail and Vbias are CLI inputs, not pre-registered. Chosen per run to target I_tail ≈ 50 µA; exact values reported in `summary.json`. |
 | Vcm (input common mode) | VDD/2 = 0.9 V | Maximises differential input headroom. |
-| Step amplitude | ±250 mV differential (Vin+ = Vcm + 250 mV, Vin- = Vcm − 250 mV after step) | Large-signal regime; same stimulus for both Phase 3a ranking and Phase 3b FNO validation. |
-| Step rise time | 5 ns | Finite slew avoids numerical Gibbs artefacts. |
-| Step start | t = 100 ns | Allows initial quiescent settle before stimulus. |
-| Simulation window | 5 µs | Captures settling to better than 5% for all expected designs. |
-| Time step | 10 ns | Standard SPICE default; refine per-deck as needed. |
+| Step amplitude | ±50 mV differential (Vin+ = Vcm + 50 mV, Vin- = Vcm − 50 mV after step) | Enough to fully switch the diff pair (slewing regime); same stimulus used in both Phase 3a ranking and Phase 3b FNO validation. |
+| Step rise time | 5 ns | Finite ramp avoids numerical Gibbs artefacts. |
+| Step start | t = 100 ns | Allows quiescent settle before stimulus. |
+| Load capacitance | C_L = 1 pF at n_out | **Required for meaningful slew metrics.** Unlike the CS amp where c_load is aesthetic, here slew rate = I_tail / C_L and slew time = (V_rail − V_q) / (I_tail / C_L). The characterization sweep and FNO composition use the same C_L value. |
+| Simulation window | 500 ns | Covers full slew to rail (≈ 27 ns at I_tail = 53 µA, C_L = 1 pF) plus 100 ns pre-step headroom. |
+| Time step | 1 ns | Resolves the ≈ 27 ns 10–90% rise time with ≈ 27 samples. The CS amp sweep used 10 ns; the OTA requires finer resolution because slewing is the primary metric. |
 | Metrics extracted | Slew rate (V/µs), slew time (10–90% of output swing, ns) | Tran-only for composition comparison; see note on gain below. |
 | DC gain (reported only) | Small-signal Vin_diff DC sweep (±20 mV, Vcm fixed) in SPICE | Reported as a design descriptor to confirm the circuit is reasonable; not a Phase 3b gate (FNO is a transient operator). |
 

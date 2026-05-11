@@ -790,6 +790,7 @@ def _ota_tran(  # pylint: disable=too-many-arguments,too-many-locals
     t_step_start: float,
     t_end: float,
     t_step: float,
+    c_load_f: float,
     pdk_root: str | None,
 ) -> TransientResult | None:
     """Runs the large-signal differential-step transient for one OTA design."""
@@ -812,6 +813,7 @@ def _ota_tran(  # pylint: disable=too-many-arguments,too-many-locals
         "vcm_v": vcm_v,
         "vinp_tran": vinp_pwl,
         "vinn_tran": vinn_pwl,
+        "c_load_f": c_load_f,
     }
     if pdk_root is not None:
         kwargs["pdk_root"] = pdk_root
@@ -861,7 +863,7 @@ def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-lo
     *,
     vdd: float = 1.8,
     vcm_v: float = 0.9,
-    step_amp_v: float = 0.25,
+    step_amp_v: float = 0.05,
     rise_time_s: float = 5e-9,
     diff_l_um: float = 0.40,
     mirror_l_um: float = 0.40,
@@ -869,8 +871,9 @@ def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-lo
     tail_l_um: float = 0.40,
     vbias_v: float = 1.2,
     t_step_start: float = 100e-9,
-    t_end: float = 5e-6,
-    t_step: float = 10e-9,
+    t_end: float = 500e-9,
+    t_step: float = 1e-9,
+    c_load_f: float = 1e-12,
     dc_sweep_amp_v: float = 0.02,
     dc_sweep_step_v: float = 0.001,
     pdk_root: str | None = None,
@@ -901,6 +904,10 @@ def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-lo
     :param t_step_start: Step onset time in seconds.
     :param t_end: Total simulation window in seconds.
     :param t_step: SPICE maximum timestep.
+    :param c_load_f: Load capacitance at ``n_out`` in farads. Unlike the CS amp
+        where ``c_load`` is only aesthetic, this value directly defines the slew
+        metric: ``slew_rate = I_tail / c_load_f``. Must be nonzero for
+        meaningful slew-rate and slew-time measurements.
     :param dc_sweep_amp_v: Half-range of the gain sweep (V).
     :param dc_sweep_step_v: DC sweep resolution (V).
     :param pdk_root: Optional PDK root override.
@@ -933,6 +940,7 @@ def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-lo
         t_step_start=t_step_start,
         t_end=t_end,
         t_step=t_step,
+        c_load_f=c_load_f,
         **shared,
     )
     if tran is None:
@@ -971,7 +979,7 @@ def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-local
     *,
     vdd: float = 1.8,
     vcm_v: float = 0.9,
-    step_amp_v: float = 0.25,
+    step_amp_v: float = 0.05,
     rise_time_s: float = 5e-9,
     diff_l_um: float = 0.40,
     mirror_l_um: float = 0.40,
@@ -979,8 +987,9 @@ def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-local
     tail_l_um: float = 0.40,
     vbias_v: float = 1.2,
     t_step_start: float = 100e-9,
-    t_end: float = 5e-6,
-    t_step: float = 10e-9,
+    t_end: float = 500e-9,
+    t_step: float = 1e-9,
+    c_load_f: float = 1e-12,
     pdk_root: str | None = None,
     progress: Callable[[int, int, OtaDesignPoint, OtaMetrics], None] | None = None,
 ) -> OtaSweepResult:
@@ -1001,6 +1010,7 @@ def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-local
     :param t_step_start: Step onset time.
     :param t_end: Simulation window.
     :param t_step: SPICE timestep.
+    :param c_load_f: Load capacitance at ``n_out`` passed to every design point.
     :param pdk_root: Optional PDK root override.
     :param progress: Optional callback ``(index, total, point, metrics)``.
     :return: Completed sweep result.
@@ -1023,6 +1033,7 @@ def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-local
             t_step_start=t_step_start,
             t_end=t_end,
             t_step=t_step,
+            c_load_f=c_load_f,
             pdk_root=pdk_root,
         )
         metrics_list.append(result)

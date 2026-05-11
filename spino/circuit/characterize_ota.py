@@ -53,7 +53,7 @@ _DEFAULT_MIRROR_WIDTHS: tuple[float, ...] = (0.5, 0.8, 1.3, 2.0, 3.2, 5.0, 8.0)
 
 _DEFAULT_VDD = 1.8
 _DEFAULT_VCM = 0.9
-_DEFAULT_STEP_AMP = 0.25  # ±250 mV differential
+_DEFAULT_STEP_AMP = 0.05  # ±50 mV differential (pre-registered)
 _DEFAULT_RISE_TIME = 5e-9  # 5 ns (pre-registered)
 _DEFAULT_NFET_L = 0.40  # diff-pair L
 _DEFAULT_PFET_L = 0.40  # mirror L
@@ -61,11 +61,12 @@ _DEFAULT_TAIL_L = 0.40  # tail L
 _DEFAULT_TAIL_W = 2.0  # tail W (µm)
 _DEFAULT_VBIAS = 1.2  # tail gate bias (V)
 _DEFAULT_T_STEP_START = 100e-9
-_DEFAULT_T_END = 5e-6
-_DEFAULT_T_STEP = 10e-9
+_DEFAULT_T_END = 500e-9  # 500 ns: covers full slew at CL=1 pF + 100 ns headroom
+_DEFAULT_T_STEP = 1e-9  # 1 ns: resolves ~27 ns 10-90% rise at CL=1 pF
+_DEFAULT_C_LOAD = 1e-12  # 1 pF: defines slew metric (slew = I_tail / C_load)
 _DEFAULT_SLEW_MIN = 5.0  # V/µs (pre-registered gate)
 _DEFAULT_SLEW_TIME_MAX = 500.0  # ns (pre-registered gate)
-_FIGURE_T_WINDOW_S = 2e-6  # plot zoom window after step onset
+_FIGURE_T_WINDOW_S = 300e-9  # plot zoom window after step onset
 
 
 def _log_progress(idx: int, total: int, point: OtaDesignPoint, metrics: OtaMetrics) -> None:
@@ -139,6 +140,7 @@ def _generate_figure(
         "vcm_v": vcm_v,
         "vinp_tran": vinp_pwl,
         "vinn_tran": vinn_pwl,
+        "c_load_f": config["c_load_f"],
     }
     if config.get("pdk_root") is not None:
         kwargs["pdk_root"] = config["pdk_root"]
@@ -232,6 +234,16 @@ def _generate_figure(
     show_default=True,
     help="Selection rule: maximum 10–90 %% slew time (ns).",
 )
+@click.option(
+    "--c-load",
+    type=float,
+    default=_DEFAULT_C_LOAD,
+    show_default=True,
+    help=(
+        "Load capacitance at n_out (F). Defines the slew metric: "
+        "slew_rate = I_tail / c_load. Must match the value used in compose_ota."
+    ),
+)
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     output_dir: Path,
@@ -248,6 +260,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
     t_step: float,
     slew_min: float,
     slew_time_max: float,
+    c_load: float,
     pdk_root: str | None,
 ) -> None:
     """Runs the 5T OTA characterization sweep and writes artefacts."""
@@ -268,19 +281,21 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         "t_step_start": t_step_start,
         "t_end": t_end,
         "t_step": t_step,
+        "c_load_f": c_load,
         "pdk_root": pdk_root,
     }
     rule = OtaSelectionRule(slew_min_v_per_us=slew_min, slew_time_max_ns=slew_time_max)
 
     n_points = len(_DEFAULT_DIFF_WIDTHS) * len(_DEFAULT_MIRROR_WIDTHS)
     logger.info(
-        "Sweeping %d × %d = %d OTA design points (nfet_l=%.2f, pfet_l=%.2f, tail_l=%.2f µm)...",
+        "Sweeping %d × %d = %d OTA design points (nfet_l=%.2f, pfet_l=%.2f, tail_l=%.2f µm, CL=%.0f fF)...",
         len(_DEFAULT_DIFF_WIDTHS),
         len(_DEFAULT_MIRROR_WIDTHS),
         n_points,
         nfet_l,
         pfet_l,
         tail_l,
+        c_load * 1e15,
     )
 
     sweep = sweep_ota_design_space(
@@ -298,6 +313,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
         t_step_start=t_step_start,
         t_end=t_end,
         t_step=t_step,
+        c_load_f=c_load,
         pdk_root=pdk_root,
         progress=_log_progress,
     )
