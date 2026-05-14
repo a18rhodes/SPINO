@@ -42,7 +42,7 @@ from spino.mosfet.evaluate import (
     DEFAULT_TRIM_EVAL,
 )
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO
+from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
 from spino.utils import generate_unique_id, timeit
 
 # Configure Logging
@@ -102,6 +102,11 @@ def _initialize_training_components(
             input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
         ).cuda()
         logger.info("Initialized MosfetFiLMFNO (FiLM architecture)")
+    elif model_type == "mlp":
+        model = MosfetMLP(
+            input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width
+        ).cuda()
+        logger.info("Initialized MosfetMLP (per-timestep quasi-static baseline)")
     else:
         model = MosfetFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
         logger.info("Initialized MosfetFNO (Concat architecture)")
@@ -556,7 +561,10 @@ def run_mosfet_training(
     "--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training."
 )
 @click.option(
-    "--model-type", default="concat", type=click.Choice(["concat", "film", "vcfilm"]), help="Architecture type."
+    "--model-type",
+    default="concat",
+    type=click.Choice(["concat", "film", "vcfilm", "mlp"]),
+    help="Architecture type. 'mlp' is the quasi-static per-timestep baseline.",
 )
 @click.option("--trim-startup", default=0, help="Timesteps to trim from start of each sample (removes .op blip).")
 @click.option(

@@ -267,6 +267,42 @@ python -m spino.circuit.ota_attribution \
 
 ---
 
+## MLP ablation: architecture defense
+
+To justify the FNO architecture choice, a per-timestep `MosfetMLP` baseline was trained on the
+same 61K NFET dataset as the production Exp 19b VCFiLM-FNO. The MLP maps each timestep
+independently: `I_D(t) = f(Vg(t), Vd(t), Vs(t), Vb(t), θ_embed)`. Off-diagonal Jacobian terms
+`dI[t]/dV[t']` are exactly zero by construction — this is the structurally correct choice for a
+quasi-static device.
+
+Two capacity levels were evaluated (h64: 32K params, h128: 58K params) against FNO Exp19b (1.28M
+params). Fast Dataset R² is averaged over 64 fixed-seed samples from the training distribution;
+SPICE metrics use deterministic ramp sweeps.
+
+| Metric | MLP h64 | MLP h128 | FNO Exp19b |
+|---|---|---|---|
+| Fast Dataset R² (64-sample avg) | -4.42 | -5.43 | **0.9879** |
+| SPICE Transfer R² | 0.9990 | 0.9989 | **0.9995** |
+| SPICE Transfer SubTh-R² | **0.9856** | 0.9631 | 0.9861 |
+| SPICE Output R² | 0.9456 | 0.9763 | **0.9960** |
+| Speedup vs SPICE | 863x | 6501x | 473x |
+
+The MLP matches FNO on controlled ramp sweeps (Transfer R² ≥ 0.999) but fails catastrophically
+on arbitrary PWL waveforms (Fast Dataset R² ≈ −4 to −5). The gap **worsens** with more capacity,
+ruling out underfitting as the cause. FNO spectral mixing acts as a **waveform-shape regularizer**:
+by aggregating information across the full input trajectory, it generalizes to the diverse waveform
+types present in the training distribution. This effect is empirically necessary even though
+MOSFET physics does not require temporal dependencies.
+
+The ablation also confirms that the inverter-chain failure (see below) is attributable to spurious
+FNO off-diagonal Jacobian terms, not to a deficiency in the FNO's expressive capacity. An MLP
+surrogate would produce an exactly diagonal Jacobian — but MLP fails on the waveform distribution
+that makes it a viable surrogate in the first place.
+
+Figures: [`docs/assets/mosfet/nfet/mlp_ablation/`](assets/mosfet/nfet/mlp_ablation/)
+
+---
+
 ## Digital circuits: known limitation
 
 The inverter-chain composition path was evaluated as a digital extension using

@@ -12,7 +12,15 @@ from neuralop.models import FNO
 from neuralop.layers.fno_block import FNOBlocks
 from neuralop.layers.spectral_convolution import SpectralConv
 
-__all__ = ["DeviceEmbedding", "MosfetFNO", "BatchedFiLM", "MosfetFiLMFNO", "VoltageConditionedFiLM", "MosfetVCFiLMFNO"]
+__all__ = [
+    "DeviceEmbedding",
+    "MosfetFNO",
+    "BatchedFiLM",
+    "MosfetFiLMFNO",
+    "VoltageConditionedFiLM",
+    "MosfetVCFiLMFNO",
+    "MosfetMLP",
+]
 
 
 class BatchedFiLM(nn.Module):
@@ -512,4 +520,70 @@ class MosfetVCFiLMFNO(nn.Module):
         x = self.projection(x)
         x = x.permute(0, 2, 1)
         x = self._unpad(x, pad_len)
+        return x
+
+
+class MosfetMLP(nn.Module):
+    """
+    Quasi-static per-timestep MOSFET operator baseline.
+
+    Learns the mapping :math:`I_d(t) = f(V_g(t), V_d(t), V_s(t), V_b(t), \\theta)`
+    pointwise in time. No spectral or temporal mixing: the prediction at time ``t``
+    depends only on the terminal voltages at time ``t`` and the static physics
+    vector. Off-diagonal autograd Jacobian terms :math:`dI[t] / dV[t']` are exactly
+    zero by construction, in contrast to the FNO variants whose Fourier convolutions
+    produce spurious non-local sensitivities.
+
+    Intended use: architecture-defense baseline against :class:`MosfetVCFiLMFNO` —
+    quasi-static MOSFET physics motivates a quasi-static surrogate. If this model
+    matches FNO accuracy, the FNO temporal mixing is not architecturally required.
+
+    Forward signature matches the FNO variants for drop-in composition reuse.
+    """
+
+    def __init__(
+        self,
+        input_param_dim: int,
+        embedding_dim: int = 16,
+        hidden_dim: int = 256,
+        n_hidden_layers: int = 3,
+        embedding_hidden_dim: int = 128,
+    ) -> None:
+        """
+        Initialize the per-timestep MLP architecture.
+
+        :param input_param_dim: Dimension of the raw BSIM parameter vector.
+        :param embedding_dim: Size of the device parameter embedding.
+        :param hidden_dim: Width of the per-timestep MLP hidden layers.
+        :param n_hidden_layers: Number of hidden GELU blocks in the per-timestep MLP.
+        :param embedding_hidden_dim: Hidden dimension for the DeviceEmbedding encoder.
+        """
+        super().__init__()
+        self.embedding = DeviceEmbedding(
+            input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim
+        )
+        self.n_voltage_channels = 4
+        input_features = self.n_voltage_channels + embedding_dim
+        layers: list[nn.Module] = [nn.Linear(input_features, hidden_dim), nn.GELU()]
+        for _ in range(n_hidden_layers - 1):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.GELU())
+        layers.append(nn.Linear(hidden_dim, 1))
+        self.mlp = nn.Sequential(*layers)
+
+    def forward(self, v_terminals: torch.Tensor, physical_params: torch.Tensor) -> torch.Tensor:
+        """
+        Predict transient drain current pointwise in time.
+
+        :param v_terminals: Voltage waveforms (Batch, 4, Time). Order: Vg, Vd, Vs, Vb.
+        :param physical_params: Raw physics vector (Batch, Param_Dim).
+        :return: Drain current I_d(t) (Batch, 1, Time).
+        """
+        batch_size, _, time_steps = v_terminals.shape
+        latent_vec = self.embedding(physical_params)
+        latent_expanded = latent_vec.unsqueeze(-1).expand(-1, -1, time_steps)
+        x = torch.cat([v_terminals, latent_expanded], dim=1)
+        x = x.permute(0, 2, 1).reshape(batch_size * time_steps, -1)
+        x = self.mlp(x)
+        x = x.reshape(batch_size, time_steps, 1).permute(0, 2, 1)
         return x

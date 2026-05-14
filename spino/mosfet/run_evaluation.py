@@ -23,7 +23,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from spino.config import PathConfig
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO
+from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
 from spino.mosfet.train import run_final_evaluations
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
 
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--model-type",
     default="vcfilm",
-    type=click.Choice(["concat", "film", "vcfilm"]),
+    type=click.Choice(["concat", "film", "vcfilm", "mlp"]),
     help="Architecture type (must match trained checkpoint).",
 )
 @click.option(
@@ -113,13 +113,20 @@ def run_evaluation(
     path_config = PathConfig(_subdir[strategy_name])
     logger.info("Loading model: %s (type=%s)", model_path, model_type)
     input_param_dim = ParameterSchema.input_dim()
-    model_classes = {"concat": MosfetFNO, "film": MosfetFiLMFNO, "vcfilm": MosfetVCFiLMFNO}
-    model = model_classes[model_type](
-        input_param_dim=input_param_dim,
-        embedding_dim=embedding_dim,
-        modes=modes,
-        width=width,
-    ).cuda()
+    if model_type == "mlp":
+        model = MosfetMLP(
+            input_param_dim=input_param_dim,
+            embedding_dim=embedding_dim,
+            hidden_dim=width,
+        ).cuda()
+    else:
+        model_classes = {"concat": MosfetFNO, "film": MosfetFiLMFNO, "vcfilm": MosfetVCFiLMFNO}
+        model = model_classes[model_type](
+            input_param_dim=input_param_dim,
+            embedding_dim=embedding_dim,
+            modes=modes,
+            width=width,
+        ).cuda()
     state_dict = torch.load(model_path, weights_only=False)
     state_dict.pop("_metadata", None)
     model.load_state_dict(state_dict)
