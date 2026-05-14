@@ -1,10 +1,12 @@
 """Unit tests for MosfetMLP — per-timestep quasi-static MOSFET baseline."""
 
+# pytest fixtures shadow outer names by design; suppress the pylint warning globally.
+# pylint: disable=redefined-outer-name
+
 import pytest
 import torch
 
 from spino.mosfet.model import MosfetMLP
-
 
 BATCH = 4
 TIME = 128
@@ -15,6 +17,7 @@ HIDDEN = 64
 
 @pytest.fixture
 def model():
+    """Small MosfetMLP suitable for fast CPU unit tests."""
     return MosfetMLP(
         input_param_dim=PARAM_DIM,
         embedding_dim=EMB_DIM,
@@ -25,18 +28,21 @@ def model():
 
 @pytest.fixture
 def inputs():
+    """Random (v_terminals, physical_params) pair for the batch/time dimensions above."""
     v = torch.randn(BATCH, 4, TIME)
     p = torch.randn(BATCH, PARAM_DIM)
     return v, p
 
 
 def test_output_shape(model, inputs):
+    """Output tensor must have shape (B, 1, T)."""
     v, p = inputs
     out = model(v, p)
     assert out.shape == (BATCH, 1, TIME), f"Expected ({BATCH}, 1, {TIME}), got {out.shape}"
 
 
 def test_gradient_flows(model, inputs):
+    """Autograd must propagate through v_terminals and physical_params."""
     v, p = inputs
     v.requires_grad_(True)
     p.requires_grad_(True)
@@ -58,7 +64,7 @@ def test_no_temporal_mixing(model, inputs):
     grad = torch.autograd.grad(out[0, 0, t_check], v, retain_graph=False)[0]
     # grad shape: (1, 4, T); off-diagonal columns (t != t_check) must be zero
     off_diag = grad[0, :, :t_check].abs().max().item()
-    off_diag_right = grad[0, :, t_check + 1:].abs().max().item()
+    off_diag_right = grad[0, :, t_check + 1 :].abs().max().item()
     assert off_diag == 0.0, f"Non-zero off-diagonal Jacobian before t_check: {off_diag}"
     assert off_diag_right == 0.0, f"Non-zero off-diagonal Jacobian after t_check: {off_diag_right}"
 
@@ -74,7 +80,7 @@ def test_batch_independence(model, inputs):
 def test_different_time_lengths(model):
     """Model must accept arbitrary time-axis lengths (quasi-static = no fixed grid)."""
     p = torch.randn(2, PARAM_DIM)
-    for T in (64, 256, 512, 1024):
-        v = torch.randn(2, 4, T)
+    for t_len in (64, 256, 512, 1024):
+        v = torch.randn(2, 4, t_len)
         out = model(v, p)
-        assert out.shape == (2, 1, T), f"Wrong shape at T={T}: {out.shape}"
+        assert out.shape == (2, 1, t_len), f"Wrong shape at t_len={t_len}: {out.shape}"

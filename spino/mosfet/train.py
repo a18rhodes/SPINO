@@ -103,9 +103,7 @@ def _initialize_training_components(
         ).cuda()
         logger.info("Initialized MosfetFiLMFNO (FiLM architecture)")
     elif model_type == "mlp":
-        model = MosfetMLP(
-            input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width
-        ).cuda()
+        model = MosfetMLP(input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width).cuda()
         logger.info("Initialized MosfetMLP (per-timestep quasi-static baseline)")
     else:
         model = MosfetFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
@@ -315,7 +313,13 @@ def run_final_evaluations(
     plt.close(final_fig_fast)
     logger.info("Running final SPICE-based I-V sweep validation...")
     final_fig_spice, final_metrics_spice = evaluate_spice_iv_sweeps(
-        model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=trim_eval,
+        model,
+        dataset,
+        device="cuda",
+        w_um=1.0,
+        l_um=0.18,
+        t_steps=512,
+        trim_eval=trim_eval,
         strategy_name=strategy_name,
     )
     final_fig_spice.savefig(training_fig_dir / "iv_final_spice.png")
@@ -326,7 +330,12 @@ def run_final_evaluations(
     logger.info("Running comprehensive multi-geometry SPICE validation...")
     comprehensive_dir = training_fig_dir / "comprehensive"
     comprehensive_metrics, comprehensive_figures = evaluate_comprehensive(
-        model, dataset, comprehensive_dir, device="cuda", t_steps=512, trim_eval=trim_eval,
+        model,
+        dataset,
+        comprehensive_dir,
+        device="cuda",
+        t_steps=512,
+        trim_eval=trim_eval,
         strategy_name=strategy_name,
     )
     for geom_name, geom_metrics in comprehensive_metrics.items():
