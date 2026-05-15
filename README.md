@@ -6,7 +6,7 @@
 
 ---
 
-## Abstract
+## Overview
 
 **SPINO** (SPICE Neural Operator) studies whether Fourier Neural Operator
 (FNO) device surrogates can be composed inside Newton-Raphson circuit solvers
@@ -33,7 +33,7 @@ Four device operators have been trained and validated against NGSPICE ground tru
 | sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | [NFET](docs/nfet.md) |
 | sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | [PFET](docs/pfet.md) |
 
-The work is documented in a set of paper-style notes:
+The work is documented in a set of notes:
 
 - [Neural composition: CS amplifier method](docs/composition.md) — KCL assembly,
   Newton-Raphson solvers, autograd Jacobians, and damping policy.
@@ -58,6 +58,21 @@ with validated resolution invariance ($`\Delta R^2 < 0.0001`$ at 1024/2048/4096
 steps) and time-scale invariance (R² ≥ 0.997 across $`T_{end}`$ spanning 100 µs to 10 ms).
 The RC operator demonstrates that a single trained FNO generalises across the full stiffness
 ratio spectrum without per-circuit solver configuration.
+
+### Architecture justification: MLP ablation
+
+The FNO's spectral temporal mixing was not chosen by default. A per-timestep quasi-static MLP
+baseline (`MosfetMLP`) was trained on the *same* 61 K NFET dataset using the same loss,
+optimizer, and epoch budget, at two capacity levels (32 K and 58 K parameters). On controlled
+ramp sweeps — the kind of inputs MOSFET compact models are traditionally validated against —
+the MLP matches the FNO at Transfer R² ≥ 0.999. On random PWL waveforms drawn from the
+training distribution (the same distribution that drives Newton-Raphson circuit composition),
+the MLP collapses to Fast Dataset R² ≈ **−4 to −5**, while the FNO holds **0.99**. The gap
+*widens* with MLP capacity (h64: −4.42, h128: −5.43), ruling out underfitting as the cause.
+FNO temporal mixing is therefore acting as a waveform-shape regularizer rather than a
+physically necessary modelling choice — a structural argument the capacity sweep makes
+cleanly without requiring multi-seed variance characterisation. Full table, figures, and
+discussion in [Analog composition results — MLP ablation](docs/results.md#mlp-ablation-architecture-defense).
 
 ---
 
@@ -158,7 +173,10 @@ and sweeps gate/drain downward.
 
 †OTA max|ΔV| attributed to M4 PFET output mirror current error at Vds ≈ 0 (triode boundary);
 PFET training data underrepresents this regime. Pre-registered gate is ≤ 30 mV; failure
-is reported as a documented finding. See [Analog composition results](docs/results.md).
+is reported as a documented finding. A targeted triode-boundary fine-tune narrows the gap
+(M4 peak |ΔI|: 15.4 → 12.0 µA; composition max|ΔV|: 68.7 → 61.0 mV) but does not close it;
+the production checkpoint is unchanged. See
+[Analog composition results — PFET triode-boundary fine-tune](docs/results.md#pfet-triode-boundary-fine-tune-partial-gate-closure).
 
 ### Runtime context
 
@@ -202,7 +220,7 @@ length, mobility parameters, and threshold voltage are present in the 29-element
 while per-timestep terminal voltages provide instantaneous $`V_{\text{eff}}`$. The network can
 reconstruct an effective time constant internally without an explicit $`\lambda`$ channel.
 
-This was empirically validated on the NFET Exp 19b production model across three geometries
+This was empirically validated on the production NFET FNO across three geometries
 (core, tiny, xlarge):
 
 | Test | Variable | Range | Worst $`\Delta R^2`$ | Criterion | Verdict |
@@ -210,7 +228,7 @@ This was empirically validated on the NFET Exp 19b production model across three
 | Time-scale | $`T_{end}`$ | 100 ns – 5 µs (50×) | 0.000517 | < 0.01 | **PASS** |
 | Resolution | Step count | 512 – 4096 (8×) | 0.000002 | < 0.001 | **PASS** |
 
-All $`R^2`$ values remained above 0.999 across the full test matrix. The PFET Exp 06 model
+All $`R^2`$ values remained above 0.999 across the full test matrix. The production PFET FNO
 was independently validated with the same methodology:
 
 | Test | Variable | Range | Core/Tiny $`\Delta R^2`$ | xlarge $`\Delta R^2`$ | Criterion | Verdict |
@@ -279,10 +297,12 @@ Full tables, figures, attribution, and reproduction commands are in
 The global forward roadmap is consolidated in [Future work](docs/future_work.md),
 organized around:
 
-1. Improved model accuracy in weak-inversion and near-off regimes, with targeted
-   data work to close the PFET triode-boundary gap identified by OTA attribution.
+1. Improved model accuracy in weak-inversion and near-off regimes. An initial
+   targeted data-augmentation pass on the PFET triode boundary reduced M4 IV error
+   by 22 % but did not fully close the OTA gate; remaining options (full-backbone
+   fine-tune, geometry-stratified retrain, larger augmentation budget) are queued.
 2. Multi-stage analog topologies — the two-stage Miller op-amp is the next queued target.
-3. Runtime studies: GPU-native Krylov linear solvers (PyTorch Arnoldi, queued post-publication),
+3. Runtime studies: GPU-native Krylov linear solvers (PyTorch Arnoldi, queued for a later iteration),
    cross-hardware reproducibility envelopes, and system-level error budgeting.
 
 ---
