@@ -103,7 +103,7 @@ The archived `summary.json` does not record per-sweep-point DC Newton iteration
 histograms for the VTC curve; at this geometry scalar DC OP for each `V_in` is the
 same code path as the published composition DC solve and shows no pathology in the
 stress run's nominal/off bias reports. A full per-point iteration export would be
-straightforward instrumentation if a reviewer requires it.
+straightforward instrumentation if subsequent investigation requires it.
 
 ![VTC IV error vs Vin](assets/cs_amp_fno_exp2/attribution/vtc_probe1_iv_error.png)
 

@@ -50,7 +50,7 @@ docs/               Technical documentation and figure assets
 
 ## Generating Documentation Figures
 
-All publication figures (light background) are generated from a single entry point:
+All documentation figures (light background) are generated from a single entry point:
 
 ```bash
 python -m spino.export_docs_figures
