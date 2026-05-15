@@ -234,6 +234,56 @@ L=0.40 is a downstream consequence: the 10–90% threshold shifts by ~3.5 ns.
 
 Artefacts: `docs/assets/ota_5t_fno_l040/attribution/`, `docs/assets/ota_5t_fno_l050/attribution/`.
 
+### PFET triode-boundary fine-tune: partial gate closure
+
+Attribution localized the L=0.40 gate failure to M4 in the Vsd→0 triode regime, where
+the production PFET training data was sparse. The targeted remediation was a 2K-sample
+triode-boundary augmentation (Vsg ∈ [1.0, 1.6] V, Vsd ∈ [0.0, 0.3] V, PWL waveforms),
+merged into a 46K dataset and used for a frozen-backbone fine-tune of the production
+PFET (FiLM-conditioning layers only, 50 epochs, LR = 1e-4). The fine-tuned checkpoint
+is `pmos_exp07_triode_finetune_KG1HfPbJ.pt`.
+
+| Gate | Criterion | Production PFET | Triode fine-tune |
+|---|---|---|---|
+| Pearson r | ≥ 0.99 | 0.9997 | 0.9997 |
+| max\|ΔV\| | ≤ 30 mV | **FAIL** (68.7 mV) | **FAIL** (61.0 mV) |
+| Slew rate relative error | ≤ 10% | 1.0% | 1.7% |
+
+Per-device IV error at SPICE node voltages (production sizing, W\_diff = W\_mirror = 8 µm, W\_tail = 2 µm):
+
+| Device | Role | Production max\|ΔI\| | Fine-tune max\|ΔI\| | Δ |
+|---|---|---:|---:|---:|
+| M4 PFET mirror out | Triode target | **15.4 µA** | **12.0 µA** | **−22%** |
+| M3 PFET mirror diode | Non-triode PFET | 5.6 µA | 6.0 µA | +8% |
+| M2 NFET diff pair | NFET (untouched) | 4.8 µA | 4.8 µA | 0% |
+| M1 NFET diff pair | NFET (untouched) | 2.8 µA | 2.8 µA | 0% |
+| M5 NFET tail | NFET (untouched) | 2.1 µA | 2.1 µA | 0% |
+
+**Interpretation.** The triode augmentation reduced M4's peak IV error by 22 % at
+production sizing — a real, attribution-traceable improvement — but the 30 mV gate
+still fails by 31 mV. M3 (diode-connected PFET, not in triode) regressed slightly,
+consistent with frozen-backbone FiLM-only adaptation over-specializing to the
+triode regime. The composition error reduction (68.7 → 61.0 mV, 11 %) is smaller
+than M4's per-device improvement (22 %) because Newton coupling distributes the
+remaining mismatch across all three KCL nodes.
+
+The gap is no longer purely a training-data coverage problem: even with augmented
+triode coverage, residual M4 error in the W = 8 µm geometry bin keeps composition
+max\|ΔV\| above the gate. A larger augmentation set, full fine-tune (unfreeze
+backbone) at a tighter LR, or a geometry-stratified retrain are candidate next
+steps — deferred to future work. The production PFET checkpoint is unchanged;
+the fine-tuned checkpoint is archived alongside the attribution artefacts as a
+documented partial-closure result.
+
+![Step response overlay (triode fine-tune), L=0.40](assets/ota_5t_fno_l040_exp07/step_response_overlay.png)
+
+![Diagnostic parity, all three internal nodes (triode fine-tune), L=0.40](assets/ota_5t_fno_l040_exp07/diagnostic_parity.png)
+
+![Per-device peak IV error: production vs triode fine-tune, L=0.40](assets/ota_5t_fno_l040_exp07/attribution/device_errors_comparison.png)
+
+Artefacts: `docs/assets/ota_5t_fno_l040_exp07/`. Reproduction notebook:
+[spino/ota_pfet_triode_attribution.ipynb](../spino/ota_pfet_triode_attribution.ipynb).
+
 ### Reproduction commands
 
 ```text
@@ -263,7 +313,91 @@ python -m spino.circuit.ota_attribution \
 python -m spino.circuit.ota_attribution \
     --run-dir docs/assets/ota_5t_fno_l050 \
     --nfet-l 0.50 --pfet-l 0.50 --tail-l 0.50
+
+# PFET triode-boundary fine-tune composition + attribution
+# (see spino/ota_pfet_triode_attribution.ipynb for full pipeline)
+python -m spino.circuit.compose_ota \
+    --pfet-checkpoint spino/models/mosfet/pfet/pmos_exp07_triode_finetune_KG1HfPbJ.pt \
+    --pfet-dataset    datasets/sky130_pmos_50k_triode.h5 \
+    --diff-w 8.0 --mirror-w 8.0 --tail-w 2.0 \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40 \
+    --output-dir docs/assets/ota_5t_fno_l040_exp07
+
+python -m spino.circuit.ota_attribution \
+    --run-dir         docs/assets/ota_5t_fno_l040_exp07 \
+    --pfet-checkpoint spino/models/mosfet/pfet/pmos_exp07_triode_finetune_KG1HfPbJ.pt \
+    --pfet-dataset    datasets/sky130_pmos_50k_triode.h5 \
+    --diff-w 8.0 --mirror-w 8.0 --tail-w 2.0 \
+    --nfet-l 0.40 --pfet-l 0.40 --tail-l 0.40
 ```
+
+---
+
+## MLP ablation: architecture defense
+
+To justify the FNO architecture choice, a per-timestep `MosfetMLP` baseline was trained on the
+same 61K NFET dataset as the production VCFiLM-FNO. The MLP maps each timestep
+independently: `I_D(t) = f(Vg(t), Vd(t), Vs(t), Vb(t), θ_embed)`. Off-diagonal Jacobian terms
+`dI[t]/dV[t']` are exactly zero by construction — this is the structurally correct choice for a
+quasi-static device.
+
+Two capacity levels were evaluated (h64: 32K params, h128: 58K params) against the production
+FNO (1.28M params). Fast Dataset R² is averaged over 64 fixed-seed samples from the training
+distribution; SPICE metrics use deterministic ramp sweeps.
+
+**Methodology note.** All reported metrics in this section (and throughout this document) come
+from single-seed training runs. The MLP-vs-FNO comparison instead controls for tuning effort via
+the capacity sweep h64 → h128: increasing MLP capacity *worsens* Fast Dataset R² (−4.42 → −5.43),
+which rules out the "you didn't tune the MLP" rebuttal. The argument for the FNO architecture
+choice is therefore structural — quasi-static MLPs cannot aggregate cross-timestep information,
+which the random-PWL evaluation requires — rather than dependent on training-seed variance.
+
+| Metric | MLP h64 | MLP h128 | FNO (production) |
+|---|---|---|---|
+| Fast Dataset R² (64-sample avg) | -4.42 | -5.43 | **0.9879** |
+| SPICE Transfer R² | 0.9990 | 0.9989 | **0.9995** |
+| SPICE Transfer SubTh-R² | **0.9856** | 0.9631 | 0.9861 |
+| SPICE Output R² | 0.9456 | 0.9763 | **0.9960** |
+| Speedup vs SPICE | 863x | 6501x | 473x |
+
+The MLP matches FNO on controlled ramp sweeps (Transfer R² ≥ 0.999) but fails catastrophically
+on arbitrary PWL waveforms (Fast Dataset R² ≈ −4 to −5). The gap **worsens** with more capacity,
+ruling out underfitting as the cause. FNO spectral mixing acts as a **waveform-shape regularizer**:
+by aggregating information across the full input trajectory, it generalizes to the diverse waveform
+types present in the training distribution. This effect is empirically necessary even though
+MOSFET physics does not require temporal dependencies.
+
+The ablation also confirms that the inverter-chain failure (see below) is attributable to spurious
+FNO off-diagonal Jacobian terms, not to a deficiency in the FNO's expressive capacity. An MLP
+surrogate would produce an exactly diagonal Jacobian — but MLP fails on the waveform distribution
+that makes it a viable surrogate in the first place.
+
+#### Fast dataset (random PWL waveforms)
+
+The Fast Dataset evaluation draws random PWL terminal voltage waveforms — the same distribution
+the surrogate sees during training and the same distribution that drives KCL composition. The MLP's
+catastrophic failure here is the load-bearing finding.
+
+![MLP h64 — fast dataset PWL parity](assets/mosfet/nfet/mlp_ablation/mlp_h64_fast_iv.png)
+
+![MLP h128 — fast dataset PWL parity](assets/mosfet/nfet/mlp_ablation/mlp_h128_fast_iv.png)
+
+![FNO (production) — fast dataset PWL parity](assets/mosfet/nfet/mlp_ablation/fno_exp19b_fast_iv.png)
+
+#### SPICE I-V sweeps (deterministic ramps)
+
+The SPICE-validated transfer / output sweeps use monotonic ramp inputs. The MLP recovers R² ≥ 0.999
+on these sweeps — its per-timestep representation is sufficient when the input itself is
+quasi-monotonic. This is the "MLP looks fine on textbook curves" trap that the fast-dataset
+evaluation breaks.
+
+![MLP h64 — SPICE I-V](assets/mosfet/nfet/mlp_ablation/mlp_h64_spice_iv.png)
+
+![MLP h128 — SPICE I-V](assets/mosfet/nfet/mlp_ablation/mlp_h128_spice_iv.png)
+
+![FNO (production) — SPICE I-V](assets/mosfet/nfet/mlp_ablation/fno_exp19b_spice_iv.png)
+
+Artefacts: [`docs/assets/mosfet/nfet/mlp_ablation/`](assets/mosfet/nfet/mlp_ablation/).
 
 ---
 
@@ -273,6 +407,18 @@ The inverter-chain composition path was evaluated as a digital extension using
 1-, 2-, and 4-stage CMOS chains. SPICE converges for these circuits. The
 FNO-composed transient solver does not converge to acceptance-quality outputs,
 so its waveforms, delay metrics, and parity statistics are diagnostic only.
+
+Warm-pass numbers from `runs/inv_chain/matrix/n{1,2,4}/rep00/`:
+
+| N | DC converged | DC iters | Transient converged | Transient iters | max\|ΔV\| (V) | Pearson r |
+|---|---|---|---|---|---:|---:|
+| 1 | ✓ | 0  | ✗ | 25 (cap) | 1.800 | NaN |
+| 2 | ✓ | 3  | ✗ | 25 (cap) | 1.777 | NaN |
+| 4 | ✓ | 5  | ✗ | 25 (cap) | 1.778 | NaN |
+
+The max\|ΔV\| values are ≈ VDD (1.8 V) — the FNO trajectory is stuck near its
+initial condition and never traverses the switching event. Pearson r and
+crossing-time delay return NaN as a downstream consequence.
 
 Measured transient timing is not evidence of a usable digital accelerator:
 relative FNO/SPICE transient time was approximately `0.77x` at `N=1`,

@@ -42,7 +42,7 @@ from spino.mosfet.evaluate import (
     DEFAULT_TRIM_EVAL,
 )
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO
+from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
 from spino.utils import generate_unique_id, timeit
 
 # Configure Logging
@@ -102,6 +102,9 @@ def _initialize_training_components(
             input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
         ).cuda()
         logger.info("Initialized MosfetFiLMFNO (FiLM architecture)")
+    elif model_type == "mlp":
+        model = MosfetMLP(input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width).cuda()
+        logger.info("Initialized MosfetMLP (per-timestep quasi-static baseline)")
     else:
         model = MosfetFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
         logger.info("Initialized MosfetFNO (Concat architecture)")
@@ -310,7 +313,13 @@ def run_final_evaluations(
     plt.close(final_fig_fast)
     logger.info("Running final SPICE-based I-V sweep validation...")
     final_fig_spice, final_metrics_spice = evaluate_spice_iv_sweeps(
-        model, dataset, device="cuda", w_um=1.0, l_um=0.18, t_steps=512, trim_eval=trim_eval,
+        model,
+        dataset,
+        device="cuda",
+        w_um=1.0,
+        l_um=0.18,
+        t_steps=512,
+        trim_eval=trim_eval,
         strategy_name=strategy_name,
     )
     final_fig_spice.savefig(training_fig_dir / "iv_final_spice.png")
@@ -321,7 +330,12 @@ def run_final_evaluations(
     logger.info("Running comprehensive multi-geometry SPICE validation...")
     comprehensive_dir = training_fig_dir / "comprehensive"
     comprehensive_metrics, comprehensive_figures = evaluate_comprehensive(
-        model, dataset, comprehensive_dir, device="cuda", t_steps=512, trim_eval=trim_eval,
+        model,
+        dataset,
+        comprehensive_dir,
+        device="cuda",
+        t_steps=512,
+        trim_eval=trim_eval,
         strategy_name=strategy_name,
     )
     for geom_name, geom_metrics in comprehensive_metrics.items():
@@ -556,7 +570,10 @@ def run_mosfet_training(
     "--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training."
 )
 @click.option(
-    "--model-type", default="concat", type=click.Choice(["concat", "film", "vcfilm"]), help="Architecture type."
+    "--model-type",
+    default="concat",
+    type=click.Choice(["concat", "film", "vcfilm", "mlp"]),
+    help="Architecture type. 'mlp' is the quasi-static per-timestep baseline.",
 )
 @click.option("--trim-startup", default=0, help="Timesteps to trim from start of each sample (removes .op blip).")
 @click.option(
