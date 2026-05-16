@@ -19,6 +19,22 @@ scope. It is intended to support milestone planning and cross-track prioritizati
 - Quantify how error shifts when width and length move across bin boundaries
   defined in `GEOMETRY_BINS`.
 
+### C. Multi-corner transferability
+
+- The production FNO operators are trained on Sky130 ``tt`` BSIM parameters
+  at 27 °C only. A single-point ``ff`` / 125 °C probe at the 5T-OTA
+  production sizing (`docs/results.md` §Off-corner transferability probe)
+  shows shape fidelity holds (Pearson r 0.9991 vs 0.9997 at ``tt``) but DC
+  operating-point bias does not transfer: max\|ΔV\| grows from 68.7 mV to
+  171.8 mV (2.5×), driven by a 170 mV shift in the pre-step quiescent
+  $`V_\mathrm{out}`$ that the FNO continues to predict at the ``tt`` level.
+- Plumb a corner identifier through the device-conditioning path so the FNO
+  sees corner-specific BSIM4 parameters at inference, and retrain (or
+  fine-tune) on a multi-corner dataset spanning the canonical PVT box.
+- Extend the off-corner probe to a small multi-corner sweep (TT/FF/SS at
+  −40/27/125 °C) to chart the transferability surface rather than rely on
+  a single off-corner spot check.
+
 ## 2) Evaluate larger and more relevant analog architectures
 
 ### A. Analog topologies

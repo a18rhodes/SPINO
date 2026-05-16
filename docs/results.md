@@ -500,3 +500,45 @@ multi-spec).
 See [`sizing.md`](sizing.md) §FD-SPICE Adam baseline for the full
 comparison table and the overlaid $`\theta`$-trajectory figure.
 
+## Off-corner transferability probe
+
+The FNO device operators were trained on Sky130 ``tt`` BSIM parameters at
+27 °C only. The composition layer carries no corner-awareness in its
+conditioning. To bound how well the surrogate transfers to off-corner
+foundry conditions, this probe runs the FNO-composed transient once and
+compares it against two SPICE references at the production sizing
+($`W_\mathrm{diff} = W_\mathrm{mirror} = 8`$ µm, $`W_\mathrm{tail} = 2`$ µm,
+$`L = 0.40`$ µm, $`V_\mathrm{bias} = 1.2`$ V): NGSpice at ``tt`` / 27 °C
+(the training corner) and NGSpice at ``ff`` / 125 °C (single off-corner
+point).
+
+| Comparison | Pearson r | max\|ΔV\| | SPICE slew (V/µs) |
+|---|---|---|---|
+| FNO vs SPICE ``tt`` @ 27 °C | 0.99966 | 68.7 mV | 48.28 |
+| FNO vs SPICE ``ff`` @ 125 °C | 0.99912 | 171.8 mV | 46.80 |
+
+FNO slew rate at the same design point: 48.29 V/µs.
+
+![Off-corner V_out overlay](assets/off_corner/v_out_overlay.png)
+
+Two effects separate cleanly in the data. Shape fidelity holds: Pearson r
+stays $`> 0.999`$ at both corners, and the FNO-predicted slew rate matches
+``tt`` SPICE to 0.01 V/µs and ``ff`` SPICE to 1.5 V/µs (3 % off). DC
+operating-point bias does not transfer: the ``ff`` / 125 °C corner shifts
+the pre-step quiescent $`V_\mathrm{out}`$ from 0.61 V to 0.78 V, and the
+FNO continues to predict the ``tt`` quiescent level. The 2.5× degradation
+in max\|ΔV\| (68.7 → 171.8 mV) is therefore primarily a DC-bias
+generalisation gap, not a transient-shape gap. A corner-aware conditioning
+vector (e.g., BSIM4 parameters queried at the target corner) is the
+natural mitigation and is left to follow-up work.
+
+Reproduction:
+
+```bash
+python -m spino.circuit.off_corner_probe \
+    --output-dir runs/off_corner/ota_ff_125c
+```
+
+Artefacts under [`runs/off_corner/ota_ff_125c/`](../runs/off_corner/ota_ff_125c/);
+figure under [`docs/assets/off_corner/`](assets/off_corner/).
+

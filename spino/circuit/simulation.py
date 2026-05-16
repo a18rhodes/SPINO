@@ -107,6 +107,23 @@ def _maybe_with_acct(options: tuple[str, ...], capture_iters: bool) -> tuple[str
     return options + (_ACCT_OPTION,)
 
 
+def _maybe_with_temp(options: tuple[str, ...], temperature: float | None) -> tuple[str, ...]:
+    """
+    Appends an NGSpice ``temp=<value>`` option when a temperature override is set.
+
+    Used for off-corner / multi-corner probes. NGSpice accepts ``temp`` either
+    via the ``.temp`` directive or the ``.option temp=<value>`` form; this
+    code uses the latter so it can flow through the existing options channel.
+
+    :param options: Existing ``.option`` tuple for the analysis.
+    :param temperature: Nominal operating temperature in °C; ``None`` keeps default.
+    :return: Possibly-extended option tuple.
+    """
+    if temperature is None:
+        return options
+    return options + (f"temp={temperature}",)
+
+
 def _parse_iter_count(stdout: str) -> int | None:
     """
     Extracts the ``Total iterations`` value from NGSpice ``.option acct``.
@@ -129,6 +146,7 @@ def run_operating_point(
     circuit: Circuit,
     timeout: float = _DEFAULT_TIMEOUT,
     capture_iters: bool = False,
+    temperature: float | None = None,
 ) -> OperatingPoint | None:
     """
     Runs DC operating point analysis on the circuit.
@@ -137,10 +155,11 @@ def run_operating_point(
     :param timeout: NGSpice subprocess timeout in seconds.
     :param capture_iters: When True, enables ``.option acct`` and returns
         the parsed ``Total iterations`` count alongside the variables.
+    :param temperature: Optional nominal operating temperature in °C.
     :return: Operating point with all node voltages and branch currents,
         or None on failure.
     """
-    options = _maybe_with_acct(_OP_OPTIONS, capture_iters)
+    options = _maybe_with_temp(_maybe_with_acct(_OP_OPTIONS, capture_iters), temperature)
     deck = circuit.build_deck(".op", options=options)
     if capture_iters:
         success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_op.spice", timeout=timeout)
@@ -159,12 +178,13 @@ def run_operating_point(
     )
 
 
-def run_transient(
+def run_transient(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     circuit: Circuit,
     t_step: float,
     t_end: float,
     timeout: float = _DEFAULT_TIMEOUT,
     capture_iters: bool = False,
+    temperature: float | None = None,
 ) -> TransientResult | None:
     """
     Runs transient analysis on the circuit.
@@ -175,10 +195,11 @@ def run_transient(
     :param timeout: NGSpice subprocess timeout in seconds.
     :param capture_iters: When True, enables ``.option acct`` and returns
         the parsed ``Total iterations`` count alongside the variables.
+    :param temperature: Optional nominal operating temperature in °C.
     :return: Time-series result with all node voltages and currents, or
         None on failure.
     """
-    options = _maybe_with_acct(_TRAN_OPTIONS, capture_iters)
+    options = _maybe_with_temp(_maybe_with_acct(_TRAN_OPTIONS, capture_iters), temperature)
     deck = circuit.build_deck(f".tran {t_step} {t_end}", options=options)
     if capture_iters:
         success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_tran.spice", timeout=timeout)
@@ -238,9 +259,7 @@ def run_dc_sweep(
     nodes = dict(parsed["nodes"])
     if (sweep_key := _find_sweep_variable(nodes, source_name)) is not None:
         sweep_values = nodes.pop(sweep_key)
-        return DCSweepResult(
-            sweep_param=sweep_key, sweep_values=sweep_values, variables=nodes, iter_count=iter_count
-        )
+        return DCSweepResult(sweep_param=sweep_key, sweep_values=sweep_values, variables=nodes, iter_count=iter_count)
     if parsed["time"] is not None:
         return DCSweepResult(
             sweep_param=source_name.lower(), sweep_values=parsed["time"], variables=nodes, iter_count=iter_count
