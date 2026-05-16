@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """Gradient-based 5T OTA sizing via the Implicit Function Theorem (IFT).
 
 Design vector θ = (W_diff, W_mirror, W_tail, L_common, V_bias).
@@ -616,8 +617,8 @@ def _load_base_state(
         pfet_dataset=problem.pfet_dataset,
         map_location=problem.torch_device,
     )
-    nfet_strategy = DeviceStrategy.create("sky130_nmos", pdk_root=problem.pdk_root)
-    pfet_strategy = DeviceStrategy.create("sky130_pmos", pdk_root=problem.pdk_root)
+    nfet_strategy = DeviceStrategy.create("sky130_nmos")
+    pfet_strategy = DeviceStrategy.create("sky130_pmos")
 
     time_np = np.arange(0.0, problem.t_end, problem.t_step, dtype=np.float32)
     vinp_np, vinn_np = _build_input_trajectories(
@@ -728,6 +729,163 @@ def run_adam(
 
 
 # ---------------------------------------------------------------------------
+# FD-SPICE gradient descent
+# ---------------------------------------------------------------------------
+
+
+def _spice_metrics_at(theta_vals: tuple[float, ...], problem: OtaSizingProblem) -> tuple[float, float, bool]:
+    """Single-point NGSpice evaluation. Returns ``(slew_v_per_us, power_uw, converged)``."""
+    w_diff, w_mirror, w_tail, l_um, vbias = theta_vals
+    metrics = simulate_ota_design_point(
+        OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror),
+        vdd=problem.vdd,
+        vcm_v=problem.vcm,
+        step_amp_v=problem.step_amp,
+        diff_l_um=l_um,
+        mirror_l_um=l_um,
+        tail_w_um=w_tail,
+        tail_l_um=l_um,
+        vbias_v=vbias,
+        t_step_start=problem.t_step_start,
+        t_end=problem.t_end,
+        t_step=problem.t_step,
+        c_load_f=problem.c_load_f,
+        pdk_root=problem.pdk_root,
+    )
+    power_uw = float(metrics.static_current_a) * problem.vdd * 1e6
+    return float(metrics.slew_rate_v_per_us), power_uw, bool(metrics.converged)
+
+
+def _scalar_loss(slew: float, power_uw: float, problem: OtaSizingProblem) -> float:
+    """Same hinge loss as :func:`loss_fn` but on float metrics (no autograd)."""
+    return problem.slew_weight * max(0.0, problem.slew_rate_min_v_per_us - slew) + problem.power_weight * max(
+        0.0, power_uw - problem.power_max_uw
+    )
+
+
+def fd_spice_gradient(
+    theta: Tensor,
+    problem: OtaSizingProblem,
+    *,
+    eps_rel: float = 0.01,
+) -> tuple[Tensor, float, float, float, int]:
+    """Forward finite-difference loss gradient via NGSpice.
+
+    For each θ_i, runs SPICE at ``θ + eps_i e_i`` and finite-differences the
+    scalar loss. Cost: ``5 + 1 = 6`` SPICE evaluations per call (1 baseline,
+    5 perturbations). Returns the gradient and the baseline (slew, power, loss)
+    for logging.
+
+    :param theta: Design vector ``(5,)``.
+    :param problem: Sizing configuration.
+    :param eps_rel: Relative perturbation; absolute eps = ``max(|θ_i| * eps_rel, 1e-4)``.
+    :return: Tuple ``(grad, slew, power_uw, loss, sims_consumed)``.
+    """
+    base_vals = tuple(float(x) for x in theta.detach().tolist())
+    slew_base, power_base, converged = _spice_metrics_at(base_vals, problem)
+    if not converged:
+        logger.warning("FD-SPICE baseline did not converge at θ=%s; returning zero gradient.", base_vals)
+        return torch.zeros(5, dtype=theta.dtype), slew_base, power_base, float("nan"), 1
+    loss_base = _scalar_loss(slew_base, power_base, problem)
+
+    grad = torch.zeros(5, dtype=theta.dtype)
+    sims = 1
+    for i in range(5):
+        eps = max(abs(base_vals[i]) * eps_rel, 1e-4)
+        plus_vals = list(base_vals)
+        plus_vals[i] += eps
+        slew_p, power_p, conv_p = _spice_metrics_at(tuple(plus_vals), problem)
+        sims += 1
+        if not conv_p:
+            logger.warning("FD-SPICE perturbation %d did not converge; setting grad_i=0.", i)
+            grad[i] = 0.0
+            continue
+        loss_p = _scalar_loss(slew_p, power_p, problem)
+        grad[i] = (loss_p - loss_base) / eps
+    return grad, slew_base, power_base, loss_base, sims
+
+
+def run_fd_spice_adam(  # pylint: disable=too-many-locals
+    problem: OtaSizingProblem,
+    *,
+    theta_init: Tensor,
+    n_iters: int = 50,
+    lr: float = 5e-2,
+    output_dir: Path,
+) -> Tensor:
+    """Adam loop with forward-FD SPICE gradients (no FNO surrogate).
+
+    Same hyperparameters and loss as :func:`run_adam`. Per-step cost:
+    6 SPICE simulations (1 baseline + 5 perturbations).
+
+    Writes ``trajectory.json`` and ``theta_final.json`` to ``output_dir``.
+
+    :return: Final θ tensor.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    lower = problem.lower_bounds
+    upper = problem.upper_bounds
+    theta = theta_init.clone().detach().requires_grad_(True)
+    optimizer = torch.optim.Adam([theta], lr=lr)
+    trajectory: list[dict] = []
+    sims_total = 0
+
+    for step in range(n_iters):
+        optimizer.zero_grad()
+        t0 = time_module.perf_counter()
+        grad, slew, power_uw, loss_val, sims = fd_spice_gradient(theta, problem)
+        sims_total += sims
+
+        if not np.isfinite(loss_val):
+            logger.warning("Step %d: SPICE non-convergent; skipping.", step)
+            continue
+
+        theta.grad = grad
+        optimizer.step()
+        with torch.no_grad():
+            theta.clamp_(lower, upper)
+
+        elapsed = time_module.perf_counter() - t0
+        row = {
+            "step": step,
+            "loss": loss_val,
+            "slew_rate_v_per_us": slew,
+            "power_uw": power_uw,
+            "theta": theta.detach().tolist(),
+            "sims_step": sims,
+            "sims_total": sims_total,
+            "wall_s": round(elapsed, 3),
+        }
+        trajectory.append(row)
+        logger.info(
+            "Step %3d | loss=%.4f | slew=%.1f V/µs | power=%.0f µW | sims=%d (Σ%d) | θ=%s",
+            step,
+            loss_val,
+            slew,
+            power_uw,
+            sims,
+            sims_total,
+            [f"{v:.3f}" for v in row["theta"]],
+        )
+
+    (output_dir / "trajectory.json").write_text(json.dumps(trajectory, indent=2), encoding="utf-8")
+    final_theta = theta.detach()
+    (output_dir / "theta_final.json").write_text(
+        json.dumps(
+            {
+                "theta": final_theta.tolist(),
+                "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_um", "V_bias_v"],
+                "sims_total": sims_total,
+            }
+        ),
+        encoding="utf-8",
+    )
+    logger.info("FD-SPICE Adam complete. Final θ: %s | total SPICE sims: %d", final_theta.tolist(), sims_total)
+    return final_theta
+
+
+# ---------------------------------------------------------------------------
 # SPICE validation
 # ---------------------------------------------------------------------------
 
@@ -800,7 +958,13 @@ def spice_validate(
 
 
 @click.command()
-@click.option("--mode", type=click.Choice(["adam-fno"]), default="adam-fno", show_default=True)
+@click.option(
+    "--mode",
+    type=click.Choice(["adam-fno", "fd-spice"]),
+    default="adam-fno",
+    show_default=True,
+    help="adam-fno: IFT through FNO. fd-spice: finite-difference Adam baseline through NGSpice.",
+)
 @click.option(
     "--theta-init",
     type=str,
@@ -833,7 +997,7 @@ def spice_validate(
 )
 @click.option("--validate-spice", is_flag=True, default=False, help="Run SPICE validation at final θ.")
 @click.option("--pdk-root", type=str, default=None, help="Override PDK root.")
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,unused-argument
+def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     mode: str,
     theta_init: str,
     n_iters: int,
@@ -847,7 +1011,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,un
     validate_spice: bool,
     pdk_root: str | None,
 ) -> None:
-    """Gradient-based 5T OTA sizing via IFT through the KCL Newton solver."""
+    """Gradient-based 5T OTA sizing: IFT-FNO (``adam-fno``) or FD-SPICE baseline (``fd-spice``)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     theta_vals = [float(v) for v in theta_init.split(",")]
@@ -865,13 +1029,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,un
     )
 
     theta_t = torch.tensor(theta_vals, dtype=torch.float32)
-    final_theta = run_adam(
-        problem,
-        theta_init=theta_t,
-        n_iters=n_iters,
-        lr=lr,
-        output_dir=output_dir,
-    )
+    if mode == "adam-fno":
+        final_theta = run_adam(problem, theta_init=theta_t, n_iters=n_iters, lr=lr, output_dir=output_dir)
+    else:  # fd-spice
+        final_theta = run_fd_spice_adam(problem, theta_init=theta_t, n_iters=n_iters, lr=lr, output_dir=output_dir)
 
     if validate_spice:
         summary = spice_validate(final_theta, problem, output_dir)
