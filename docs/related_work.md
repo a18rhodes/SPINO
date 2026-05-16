@@ -109,8 +109,12 @@ performance abstraction. Ghosh et al. [17] use ML for the spec-to-size map direc
 bypassing the circuit-physics simulator entirely. SPINO targets a lower level, namely
 FNO device operators inside KCL; gradients are w.r.t.
 device geometry through the Newton-Raphson residual itself, not through an external
-adjoint pass or a learned abstraction of circuit behavior. The current work does not close
-the loop into a complete sizing optimizer; that step is deferred to future work.
+adjoint pass or a learned abstraction of circuit behavior. The Adam sizing loop
+closing this gradient path is reported in `docs/sizing.md`: a 5-variable 5T-OTA
+design vector optimised via the Implicit Function Theorem (IFT) through the KCL
+Newton solver converges to a spec-feasible design whose FNO-predicted slew matches
+SPICE within 0.35 % on re-simulation, at roughly $6\times$ lower per-iteration
+circuit-simulation cost than a forward-FD-SPICE Adam baseline on the same problem.
 
 ---
 
