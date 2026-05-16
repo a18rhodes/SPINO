@@ -179,6 +179,32 @@ is reported as a documented finding. A targeted triode-boundary fine-tune narrow
 the production checkpoint is unchanged. See
 [Analog composition results — PFET triode-boundary fine-tune](docs/results.md#pfet-triode-boundary-fine-tune-partial-gate-closure).
 
+### Gradient-based sizing
+
+| Result | Number |
+|---|---|
+| FNO-Adam-converged θ slew rate (FNO predicted / SPICE re-simulated) | 53.97 / 53.78 V/µs (0.35 % gap) |
+| Iters to spec crossing (FNO/IFT vs FD-SPICE Adam) | 5 vs 4 |
+| Circuit simulations per Adam step (FNO/IFT vs FD-SPICE) | ~1 vs 6 |
+
+Full methodology, trajectory plots, and the FD-SPICE comparison in
+[Gradient-based OTA sizing](docs/sizing.md).
+
+### Off-corner transferability
+
+| Comparison at production OTA sizing | Pearson r | max\|ΔV\| |
+|---|---|---|
+| FNO vs SPICE `tt` @ 27 °C (training corner) | 0.99966 | 68.7 mV |
+| FNO vs SPICE `ff` @ 125 °C (off-corner probe) | 0.99912 | 171.8 mV |
+
+Shape fidelity transfers (FNO slew matches SPICE-tt to 0.01 V/µs and
+SPICE-ff to 1.5 V/µs); DC operating-point bias does not (the 170 mV shift
+in pre-step quiescent $`V_\mathrm{out}`$ at `ff` / 125 °C drives the 2.5×
+max\|ΔV\| increase). The FNO operators are trained on `tt` BSIM
+parameters only; corner-aware conditioning is queued for follow-up work.
+Details in
+[Analog composition results — Off-corner transferability probe](docs/results.md#off-corner-transferability-probe).
+
 ### Runtime context
 
 Runtime is measured and archived, but it is not the central claim. The useful
