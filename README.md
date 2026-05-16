@@ -1,8 +1,7 @@
 # SPINO: Universal Parametric Neural Operators for Differentiable Analog Circuit Simulation
 
-> **Disclaimer:** Experiments and results are verified by the author. References and citations
-> have *not* been independently verified. All code and experiments are original work by the
-> project author, with AI tooling assistance.
+> **Disclaimer:** Experiments and results are verified by the author. All code and
+> experiments are original work by the project author, with AI tooling assistance.
 
 ---
 
@@ -316,28 +315,39 @@ For installation, training, evaluation, and figure generation instructions, see 
 
 ## References
 
+The references below ground the motivation and method. For a survey of competing
+approaches in neural device surrogates, differentiable circuit simulators, operator
+learning, and analog sizing, see [docs/related_work.md](docs/related_work.md).
+
 \[1\] L. W. Nagel and D. O. Pederson, "SPICE (Simulation Program with Integrated Circuit
-Emphasis)," Memorandum No. ERL-M382, University of California, Berkeley, 1973.
+Emphasis)," Memorandum No. ERL-M382, Electronics Research Laboratory, University of
+California, Berkeley, April 1973.
 
 \[2\] K. Kundert, "Introduction to RF Simulation and Its Application," *IEEE Journal of
-Solid-State Circuits*, vol. 34, no. 9, 1999.
+Solid-State Circuits*, vol. 34, no. 9, pp. 1298–1319, September 1999.
+DOI: 10.1109/4.782091
 
-\[3\] J. Phillips, "Projection-based approaches for model reduction of weakly nonlinear,
-time-varying systems," *IEEE Transactions on Computer-Aided Design*, vol. 22, no. 2, 2003.
+\[3\] J. R. Phillips, "Projection-based approaches for model reduction of weakly nonlinear,
+time-varying systems," *IEEE Transactions on Computer-Aided Design of Integrated Circuits
+and Systems*, vol. 22, no. 2, pp. 171–187, 2003. DOI: 10.1109/TCAD.2002.806605
 
-\[4\] M. Raissi, P. Perdikaris, and G. E. Karniadakis, "Physics-informed neural networks:
-A deep learning framework for solving forward and inverse problems involving nonlinear
-partial differential equations," *Journal of Computational Physics*, vol. 378, 2019.
+\[4\] M. Raissi, P. Perdikaris, and G. E. Karniadakis, "Physics-Informed Neural Networks:
+A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear
+Partial Differential Equations," *Journal of Computational Physics*, vol. 378,
+pp. 686–707, 2019. DOI: 10.1016/j.jcp.2018.10.045
 
 \[5\] E. Hairer and G. Wanner, *Solving Ordinary Differential Equations II: Stiff and
-Differential-Algebraic Problems*, Springer, 1996.
+Differential-Algebraic Problems*, 2nd ed., Springer Series in Computational Mathematics,
+vol. 14, Springer, 1996.
 
-\[6\] Z. Li, N. Kovachki, K. Azizzadenesheli, et al., "Fourier Neural Operator for
-Parametric Partial Differential Equations," *ICLR*, 2021.
+\[6\] Z. Li, N. Kovachki, K. Azizzadenesheli, B. Liu, K. Bhattacharya, A. Stuart, and
+A. Anandkumar, "Fourier Neural Operator for Parametric Partial Differential Equations,"
+*International Conference on Learning Representations (ICLR)*, 2021. arXiv:2010.08895
 
-\[7\] G. E. Karniadakis, I. G. Kevrekidis, L. Lu, et al., "Physics-informed machine
-learning," *Nature Reviews Physics*, vol. 3, 2021.
+\[7\] G. E. Karniadakis, I. G. Kevrekidis, L. Lu, P. Perdikaris, S. Wang, and L. Yang,
+"Physics-Informed Machine Learning," *Nature Reviews Physics*, vol. 3, no. 6,
+pp. 422–440, 2021. DOI: 10.1038/s42254-021-00314-5
 
-\[8\] S. Wang, H. Wang, and P. Perdikaris, "Learning the solution operator of parametric
-partial differential equations with physics-informed DeepONets," *Science Advances*, vol. 7,
-2021.
+\[8\] S. Wang, H. Wang, and P. Perdikaris, "Learning the Solution Operator of Parametric
+Partial Differential Equations with Physics-Informed DeepONets," *Science Advances*,
+vol. 7, no. 40, eabi8605, 2021. DOI: 10.1126/sciadv.abi8605
