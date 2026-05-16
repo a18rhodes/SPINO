@@ -36,11 +36,11 @@ import logging
 import time as time_module
 from dataclasses import dataclass
 
-import torch
-from torch import Tensor
 import numpy as np
+import torch
 from scipy.sparse.linalg import LinearOperator
 from scipy.sparse.linalg import gmres as scipy_gmres
+from torch import Tensor
 from torch.autograd.functional import jacobian
 from torch.autograd.functional import jvp as torch_jvp
 
@@ -263,13 +263,22 @@ class OtaDcSolver:
         r_out = i_m4 - i_m2
         return torch.stack([r_tail, r_left, r_out])
 
-    def solve(self, v_init: Tensor | None = None) -> OtaDcSolution:
+    def solve(
+        self,
+        v_init: Tensor | None = None,
+        *,
+        return_final_jac: bool = False,
+    ) -> OtaDcSolution | tuple[OtaDcSolution, Tensor]:
         """
         Runs the Newton–Raphson loop and returns the operating-point solution.
 
         :param v_init: Optional ``(3,)`` initial guess ``[v_tail, v_left, v_out]``
             in volts. Defaults to ``[0.1, 0.55, 0.55]`` V.
-        :return: :class:`OtaDcSolution` with converged (or best-effort) voltages.
+        :param return_final_jac: When ``True``, also return the ``(3, 3)`` Jacobian
+            of the DC residual evaluated at the converged solution.  Used by the IFT
+            gradient in :mod:`spino.circuit.sizing`.
+        :return: :class:`OtaDcSolution` with converged (or best-effort) voltages,
+            or a ``(solution, jacobian)`` tuple when ``return_final_jac`` is ``True``.
         """
         start = time_module.perf_counter()
         if v_init is None:
@@ -288,7 +297,7 @@ class OtaDcSolver:
             iters += 1
             jac = jacobian(self._residual, v, vectorize=True, create_graph=False)
             res = self._residual(v)
-            direction = torch.linalg.solve(jac, -res.detach())
+            direction = torch.linalg.solve(jac, -res.detach())  # pylint: disable=not-callable
 
             alpha, _ = _backtrack(
                 self._residual,
@@ -307,6 +316,10 @@ class OtaDcSolver:
             converged = rn <= self.residual_tol
 
         wall_ms = 1000.0 * (time_module.perf_counter() - start)
+        # Optionally compute the Jacobian at the converged point for IFT gradient use.
+        final_jac: Tensor | None = None
+        if return_final_jac:
+            final_jac = jacobian(self._residual, v, vectorize=True, create_graph=False).detach()
         v_sol = v.detach()
         logger.debug(
             "OtaDcSolver: %s in %d iters (rn=%.2e, wall=%.1f ms)",
@@ -315,7 +328,7 @@ class OtaDcSolver:
             rn,
             wall_ms,
         )
-        return OtaDcSolution(
+        sol = OtaDcSolution(
             v_tail_v=float(v_sol[0].item()),
             v_left_v=float(v_sol[1].item()),
             v_out_v=float(v_sol[2].item()),
@@ -327,6 +340,9 @@ class OtaDcSolver:
                 wall_ms=wall_ms,
             ),
         )
+        if return_final_jac:
+            return sol, final_jac  # type: ignore[return-value]
+        return sol
 
 
 # ---------------------------------------------------------------------------
@@ -456,16 +472,16 @@ class OtaTransientSolver:
             _, jv = torch_jvp(rfn, (v_flat,), (v_t,), create_graph=False, strict=False)
             return jv.detach().cpu().to(torch.float64).numpy()
 
-        A = LinearOperator((n, n), matvec=_matvec, dtype=np.float64)
+        lin_op = LinearOperator((n, n), matvec=_matvec, dtype=np.float64)
         # Inexact Newton tolerance: tighten as residual decreases.
         gmres_tol = min(0.5, float(rn) ** 0.5) * max(1e-10, self.residual_tol) / max(rn, 1e-30)
         gmres_tol = max(1e-10, min(0.5, gmres_tol))
-        direction_np, info = scipy_gmres(A, rhs, rtol=gmres_tol, maxiter=self.gmres_max_iter, atol=0.0)
+        direction_np, info = scipy_gmres(lin_op, rhs, rtol=gmres_tol, maxiter=self.gmres_max_iter, atol=0.0)
         if info != 0:
             # Fall back to one Jacobian+direct solve if GMRES failed.
             logger.debug("GMRES did not converge (info=%d); falling back to direct solve", info)
             jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
-            return torch.linalg.solve(jac, -res_vec.detach())
+            return torch.linalg.solve(jac, -res_vec.detach())  # pylint: disable=not-callable
         return torch.from_numpy(direction_np.astype(np.float32)).to(device=dev, dtype=dtype)
 
     def solve(
@@ -475,7 +491,9 @@ class OtaTransientSolver:
         vinn_t: Tensor,
         v_dc: Tensor,
         v_flat_init: Tensor | None = None,
-    ) -> OtaTransientSolution:
+        *,
+        return_final_jac: bool = False,
+    ) -> OtaTransientSolution | tuple[OtaTransientSolution, Tensor, Tensor]:
         """
         Runs the whole-window implicit NR and returns the transient solution.
 
@@ -486,7 +504,12 @@ class OtaTransientSolver:
             used as the initial condition at ``t = 0``.
         :param v_flat_init: Optional ``(3T,)`` warm-start for the solver.
             Defaults to a constant trajectory at the DC values.
-        :return: :class:`OtaTransientSolution` with the solved trajectories.
+        :param return_final_jac: When ``True``, also return the ``(3T, 3T)``
+            Jacobian at convergence and the ``(3T,)`` converged state.  Used by
+            the IFT gradient in :mod:`spino.circuit.sizing`.
+        :return: :class:`OtaTransientSolution`, or a
+            ``(solution, jacobian, v_flat_star)`` tuple when
+            ``return_final_jac`` is ``True``.
         """
         start = time_module.perf_counter()
         tg = time_s.to(device=self._device, dtype=self._dtype)
@@ -522,7 +545,7 @@ class OtaTransientSolver:
                 direction = self._gmres_direction(rfn, v_flat, res_vec, rn)
             else:
                 jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
-                direction = torch.linalg.solve(jac, -res_vec.detach())
+                direction = torch.linalg.solve(jac, -res_vec.detach())  # pylint: disable=not-callable
             alpha, _ = _backtrack(
                 rfn,
                 v_flat.detach(),
@@ -539,6 +562,12 @@ class OtaTransientSolver:
             converged = rn <= self.residual_tol
 
         wall_ms = 1000.0 * (time_module.perf_counter() - start)
+        # Optionally compute converged Jacobian and state for IFT gradient use.
+        final_jac: Tensor | None = None
+        v_flat_star: Tensor | None = None
+        if return_final_jac:
+            final_jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False).detach()
+            v_flat_star = v_flat.detach()
         sol = v_flat.detach().reshape(3, t)
         logger.debug(
             "OtaTransientSolver: %s in %d iters (rn=%.2e, wall=%.1f ms)",
@@ -547,7 +576,7 @@ class OtaTransientSolver:
             rn,
             wall_ms,
         )
-        return OtaTransientSolution(
+        result = OtaTransientSolution(
             time_s=tg.detach(),
             v_tail_v=sol[0],
             v_left_v=sol[1],
@@ -560,3 +589,6 @@ class OtaTransientSolver:
                 wall_ms=wall_ms,
             ),
         )
+        if return_final_jac:
+            return result, final_jac, v_flat_star  # type: ignore[return-value]
+        return result
