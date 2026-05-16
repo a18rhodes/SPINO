@@ -442,34 +442,61 @@ analog-style waveforms with gate and drain varying together. It does not include
 quasi-static fixed-gate drain sweeps or digital step families sufficient to teach
 clean conductive Jacobians at fixed bias.
 
-## Gradient-based 5T OTA sizing (Phase 5–6)
+## Gradient-based 5T OTA sizing
 
-The "differentiable analog simulator" claim is now a measured result. Adam
-optimises $`\theta = (W_\mathrm{diff}, W_\mathrm{mirror}, W_\mathrm{tail}, L, V_\mathrm{bias})`$
+Adam optimises
+$`\theta = (W_\mathrm{diff}, W_\mathrm{mirror}, W_\mathrm{tail}, L, V_\mathrm{bias})`$
 with gradients backpropagated through the FNO device surrogates and the KCL
-Newton solver via the Implicit Function Theorem. Full methodology, trajectory
+Newton solver via the Implicit Function Theorem. Methodology, trajectory
 plots, and reproduction commands in [`sizing.md`](sizing.md).
 
-Headline run: $`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.9)`$ —
-deliberately ~30 % below the SPICE-sweep optimum on slew. Specs:
-$`\mathrm{SR} \ge 30`$ V/µs, $`P \le 200`$ µW. Adam, $`\eta = 5 \times 10^{-2}`$,
-50 iterations on one GPU.
+Run: $`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.9)`$, deliberately
+~30 % below the SPICE-sweep optimum on slew. Specs:
+$`\mathrm{SR} \ge 30`$ V/µs, $`P \le 200`$ µW. Adam,
+$`\eta = 5 \times 10^{-2}`$, 50 iterations on one GPU.
 
 | Stage | Outcome |
 |---|---|
-| Spec convergence | Slew crosses 30 V/µs at **step 5**; loss saturates at 0. |
+| Spec convergence | Slew crosses 30 V/µs at step 5; loss saturates at 0. |
 | Trajectory plateau | $`\theta`$ stabilises by step ~40 (Adam momentum decay). |
 | Final $`\theta`$ | $`(3.638, 3.599, 1.671, 0.180, 1.565)`$; $`L`$ at lower bound. |
-| **FNO vs SPICE on slew** | 53.97 → **53.78** V/µs — **0.35 % gap**. |
-| FNO vs SPICE on power | 180 → 204.1 µW (4 % over the 200 µW cap, see caveat). |
+| FNO vs SPICE on slew | 53.97 → 53.78 V/µs (0.35 % gap). |
+| FNO vs SPICE on power | 180 µW (placeholder) → 204.1 µW (4 % over the 200 µW cap, see caveat). |
 
-The 0.35 % FNO-vs-SPICE slew gap at the converged $`\theta`$ is the key
-result: gradient-driven Adam steps did not exploit the surrogate's error.
-Power over-shoots the cap because it is monitored as a constraint, not
-gradient-optimised — a deliberate POC scope choice deferred to Paper 2 as
-multi-spec joint optimisation.
+![Adam loss and slew vs step](assets/sizing/loss_and_slew.png)
+![FNO vs SPICE at θ_final](assets/sizing/fno_vs_spice.png)
 
-Figure set: [`docs/assets/sizing/`](assets/sizing/) — loss-and-slew vs step,
-5-panel $`\theta`$ trajectory with bounds, FNO-vs-SPICE bar chart at
-$`\theta_\mathrm{final}`$.
+The 0.35 % FNO-vs-SPICE slew gap at the converged $`\theta`$ indicates the
+optimiser did not steer to a point where the surrogate disagrees with
+SPICE on the slew metric. The 4 % power overshoot has a different cause:
+the loss currently uses a placeholder $`I_\mathrm{tail}`$ (constant
+100 µA) rather than a true FNO DC-OP prediction, so the power-cap hinge
+never fires regardless of $`\theta`$, and the optimiser is free to drift
+toward higher $`V_\mathrm{bias}`$. SPICE on the converged sizing reports
+the true $`I_\mathrm{tail} = 113`$ µA (204 µW). Wiring a real FNO
+$`I_\mathrm{tail}`$ output into the loss and switching to a two-sided
+hinge with active power gradients is queued for follow-up work; details
+in [`sizing.md`](sizing.md) §SPICE validation.
+
+Full $`\theta`$ trajectory and reproduction commands in
+[`sizing.md`](sizing.md); figures under
+[`docs/assets/sizing/`](assets/sizing/).
+
+### FD-SPICE Adam baseline
+
+The same Adam loop with forward finite-difference SPICE gradients
+(6 NGSpice simulations per step) produces a similar trajectory and a
+spec-feasible final design, at 300 circuit simulations vs the FNO/IFT
+path's ~1 SPICE-equivalent (final validation only). The per-iteration
+ratio is roughly $`6\times`$ and scales linearly with the number of
+optimisation variables. Wall-clock on this single 5-variable problem is
+comparable (~92 min CPU vs ~4.3 h GPU); whether the per-iteration
+advantage translates into total runtime advantage is a function of
+problem scale and is left to follow-up work (Miller opamp, multi-corner,
+multi-spec).
+
+![FNO vs FD-SPICE Adam convergence](assets/sizing/comparison_loss_slew.png)
+
+See [`sizing.md`](sizing.md) §FD-SPICE Adam baseline for the full
+comparison table and the overlaid $`\theta`$-trajectory figure.
 
