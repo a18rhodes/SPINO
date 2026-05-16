@@ -19,9 +19,9 @@ Power is tracked but not connected to the IFT gradient (see ``extract_metrics``)
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
-import subprocess
 import time as time_module
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -46,6 +46,7 @@ from spino.circuit.ota_composition import (
     OtaDcSolver,
     OtaTransientSolver,
 )
+from spino.circuit.tuning import OtaDesignPoint, simulate_ota_design_point
 from spino.mosfet.device_strategy import DeviceStrategy
 
 __all__ = [
@@ -736,55 +737,61 @@ def spice_validate(
     problem: OtaSizingProblem,
     output_dir: Path,
 ) -> dict:
-    """Run NGSpice characterise_ota at the final θ for ground-truth validation.
+    """Single-point NGSpice evaluation at the final θ for ground-truth validation.
 
-    Calls the ``spino.circuit.characterize_ota`` CLI via subprocess so that
-    Click's isolation is preserved.
+    Uses :func:`simulate_ota_design_point` so the SPICE evaluation is at the
+    *exact* (W_diff, W_mirror, W_tail, L, V_bias) the optimiser landed on — not
+    an argmax over a sweep. This is the apples-to-apples comparison against the
+    FNO-predicted metrics at the same θ.
 
     :param theta: Final design vector ``(5,)`` [W_diff, W_mirror, W_tail, L, V_bias].
     :param problem: Sizing problem configuration.
     :param output_dir: Directory for SPICE validation artefacts.
-    :return: Parsed ``summary.json`` dict.
+    :return: Dict with ``theta``, ``metrics``, and ``converged`` keys.
     """
-    vals = theta.tolist()
+    vals = theta.detach().tolist()
     w_diff, w_mirror, w_tail, l_um, vbias = vals
     out = output_dir / "spice_validation"
     out.mkdir(parents=True, exist_ok=True)
 
-    cmd = [
-        "python",
-        "-m",
-        "spino.circuit.characterize_ota",
-        "--output-dir",
-        str(out),
-        "--diff-w",
-        str(w_diff),
-        "--mirror-w",
-        str(w_mirror),
-        "--tail-w",
-        str(w_tail),
-        "--nfet-l",
-        str(l_um),
-        "--pfet-l",
-        str(l_um),
-        "--tail-l",
-        str(l_um),
-        "--vbias",
-        str(vbias),
-    ]
-    if problem.pdk_root:
-        cmd += ["--pdk-root", problem.pdk_root]
-
-    logger.info("Running SPICE validation: %s", " ".join(cmd))
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        logger.error("characterize_ota failed:\n%s", result.stderr)
-        return {"error": result.stderr}
-
-    summary_path = out / "summary.json"
-    if summary_path.exists():
-        return json.loads(summary_path.read_text(encoding="utf-8"))
-    return {}
+    point = OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror)
+    logger.info(
+        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, L=%.3f, Vbias=%.3f)",
+        w_diff,
+        w_mirror,
+        w_tail,
+        l_um,
+        vbias,
+    )
+    metrics = simulate_ota_design_point(
+        point,
+        vdd=problem.vdd,
+        vcm_v=problem.vcm,
+        step_amp_v=problem.step_amp,
+        diff_l_um=l_um,
+        mirror_l_um=l_um,
+        tail_w_um=w_tail,
+        tail_l_um=l_um,
+        vbias_v=vbias,
+        t_step_start=problem.t_step_start,
+        t_end=problem.t_end,
+        t_step=problem.t_step,
+        c_load_f=problem.c_load_f,
+        pdk_root=problem.pdk_root,
+    )
+    summary = {
+        "theta": {
+            "w_diff_um": w_diff,
+            "w_mirror_um": w_mirror,
+            "w_tail_um": w_tail,
+            "l_um": l_um,
+            "vbias_v": vbias,
+        },
+        "converged": bool(metrics.converged),
+        "metrics": dataclasses.asdict(metrics),
+    }
+    (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    return summary
 
 
 # ---------------------------------------------------------------------------
