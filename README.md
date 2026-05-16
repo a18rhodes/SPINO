@@ -40,6 +40,8 @@ The work is documented in a set of notes:
   formulation, generalized source-terminal displacement, and pre-registered gates.
 - [Analog composition results](docs/results.md) — SPICE baselines, composed-fidelity
   metrics, runtime context, attribution, and documented limitations.
+- [Gradient-based OTA sizing](docs/sizing.md) — IFT through KCL Newton, Adam loop,
+  SPICE-validated final θ.
 - [Future work](docs/future_work.md) — global forward roadmap.
 
 SPICE-only characterization methodology is documented in

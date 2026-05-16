@@ -442,3 +442,34 @@ analog-style waveforms with gate and drain varying together. It does not include
 quasi-static fixed-gate drain sweeps or digital step families sufficient to teach
 clean conductive Jacobians at fixed bias.
 
+## Gradient-based 5T OTA sizing (Phase 5–6)
+
+The "differentiable analog simulator" claim is now a measured result. Adam
+optimises $`\theta = (W_\mathrm{diff}, W_\mathrm{mirror}, W_\mathrm{tail}, L, V_\mathrm{bias})`$
+with gradients backpropagated through the FNO device surrogates and the KCL
+Newton solver via the Implicit Function Theorem. Full methodology, trajectory
+plots, and reproduction commands in [`sizing.md`](sizing.md).
+
+Headline run: $`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.9)`$ —
+deliberately ~30 % below the SPICE-sweep optimum on slew. Specs:
+$`\mathrm{SR} \ge 30`$ V/µs, $`P \le 200`$ µW. Adam, $`\eta = 5 \times 10^{-2}`$,
+50 iterations on one GPU.
+
+| Stage | Outcome |
+|---|---|
+| Spec convergence | Slew crosses 30 V/µs at **step 5**; loss saturates at 0. |
+| Trajectory plateau | $`\theta`$ stabilises by step ~40 (Adam momentum decay). |
+| Final $`\theta`$ | $`(3.638, 3.599, 1.671, 0.180, 1.565)`$; $`L`$ at lower bound. |
+| **FNO vs SPICE on slew** | 53.97 → **53.78** V/µs — **0.35 % gap**. |
+| FNO vs SPICE on power | 180 → 204.1 µW (4 % over the 200 µW cap, see caveat). |
+
+The 0.35 % FNO-vs-SPICE slew gap at the converged $`\theta`$ is the key
+result: gradient-driven Adam steps did not exploit the surrogate's error.
+Power over-shoots the cap because it is monitored as a constraint, not
+gradient-optimised — a deliberate POC scope choice deferred to Paper 2 as
+multi-spec joint optimisation.
+
+Figure set: [`docs/assets/sizing/`](assets/sizing/) — loss-and-slew vs step,
+5-panel $`\theta`$ trajectory with bounds, FNO-vs-SPICE bar chart at
+$`\theta_\mathrm{final}`$.
+
