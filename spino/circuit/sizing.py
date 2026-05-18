@@ -48,7 +48,9 @@ from spino.circuit.ota_composition import (
     OtaTransientSolver,
 )
 from spino.circuit.tuning import OtaDesignPoint, simulate_ota_design_point
+from spino.constants import ARCSINH_SCALE_MA
 from spino.mosfet.device_strategy import DeviceStrategy
+from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
 
 __all__ = [
     "OtaSizingProblem",
@@ -73,6 +75,26 @@ _DEFAULT_T_END = 500e-9
 _DEFAULT_T_STEP = 1e-9
 _DEFAULT_C_LOAD = 1e-12
 _TIKHONOV_LAMBDA = 1e-6
+
+# Bilinear-interp bracket for the autograd-friendly I_tail evaluation.
+# A 2x2 (W_tail, L) cell around the current theta point gives a central-FD
+# accurate physics_raw vs (W_tail, L) inside the cell while preserving the
+# autograd connection back to theta.
+_ITAIL_FD_DW_UM = 0.05
+_ITAIL_FD_DL_UM = 0.02
+_ITAIL_T_PROBE = 256
+_MA_TO_A_LOCAL = 1.0e-3
+
+# PDK validity bracket per theta component. Used by _jtheta_fd to fall back to
+# one-sided FD when a perturbation crosses a bound, so the gradient divisor
+# matches the actual displacement.
+_FD_THETA_CLAMP: tuple[tuple[float, float], ...] = (
+    (0.1, 20.0),
+    (0.1, 20.0),
+    (0.1, 20.0),
+    (0.18, 1.0),
+    (0.5, 1.6),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -296,18 +318,32 @@ def _jtheta_fd(
 
     for i in range(5):
         eps_i = max(abs(float(theta[i])) * problem.fd_eps_frac, 1e-4)
+        low, high = _FD_THETA_CLAMP[i]
+        base_val = float(theta[i].detach())
+        # Choose the perturbation bracket so a bound crossing falls back to a
+        # one-sided FD rather than a clamped central FD with a mismatched divisor.
+        plus_val = base_val + eps_i
+        minus_val = base_val - eps_i
+        if plus_val > high and minus_val >= low:
+            plus_val = base_val
+        elif minus_val < low and plus_val <= high:
+            minus_val = base_val
+        plus_val = max(low, min(high, plus_val))
+        minus_val = max(low, min(high, minus_val))
+        actual_displacement = plus_val - minus_val
         res_plus: Tensor | None = None
         res_minus: Tensor | None = None
 
         for sign in (+1, -1):
             t_vals = theta.detach().tolist()
-            t_vals[i] += sign * eps_i
+            t_vals[i] = plus_val if sign == +1 else minus_val
             w_diff, w_mirror, w_tail, l_um, vbias = t_vals
-            # Clamp to avoid querying outside PDK validity range
-            w_diff = float(np.clip(w_diff, 0.1, 20.0))
-            w_mirror = float(np.clip(w_mirror, 0.1, 20.0))
-            w_tail = float(np.clip(w_tail, 0.1, 20.0))
-            l_um = float(np.clip(l_um, 0.18, 1.0))
+            # Re-clamp the other components against their own brackets in case
+            # they sit on a bound that an earlier optimiser step pushed them to.
+            w_diff = float(np.clip(w_diff, _FD_THETA_CLAMP[0][0], _FD_THETA_CLAMP[0][1]))
+            w_mirror = float(np.clip(w_mirror, _FD_THETA_CLAMP[1][0], _FD_THETA_CLAMP[1][1]))
+            w_tail = float(np.clip(w_tail, _FD_THETA_CLAMP[2][0], _FD_THETA_CLAMP[2][1]))
+            l_um = float(np.clip(l_um, _FD_THETA_CLAMP[3][0], _FD_THETA_CLAMP[3][1]))
 
             devices_pert = _rebuild_devices(
                 (w_diff, w_mirror, w_tail, l_um, vbias),
@@ -354,7 +390,7 @@ def _jtheta_fd(
                 res_minus = res
 
         assert res_plus is not None and res_minus is not None
-        j_theta[:, i] = (res_plus - res_minus) / (2.0 * eps_i)
+        j_theta[:, i] = (res_plus - res_minus) / actual_displacement
 
     return j_theta
 
@@ -512,45 +548,127 @@ def compose_ota_differentiable(
     return v_out, dc_sol
 
 
+def _eval_itail_through_fno(
+    theta: Tensor,
+    dc_sol: OtaDcSolution,
+    base_devices: tuple[FnoMosfetDevice, ...],
+    nfet_strategy: DeviceStrategy,
+) -> Tensor:
+    """Evaluate M5 mean drain current at the converged DC OP with an autograd
+    link to ``theta``.
+
+    The result is a scalar tensor whose backward propagation captures:
+
+    * ∂I_tail/∂W_tail and ∂I_tail/∂L via bilinear interpolation of the curated
+      BSIM physics vector over a (W, L) 2x2 bracket around (theta[2], theta[3]);
+    * ∂I_tail/∂V_bias via FNO autograd through the M5 ``Vg`` trajectory;
+    * ∂I_tail/∂{W_diff, W_mirror} = 0 (M5 has no dependency on these);
+    * V_tail held detached from autograd, cutting the recursive
+      ``V_tail = f(I_tail)`` feedback. The omitted V_tail-shift contribution is
+      documented in ``docs/sizing.md``.
+
+    :param theta: ``(5,)`` design vector ``[W_diff, W_mirror, W_tail, L, V_bias]``
+        with ``requires_grad=True``.
+    :param dc_sol: Converged DC operating-point solution (float fields, used as a
+        detached anchor for V_tail and as an i_tail_a diagnostic reference).
+    :param base_devices: ``(M1, M2, M3, M4, M5)`` baseline devices carrying FNO
+        weights, normalisation buffers, and the strategy-resolved physics.
+    :param nfet_strategy: NFET ``DeviceStrategy`` for the BSIM bracket lookup.
+    :return: Scalar tensor with M5 drain current in amperes, autograd-connected
+        to ``theta``.
+    """
+    w_tail = theta[2]
+    l_um = theta[3]
+    v_bias = theta[4]
+
+    w_center = float(w_tail.detach().item())
+    l_center = float(l_um.detach().item())
+    dw = _ITAIL_FD_DW_UM
+    dl = _ITAIL_FD_DL_UM
+    # PDK validity clamp so bracket corners stay in BSIM range.
+    w_lo = max(0.15, w_center - dw)
+    w_hi = max(w_lo + 1e-3, w_center + dw)
+    l_lo = max(0.18, l_center - dl)
+    l_hi = max(l_lo + 1e-3, l_center + dl)
+
+    dev_loc = base_devices[4].v_mean.device
+    p00 = _read_curated_physics(nfet_strategy, w_lo, l_lo).to(dev_loc)
+    p01 = _read_curated_physics(nfet_strategy, w_lo, l_hi).to(dev_loc)
+    p10 = _read_curated_physics(nfet_strategy, w_hi, l_lo).to(dev_loc)
+    p11 = _read_curated_physics(nfet_strategy, w_hi, l_hi).to(dev_loc)
+
+    u = (w_tail - w_lo) / (w_hi - w_lo)
+    v = (l_um - l_lo) / (l_hi - l_lo)
+    physics_raw = (
+        (1.0 - u) * (1.0 - v) * p00
+        + (1.0 - u) * v * p01
+        + u * (1.0 - v) * p10
+        + u * v * p11
+    )
+
+    m5 = base_devices[4]
+    physics_norm = ((physics_raw - m5.p_mean) / m5.p_std).unsqueeze(0)
+
+    # Constant-voltage probe: Vg = V_bias (with grad), Vd = V_tail (detached
+    # anchor from the converged DC OP), Vs = Vb = 0.
+    t_probe = _ITAIL_T_PROBE
+    v_tail_const = torch.full((1, 1, t_probe), dc_sol.v_tail_v, dtype=torch.float32, device=dev_loc)
+    zero_traj = torch.zeros((1, 1, t_probe), dtype=torch.float32, device=dev_loc)
+    vg_traj = v_bias.to(dev_loc).expand(t_probe).reshape(1, 1, t_probe)
+    probe = torch.cat([vg_traj, v_tail_const, zero_traj, zero_traj], dim=1)
+
+    v_norm = (probe - m5.v_mean) / m5.v_std
+    pred_log = m5.model(v_norm, physics_norm)
+    i_d = ARCSINH_SCALE_MA * torch.sinh(pred_log) * _MA_TO_A_LOCAL
+    return i_d[0, 0, DEFAULT_TRIM_EVAL:].mean()
+
+
 def extract_metrics(
     v_out: Tensor,
     tg: Tensor,
     dc_sol: OtaDcSolution,
     problem: OtaSizingProblem,
+    *,
+    i_tail_tensor: Tensor | None = None,
 ) -> dict[str, Tensor | float]:
     """Compute OTA performance metrics from the transient trajectory.
 
     ``slew_rate`` and ``swing`` are differentiable through ``v_out`` (IFT
-    gradient available).  ``power_uw`` is evaluated at the DC operating point
-    and is NOT connected to the IFT gradient — it is monitored but not
-    gradient-optimised.
+    gradient available).  ``power_uw`` is differentiable through ``i_tail_tensor``
+    when supplied by :func:`_eval_itail_through_fno`; otherwise it falls back to
+    a non-differentiable float computed from ``dc_sol.i_tail_a`` (still a real
+    KCL-derived value, not the legacy 100 µA placeholder).
 
     :param v_out: ``(T,)`` output voltage trajectory (differentiable via IFT).
     :param tg: ``(T,)`` time grid in seconds.
     :param dc_sol: DC operating-point solution (detached floats).
     :param problem: Sizing configuration.
+    :param i_tail_tensor: Optional scalar tensor of M5 drain current in amperes
+        with an autograd link back to ``theta``. When provided, ``power_uw`` is
+        a tensor that carries gradient through the FNO M5 device.
     :return: Dict with keys ``slew_rate_v_per_us``, ``swing_v``, ``power_uw``.
     """
     dt = float((tg[1] - tg[0]).item()) if tg.shape[0] > 1 else problem.t_step
     post_mask = tg >= problem.t_step_start
     v_post = v_out[post_mask]
 
-    # Differentiable slew rate: peak |dV/dt| after step onset
+    # Differentiable slew rate: peak |dV/dt| after step onset.
     if v_out.shape[0] > 1:
-        dv_dt = torch.diff(v_out) / dt  # (T-1,)
-        slew_rate = torch.max(torch.abs(dv_dt)) * 1e-6  # V/µs
+        dv_dt = torch.diff(v_out) / dt
+        slew_rate = torch.max(torch.abs(dv_dt)) * 1e-6
     else:
         slew_rate = torch.tensor(0.0)
 
-    # Differentiable output swing: max - min in post-step window
+    # Differentiable output swing: max - min in post-step window.
     if v_post.numel() > 1:
         swing = torch.max(v_post) - torch.min(v_post)
     else:
         swing = torch.tensor(0.0)
 
-    # Non-differentiable static power: I_tail from KCL at DC op (float)
-    i_tail_a = abs(dc_sol.v_tail_v / max(abs(dc_sol.v_tail_v), 1e-12)) * 1e-4
-    power_uw = float(i_tail_a * problem.vdd * 1e6)  # rough estimate; replaced by SPICE
+    if i_tail_tensor is not None:
+        power_uw: Tensor | float = i_tail_tensor.abs() * problem.vdd * 1e6
+    else:
+        power_uw = float(abs(dc_sol.i_tail_a) * problem.vdd * 1e6)
 
     return {
         "slew_rate_v_per_us": slew_rate,
@@ -565,8 +683,11 @@ def loss_fn(
 ) -> Tensor:
     """Weighted relu-barrier loss over spec constraints.
 
-    Only ``slew_rate`` and ``swing`` contribute gradients (IFT-differentiable).
-    ``power`` is included as a constant penalty (no gradient to θ).
+    ``slew_rate`` contributes gradient through the IFT path. ``power_uw``
+    contributes gradient through the FNO M5 path when ``extract_metrics`` is
+    called with ``i_tail_tensor`` supplied; when ``power_uw`` is a Python float,
+    the term is a non-differentiable barrier (used for the legacy path and for
+    diagnostic-only calls).
 
     :param metrics: Output of :func:`extract_metrics`.
     :param problem: Sizing configuration with weights and spec targets.
@@ -575,12 +696,13 @@ def loss_fn(
     slew = metrics["slew_rate_v_per_us"]
     assert isinstance(slew, Tensor)
 
-    # Slew rate: penalise if below target
     loss_slew = problem.slew_weight * F.relu(torch.tensor(problem.slew_rate_min_v_per_us) - slew)
 
-    # Power: constant penalty (no gradient through IFT)
-    power_val = float(metrics["power_uw"])
-    loss_power = problem.power_weight * max(0.0, power_val - problem.power_max_uw)
+    power = metrics["power_uw"]
+    if isinstance(power, Tensor):
+        loss_power = problem.power_weight * F.relu(power - problem.power_max_uw)
+    else:
+        loss_power = problem.power_weight * max(0.0, float(power) - problem.power_max_uw)
 
     return loss_slew + loss_power
 
@@ -683,7 +805,8 @@ def run_adam(
                 pg["lr"] /= 2.0
             continue
 
-        metrics = extract_metrics(v_out, tg, dc_sol, problem)
+        i_tail_tensor = _eval_itail_through_fno(theta, dc_sol, base_devices, nfet_strat)
+        metrics = extract_metrics(v_out, tg, dc_sol, problem, i_tail_tensor=i_tail_tensor)
         loss = loss_fn(metrics, problem)
 
         if not loss.isfinite():
@@ -698,11 +821,13 @@ def run_adam(
             theta.clamp_(lower, upper)
 
         elapsed = time_module.perf_counter() - t0
+        power_for_log = metrics["power_uw"]
+        power_float = float(power_for_log.detach()) if isinstance(power_for_log, Tensor) else float(power_for_log)
         row = {
             "step": step,
-            "loss": float(loss),
-            "slew_rate_v_per_us": float(metrics["slew_rate_v_per_us"]),
-            "power_uw": float(metrics["power_uw"]),
+            "loss": float(loss.detach()),
+            "slew_rate_v_per_us": float(metrics["slew_rate_v_per_us"].detach()),
+            "power_uw": power_float,
             "theta": theta.detach().tolist(),
             "wall_s": round(elapsed, 3),
         }

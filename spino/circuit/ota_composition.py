@@ -146,12 +146,18 @@ class OtaDcSolution:
     :param v_tail_v: Solved ``n_tail`` voltage (V).
     :param v_left_v: Solved ``n_left`` voltage (V).
     :param v_out_v: Solved ``n_out`` voltage (V).
+    :param i_tail_a: M5 mean drain current at the converged DC operating point
+        (A). Computed by the same probe and post-trim reduction the solver uses
+        for the KCL residual. Reported as a Python float for diagnostics; the
+        autograd-differentiable I_tail used inside the sizing loss is rebuilt
+        separately in :mod:`spino.circuit.sizing`.
     :param report: Newton–Raphson convergence diagnostics.
     """
 
     v_tail_v: float
     v_left_v: float
     v_out_v: float
+    i_tail_a: float
     report: ConvergenceReport
 
 
@@ -321,17 +327,23 @@ class OtaDcSolver:
         if return_final_jac:
             final_jac = jacobian(self._residual, v, vectorize=True, create_graph=False).detach()
         v_sol = v.detach()
+        with torch.no_grad():
+            v_tail_sol = float(v_sol[0].item())
+            i_tail_tensor = self._mean_id(self.m5, self._dc_probe(self.vbias_v, v_tail_sol, 0.0, 0.0))
+            i_tail_a = float(i_tail_tensor.item())
         logger.debug(
-            "OtaDcSolver: %s in %d iters (rn=%.2e, wall=%.1f ms)",
+            "OtaDcSolver: %s in %d iters (rn=%.2e, wall=%.1f ms, i_tail=%.3e A)",
             "converged" if converged else "did not converge",
             iters,
             rn,
             wall_ms,
+            i_tail_a,
         )
         sol = OtaDcSolution(
-            v_tail_v=float(v_sol[0].item()),
+            v_tail_v=v_tail_sol,
             v_left_v=float(v_sol[1].item()),
             v_out_v=float(v_sol[2].item()),
+            i_tail_a=i_tail_a,
             report=ConvergenceReport(
                 converged=converged,
                 iter_count=iters,
