@@ -176,7 +176,13 @@ A second run swaps the gradient source from IFT-through-FNO to forward
 finite differences through NGSpice. Same loss, hyperparameters,
 $`\theta_\mathrm{init}`$, and bounds. Per Adam step: 6 single-point SPICE
 evaluations (1 baseline + 5 perturbations at
-$`\varepsilon = \max(0.01\,|\theta_i|, 10^{-4})`$).
+$`\varepsilon = \max(0.01\,|\theta_i|, 10^{-4})`$). Forward FD is
+one-sided by construction, so a perturbation at a lower-bound component
+$`(L = 0.18\,\mu\mathrm{m})`$ never crosses into the BSIM-invalid range.
+Inside the IFT path, `_jtheta_fd` uses central FD and falls back to a
+one-sided bracket with a matching divisor when a perturbation would
+cross a PDK bound (see `spino/circuit/sizing.py::_jtheta_fd` and the
+`_FD_THETA_CLAMP` constants).
 
 CLI:
 
@@ -246,6 +252,34 @@ What the comparison supports:
   the lower bound. Both end-points are inside the feasible region; they
   represent different trade-offs between the two specs at the same loss
   weighting.
+
+### Per-iteration circuit-simulation scaling
+
+The headline contribution is per-iteration circuit-simulation count, not
+absolute wall-clock at single-problem scale. The table below extrapolates
+the per-step cost analytically: FNO/IFT consumes one forward Newton solve
+plus one M5 DC re-solve per step regardless of $`n_\theta`$, while
+FD-SPICE consumes $`n_\theta + 1`$ NGSpice OP + transient pairs under
+forward FD (or $`2 n_\theta + 1`$ under central FD). The 10 cheap FNO
+residual evaluations the IFT backward issues against the converged
+Jacobian are excluded from the count; they cost a small constant
+independent of $`n_\theta`$ and are not full circuit simulations.
+
+| $`n_\theta`$ | Problem | FD-SPICE per step (forward) | FD-SPICE per step (central) | FNO/IFT per step | Ratio (forward) |
+|---:|---|---:|---:|---:|---:|
+| 5 | 5T OTA (this work) | 6 | 11 | ~1 | 6x |
+| 10 | (placeholder for tighter OTA parameterisation) | 11 | 21 | ~1 | 11x |
+| 20 | Miller two-stage opamp (representative) | 21 | 41 | ~1 | 21x |
+| 40 | Miller with cascode + comp network | 41 | 81 | ~1 | 41x |
+| 100 | Multi-corner Monte Carlo (~5 specs x ~20 corners) | 101 | 201 | ~1 | 101x |
+
+Whether the per-iteration ratio translates into total wall-clock advantage
+depends on the absolute FNO-step cost and the absolute SPICE-step cost in
+the deployment context (CPU vs GPU, transient window length, Jacobian
+solver, FNO architecture). On this 5-variable OTA, single-GPU FNO/IFT
+loses to single-CPU FD-SPICE wall-clock by ~3x. The per-iteration scaling
+is what compounds with $`n_\theta`$; the absolute cost is what
+scaling-aware deployment decisions optimise against. Both are reported.
 
 Multi-spec comparison overlays (FD-SPICE trajectory vs FNO/IFT
 multi-spec trajectory):

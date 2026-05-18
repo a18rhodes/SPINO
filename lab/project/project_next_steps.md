@@ -188,8 +188,10 @@ triode regime — a training-data coverage gap, not a solver pathology.
        source terminal and PFET current mirror.
 2. [x] DC OP and whole-window transient Newton solvers (`OtaDcSolver`,
        `OtaTransientSolver`).
-3. [x] JVP-GMRES Krylov path (`use_gmres=True`, default) for the transient
-       linear solve — replaces dense Jacobian assembly.
+3. [x] JVP-GMRES Krylov path implemented as opt-in alternative
+       (`use_gmres=False` default). Production OTA runs use the dense
+       `(3T x 3T)` Jacobian; GMRES stays in the codebase as the matrix-free
+       route for larger problems.
 4. [x] CLI `compose_ota` with `summary.json` parity vs CS-amp harness.
 5. [x] Probe 1 attribution (`ota_attribution` CLI): per-device IV error at
        SPICE node voltages.

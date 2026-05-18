@@ -63,8 +63,17 @@ $$R[n]=I_{D,\mathrm{pfet}}[n]-I_{D,\mathrm{nfet}}[n]-\frac{C_{load}}{\Delta t_{n
 Row `0` pins the initial condition to the selected DC value.
 
 A dense `T x T` Jacobian is assembled with
-`torch.autograd.functional.jacobian`. Dense form is required because the
+`torch.autograd.functional.jacobian`. Dense form is non-trivial because the
 operator is non-local in time due to Fourier mixing.
+
+The OTA solver (`spino/circuit/ota_composition.py`, `OtaTransientSolver`)
+exposes an opt-in JVP-GMRES Krylov inner solve via `use_gmres=True` that
+avoids the `(3T x 3T)` dense assembly by replacing it with sequential
+JVP matvecs and scipy GMRES. The default is `use_gmres=False`, i.e.
+the dense path described in this section, because the GPU-batched dense
+backward outperforms the sequential GMRES matvec for the OTA problem
+sizes in this work. The Krylov path stays in the codebase as the route
+that scales to larger circuits where the dense assembly stops fitting.
 
 ## Jacobian source and numerical policy
 

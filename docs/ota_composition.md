@@ -260,6 +260,16 @@ iteration count (11 and 12 of 25 budget), slew-time error at L = 0.50 µm (8.5%)
 **Failures:** max |ΔV| at both L values (~68.8 mV vs 30 mV gate); slew-time
 error at L = 0.40 µm (16.3%).
 
+The gradient-mechanism and shape-fidelity claims (Pearson r 0.9997, slew
+within 1 % at L = 0.40 and 5 % at L = 0.50, NR converging well inside the
+25-iter budget) are independent of the plateau-level offset. Probe 1
+below localises the offset to a single device (M4 PFET) in a single
+operating regime (Vsd → 0, output near VDD); the slewing trajectory is
+reproduced faithfully and the offset enters only at the post-slew
+plateau. The triode-boundary fine-tune in `results.md` reduces the M4
+contribution by 22 % at the production sizing without closing the gate;
+the production checkpoint is unchanged.
+
 ### Attribution (Probe 1 — IV branch errors at SPICE node voltages)
 
 Probe 1 evaluates each FNO device at the SPICE node-voltage trajectories and

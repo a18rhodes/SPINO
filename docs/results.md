@@ -83,7 +83,7 @@ layout are in [Error attribution: L=0.18 CUDA stress geometry](attribution.md).
 | Transient | KCL residual (probe 2) | KCL max `|i|` at pinned FNO `V_out` | 73 nA |
 | Transient | KCL residual (probe 2) | SPICE/FNO KCL-max ratio | 268x |
 | Transient | NR diagnostics (probe 4) | Iterations / max Jacobian diag ratio / line-search `alpha` | 3 / 616 / 1.0 |
-| VTC | IV error (probe 1) | NFET bad/good rel. error ratio | 4501x |
+| VTC | IV error (probe 1) | NFET bad/good rel. error ratio | 4551.5x |
 | VTC | IV error (probe 1) | PFET bad/good rel. error ratio (1000x cap on each point before mean) | 3710x |
 | VTC | IV error (probe 1) | PFET FNO vs SPICE at `V_in` ~ 0.25 V (SPICE-converged pins) | 13.7 A vs 785 pA |
 | VTC | Substitution | Mean `|Delta V_out|` in bad region (`V_in` < 0.5 V) | 176 mV -> 4.4 mV (97.5%) |
@@ -184,6 +184,14 @@ Artefacts: `docs/assets/ota_5t_l040/`, `docs/assets/ota_5t_l050/`.
 The max|ΔV| and slew-time failures are pre-registered results (gate criteria locked
 before Phase 3b ran) and are fully attributed to a training-data gap, not solver
 tuning. See Attribution below.
+
+The gradient-mechanism and shape-fidelity claims (Pearson r 0.9997, slew rate within
+1 % at L = 0.40 and 5 % at L = 0.50, NR transient convergence in 11–12 of a 25-iter
+budget) hold independent of the plateau-level offset. Attribution localises the
+offset to one device (M4 PFET) in one regime (Vsd → 0), so the load-bearing fidelity
+metrics for the composition method are not coupled to the residual; the triode
+fine-tune (next subsection) tightens M4 by 22 % without closing the gate. The
+production checkpoint is unchanged.
 
 ### Runtime context
 
@@ -408,7 +416,10 @@ The inverter-chain composition path was evaluated as a digital extension using
 FNO-composed transient solver does not converge to acceptance-quality outputs,
 so its waveforms, delay metrics, and parity statistics are diagnostic only.
 
-Warm-pass numbers from `runs/inv_chain/matrix/n{1,2,4}/rep00/`:
+Warm-pass numbers from
+[`docs/assets/inv_chain/matrix/n{1,2,4}/rep00/summary.json`](assets/inv_chain/matrix/);
+aggregate at
+[`docs/assets/inv_chain/matrix/aggregate_summary.json`](assets/inv_chain/matrix/aggregate_summary.json):
 
 | N | DC converged | DC iters | Transient converged | Transient iters | max\|ΔV\| (V) | Pearson r |
 |---|---|---|---|---|---:|---:|
@@ -505,7 +516,7 @@ multi-spec).
 See [`sizing.md`](sizing.md) §FD-SPICE Adam baseline for the full
 comparison table and the overlaid $`\theta`$-trajectory figure.
 
-## Off-corner transferability probe
+## Off-corner spot-check bound (single (ff, 125 °C) probe)
 
 The FNO device operators were trained on Sky130 ``tt`` BSIM parameters at
 27 °C only. The composition layer carries no corner-awareness in its
@@ -544,6 +555,9 @@ python -m spino.circuit.off_corner_probe \
     --output-dir runs/off_corner/ota_ff_125c
 ```
 
-Artefacts under [`runs/off_corner/ota_ff_125c/`](../runs/off_corner/ota_ff_125c/);
-figure under [`docs/assets/off_corner/`](assets/off_corner/).
+Reproducibility artefacts under [`docs/assets/off_corner/`](assets/off_corner/):
+[`summary.json`](assets/off_corner/summary.json) (Pearson r, max|ΔV|, slew rate
+per corner, FNO and SPICE wall times, design point) and the V_out overlay
+PNG. The local-run-tree analogue is `runs/off_corner/ota_ff_125c/` for
+re-generation.
 

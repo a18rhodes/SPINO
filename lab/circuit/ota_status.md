@@ -106,18 +106,23 @@ Raw traces: `scratch/ota_5t_fno_l040/`, `scratch/ota_5t_fno_l050/`
 
 ## Current status (2026-05-11): RUNTIME OPTIMIZATION
 
-Phase 3 is complete. JVP-GMRES speedup implemented in OtaTransientSolver
-(use_gmres=True, default). Replaces 1500 backward passes per Newton step with
-~15-20 GMRES iterations (JVP, forward-mode AD). Expected ~100× speedup vs CPU
-dense Jacobian; ~10× speedup vs GPU dense Jacobian.
+Phase 3 is complete. JVP-GMRES implementation lives in OtaTransientSolver
+as an opt-in (use_gmres=True) alternative to the dense Jacobian path.
+Default remains use_gmres=False: on the OTA problem sizes the GPU-batched
+dense backward outperforms sequential scipy-GMRES JVP matvecs by roughly
+7x, so the dense route is the production default.
 
 Initial GPU (dense Jacobian, use_gmres=False): ~65 s per run.
-GMRES on GPU: TBD (benchmark in progress 2026-05-11).
+GMRES on GPU: slower than the dense path at OTA scale; retained for
+larger circuits where dense assembly stops fitting on-device.
 
 ## Next engineering steps
 
-1. Confirm JVP-GMRES run time and metric parity with direct-solve results.
-2. If GMRES + GPU < 10 s per run, update runtime table in docs/ota_composition.md.
+1. Pure-PyTorch Arnoldi loop with `torch.func.vmap` (~150 LOC) as the
+   on-device replacement for scipy-GMRES; expected to close the gap to
+   the dense path at OTA scale and overtake it as the OTA grows.
+2. Re-benchmark GMRES-vs-dense on the Miller two-stage opamp where
+   (5T x 5T) dense scales out of GPU memory.
 3. ~~PFET near-triode retraining: denser Vds-near-zero training data for M3/M4.~~
    **DONE 2026-05-15 — partial closure.** See "PFET triode fine-tune" below.
 4. Two-stage Miller op-amp — next multi-node analog topology.

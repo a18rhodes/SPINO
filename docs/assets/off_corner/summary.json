@@ -1,0 +1,23 @@
+{
+  "tt_vs_fno": {
+    "pearson_r": 0.9996608478843657,
+    "max_abs_delta_v": 0.06871702758337395,
+    "spice_slew_v_per_us": 48.284034087862906,
+    "spice_wall_ms": 6521.245862997603
+  },
+  "ff_vs_fno": {
+    "pearson_r": 0.9991232019291714,
+    "max_abs_delta_v": 0.17184248994744777,
+    "spice_slew_v_per_us": 46.80170579161308,
+    "spice_wall_ms": 6245.0092830113135
+  },
+  "fno_slew_v_per_us": 48.286858490073755,
+  "fno_wall_ms": 107454.67458100757,
+  "design_point": {
+    "w_diff_um": 8.0,
+    "w_mirror_um": 8.0,
+    "w_tail_um": 2.0,
+    "l_um": 0.4,
+    "vbias_v": 1.2
+  }
+}

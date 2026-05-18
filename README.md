@@ -172,27 +172,32 @@ and sweeps gate/drain downward.
 | OTA composition (L=0.40, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.7 mV† |
 | OTA composition (L=0.50, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.9 mV† |
 
-†OTA max|ΔV| attributed to M4 PFET output mirror current error at Vds ≈ 0 (triode boundary);
-PFET training data underrepresents this regime. Pre-registered gate is ≤ 30 mV; failure
-is reported as a documented finding. A targeted triode-boundary fine-tune narrows the gap
-(M4 peak |ΔI|: 15.4 → 12.0 µA; composition max|ΔV|: 68.7 → 61.0 mV) but does not close it;
-the production checkpoint is unchanged. See
+†OTA shape-fidelity passes at both L: Pearson r = 0.9997, slew rate within 1 % (L=0.40)
+and 5 % (L=0.50) of SPICE, NR transient iters 11–12 of a 25-iter budget. The max|ΔV|
+residual is a localised plateau-level offset attributed by Probe 1 to M4 PFET at
+Vds ≈ 0 (triode boundary), where the production PFET training data is sparse. The
+pre-registered ≤ 30 mV gate locked before the run is reported as failed; the gap is a
+documented finding tied to one device in one regime, not a solver pathology. A targeted
+triode-boundary fine-tune narrows it (M4 peak |ΔI|: 15.4 → 12.0 µA; composition max|ΔV|:
+68.7 → 61.0 mV) but does not close it; the production checkpoint is unchanged. See
 [Analog composition results — PFET triode-boundary fine-tune](docs/results.md#pfet-triode-boundary-fine-tune-partial-gate-closure).
 
 ### Gradient-based sizing
 
 | Result | Number |
 |---|---|
+| Circuit simulations per Adam step (FNO/IFT vs FD-SPICE, forward FD at n_θ=5) | ~1 transient + 1 M5 DC vs 6 SPICE OP + transient |
+| Per-iter scaling with n_θ | FNO/IFT constant; FD-SPICE = n_θ + 1 (forward) or 2·n_θ + 1 (central) |
+| Wall-clock at n_θ=5 (this work, GPU vs CPU baseline) | FNO/IFT ~4.5 h on 1 GPU; FD-SPICE ~92 min on 1 CPU |
 | FNO-Adam-converged θ slew rate (FNO predicted / SPICE re-simulated) | 41.0 / 38.83 V/µs (5.6 % gap, both above 30 V/µs spec) |
 | FNO-Adam-converged θ static power (FNO predicted / SPICE re-simulated) | 143 / 138.7 µW (3.5 % gap, both under 200 µW cap) |
 | Iters to spec crossing (FNO/IFT vs FD-SPICE Adam) | 5 vs 4 |
-| Circuit simulations per Adam step (FNO/IFT vs FD-SPICE) | ~1 transient + 1 M5 DC vs 6 |
 | Power-cap hinge engagement step (multi-spec gradient response) | step 43 (FNO/IFT) |
 
 Full methodology, trajectory plots, and the FD-SPICE comparison in
 [Gradient-based OTA sizing](docs/sizing.md).
 
-### Off-corner transferability
+### Off-corner spot-check bound (single (ff, 125 °C) probe)
 
 | Comparison at production OTA sizing | Pearson r | max\|ΔV\| |
 |---|---|---|
@@ -205,7 +210,7 @@ in pre-step quiescent $`V_\mathrm{out}`$ at `ff` / 125 °C drives the 2.5×
 max\|ΔV\| increase). The FNO operators are trained on `tt` BSIM
 parameters only; corner-aware conditioning is queued for follow-up work.
 Details in
-[Analog composition results — Off-corner transferability probe](docs/results.md#off-corner-transferability-probe).
+[Analog composition results — Off-corner spot-check bound](docs/results.md#off-corner-spot-check-bound-single-ff-125-c-probe).
 
 ### Runtime context
 

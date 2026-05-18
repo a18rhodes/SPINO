@@ -58,7 +58,15 @@ composes parametric FNO device operators inside the Newton-Raphson Kirchhoff's c
 law (KCL) residual itself and obtains Jacobians through PyTorch autograd; no hand-coded
 sensitivity equations or analytic device models are required, producing an end-to-end
 differentiable path from BSIM geometry parameters to circuit node voltages on standard
-complementary metal-oxide-semiconductor (CMOS) topologies.
+complementary metal-oxide-semiconductor (CMOS) topologies. The mechanisms differ in
+gradient destination, not in autograd plumbing: Soda-PTA routes gradients to PTA
+algorithm hyperparameters, the classical adjoint routes them to scalar performance
+metrics via hand-derived device sensitivities, data-driven MNA routes them nowhere
+(device models are replaced by tables, not differentiated through), and Shem routes
+them through ODE-modelled reconfigurable primitives. SPINO routes them to BSIM
+device geometry through the transient residual, so the optimisation acts on the
+circuit's physical design vector rather than on solver-algorithm parameters or on a
+learned scalar abstraction of circuit behaviour.
 
 ## Operator Learning Foundations
 
