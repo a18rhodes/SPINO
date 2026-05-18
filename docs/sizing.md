@@ -76,28 +76,46 @@ Config:
 | Optimiser | Adam, $`\eta = 5 \times 10^{-2}`$, $`\beta_1 = 0.9`$, $`\beta_2 = 0.999`$ |
 | Iterations | 50 |
 | Device | CUDA (single GPU) |
-| Wall time | ~4.3 h, per-iter ~5 min (transient Newton + IFT backward) |
+| Wall time | ~4.5 h, per-iter ~5.4 min (transient Newton + IFT backward, including the M5 DC re-solve in the power path) |
 
-Trajectory (`docs/assets/sizing/loss_and_slew.png`):
+Trajectory (`docs/assets/sizing/v3_jtheta_fix/loss_and_slew.png`):
 
-![Loss and slew vs Adam step](assets/sizing/loss_and_slew.png)
+![Loss and slew vs Adam step](assets/sizing/v3_jtheta_fix/loss_and_slew.png)
 
-- Steps 0 to 4: aggressive descent, loss $`198.4 \to 4.5`$, slew $`10.2 \to 29.5`$ V/µs.
-- Step 5: slew crosses 30 V/µs, loss saturates at 0 (one-sided hinge).
-- Steps 5 to 40: Adam momentum carries $`\theta`$ past spec, slew climbs $`29.5 \to 53`$ V/µs.
-- Steps 40 to 49: plateau, $`\theta`$ moves by $`<0.001`$ per iter.
+- Steps 0 to 4: aggressive descent, loss $`198.4 \to 4.5`$, slew $`10.2 \to 29.6`$ V/µs, power $`26 \to 86`$ µW.
+- Step 5: slew crosses 30 V/µs, loss saturates at 0.
+- Steps 5 to 42: Adam momentum carries $`\theta`$ past spec, slew climbs $`34.1 \to 53.8`$ V/µs while power climbs $`105 \to 200`$ µW.
+- Step 43: the FNO-predicted power hits the 200 µW cap. The power-cap ReLU activates for the first time and loss jumps to $`\approx 0.11`$. $`L`$ unpins from the 0.18 µm lower bound; $`V_\mathrm{bias}`$ steps back.
+- Steps 43 to 49: gradient-driven corrective response. $`L`$ climbs $`0.180 \to 0.308`$ µm, slew drops $`53.8 \to 41.0`$ V/µs, power drops $`200 \to 143`$ µW. Loss returns to 0 at step 44; the trajectory continues adjusting within the feasible region at step 49.
 
-Design parameters (`docs/assets/sizing/theta_trajectory.png`):
+The single-step loss spike at step 43 (loss 0 → 0.113 → 0) is a property
+of the one-sided hinge under Adam, not an instability. The hinge has zero
+gradient until the cap is crossed. At step 43 the cap is crossed by
+0.113 µW, the hinge activates for the first time, and Adam's
+moment-normalised update produces an $`O(\eta)`$ step in $`\theta`$ that
+displaces power by ~15 µW below the cap (large compared with the
+violation, small compared with the bound). After the kick, power is
+inside the feasible region, both relu terms are zero, and the trajectory
+coasts on decaying first-moment momentum ($`\beta_1 = 0.9`$) over the
+remaining six steps. There is no second crossing: the hinge is one-sided
+and momentum stays directed away from the cap.
 
-![Theta trajectory](assets/sizing/theta_trajectory.png)
+The 50-iteration budget was locked before the run. Both specs are met
+with margin at step 49, but $`L`$ and the widths are still drifting on
+residual momentum and have not reached a stationary point. A
+gradient-norm-based or moving-window loss-saturation auto-stop would
+make this a settled-design claim rather than a fixed-budget one, and is
+queued for follow-up work.
 
-- $`L`$ saturates at the lower bound (0.18 µm) by step 4. Shorter channel
-  raises $`I_\mathrm{D}`$ and slew rate fastest.
-- All three widths and $`V_\mathrm{bias}`$ rise monotonically to saturating
-  values within their bounds.
-- No bound clamping is required mid-trajectory other than $`L`$.
+Design parameters (`docs/assets/sizing/v3_jtheta_fix/theta_trajectory.png`):
 
-Final $`\theta`$: $`(3.638, 3.599, 1.671, 0.180, 1.565)`$ µm/V.
+![Theta trajectory](assets/sizing/v3_jtheta_fix/theta_trajectory.png)
+
+- $`L`$ saturates at the 0.18 µm lower bound by step 4 (shorter channel raises $`I_\mathrm{D}`$ and slew rate fastest) and stays bound-clamped until step 43.
+- At step 43 the active power gradient overrides the slew descent direction and pushes $`L`$ off the bound, where it climbs to 0.308 µm by step 49.
+- $`W_\mathrm{diff}`$ and $`W_\mathrm{mirror}`$ rise monotonically and continue climbing after step 43; the power-cap response is absorbed primarily by $`L`$ and $`V_\mathrm{bias}`$.
+
+Final $`\theta`$: $`(3.638, 3.606, 1.592, 0.308, 1.537)`$ µm/V.
 
 ---
 
@@ -106,46 +124,49 @@ Final $`\theta`$: $`(3.638, 3.599, 1.671, 0.180, 1.565)`$ µm/V.
 Single-point NGSpice evaluation via `simulate_ota_design_point` at the
 optimiser-converged $`\theta`$:
 
-![FNO vs SPICE](assets/sizing/fno_vs_spice.png)
+![FNO vs SPICE](assets/sizing/v3_jtheta_fix/fno_vs_spice.png)
 
 | Metric | FNO (loss-tracked) | SPICE | Spec | Gap |
 |---|---|---|---|---|
-| Slew rate | 53.97 V/µs | 53.78 V/µs | $`\ge 30`$ V/µs | $`0.35\%`$ |
-| Static power | 180 µW (placeholder) | 204.1 µW | $`\le 200`$ µW | see caveat below |
-| Peak swing | n/a | 0.754 V | — | — |
-| DC gain | n/a | 15.0 V/V | — | — |
-| Slew time | n/a | 21.0 ns | — | — |
+| Slew rate | 41.0 V/µs | 38.83 V/µs | $`\ge 30`$ V/µs | $`5.6\%`$ |
+| Static power | 143 µW | 138.7 µW (77.1 µA $`\times`$ 1.8 V) | $`\le 200`$ µW | $`3.5\%`$ |
+| Peak swing | n/a | 0.977 V | — | — |
+| DC gain | n/a | 34.11 V/V | — | — |
+| Slew time | n/a | 28.8 ns | — | — |
 
-Slew matches SPICE to 0.35 %. Gradient-driven Adam steps did not exploit
-FNO error on the slew metric — the only metric on which the loss carried a
-real gradient.
+Both specs are satisfied with margin: slew is 37 % above the 30 V/µs floor
+and power is 30 % below the 200 µW cap. The final design is interior to
+the feasible region, not bound-clamped on $`L`$.
 
-Power mismatch caveat. SPICE reports 204.1 µW vs the FNO-DC estimate of
-180 µW (13 % over). Two effects compound here:
+The FNO-vs-SPICE slew gap is 5.6 % at the converged $`\theta`$. The
+multi-spec power-cap pullback at step 43 unpins $`L`$ and carries the
+trajectory into a region of parameter space where the FNO's slew
+prediction has measurable error against SPICE. The gap is in the
+non-conservative direction (the FNO overestimates slew) but stays well
+inside the 30 V/µs spec margin. The optimisation-time and end-point
+mechanics of this gap are bounded quantitatively in
+§"Gradient-verification bounds" below.
 
-1. **FNO $`I_\mathrm{tail}`$ tracking.** The $`I_\mathrm{tail}`$ value in
-   the loss is currently a placeholder constant in
-   `extract_metrics`, not a true FNO DC-OP prediction. It always reports
-   100 µA (180 µW) regardless of $`\theta`$. SPICE on the converged sizing
-   reports 113 µA (204 µW). A wired-up FNO tail-NFET $`I_D`$ prediction at
-   $`V_\mathrm{bias} = 1.565`$ V would carry some residual error (the
-   training distribution is sparsest at the top of the bias range), but
-   the dominant gap here is not model error — it is that power isn't being
-   computed from the FNO at all.
-2. **Power is not gradient-optimised.** The hinge
-   $`\max(0,\,P - P_\mathrm{max})`$ contributes no
-   $`\partial / \partial \theta`$. Even if a real FNO $`I_\mathrm{tail}`$
-   prediction were plugged in, the loss would produce a non-differentiable
-   penalty rather than a corrective gradient, so the optimiser would be
-   free to drift toward higher $`V_\mathrm{bias}`$ to chase slew rate.
+Power tracking. The FNO predicts 143 µW vs SPICE 138.7 µW, a 3.5 % gap that
+sits inside the M5 FNO fidelity envelope at $`V_\mathrm{bias} = 1.54`$ V
+(the high end of the training distribution). The small FNO bias on
+$`I_\mathrm{tail}`$ causes the hinge to engage at a slightly earlier
+$`\theta`$ than a true-SPICE oracle would, which is one source of the
+observed $`L`$ overshoot when compared against the FD-SPICE baseline
+(see below).
 
-The 4 % cap overshoot is therefore a property of the current loss
-(placeholder $`I_\mathrm{tail}`$, no power gradient), not a fundamental
-limitation of the differentiable simulator. Wiring a real FNO
-$`I_\mathrm{tail}`$ prediction into the loss and switching to a two-sided
-hinge with active power gradients is queued for follow-up work, alongside
-characterising the FNO's tail-NFET $`I_D`$ accuracy at the relevant bias
-range.
+Power gradient mechanics. The differentiable $`I_\mathrm{tail}`$ path
+evaluates the M5 FNO at the converged DC node voltages and obtains
+geometry sensitivities via bilinear interpolation of the curated BSIM
+physics vector over a $`(W_\mathrm{tail}, L)`$ bracket around the current
+point. $`V_\mathrm{tail}`$ is detached from the autograd graph at probe
+construction, cutting the recursive $`V_\mathrm{tail} = f(I_\mathrm{tail})`$
+feedback. The captured gradient is therefore the partial derivative at
+the converged DC OP, not the full derivative including the
+$`V_\mathrm{tail}`$-shift contribution. At typical OTA operating points
+M5 is biased in saturation, so this omission is bounded by output-resistance
+terms rather than by channel modulation; it is part of the per-step
+error budget.
 
 ---
 
@@ -168,66 +189,165 @@ python -m spino.circuit.sizing \
     --output-dir runs/sizing/fd_spice_lr5e-2
 ```
 
-Convergence comparison (`docs/assets/sizing/comparison_loss_slew.png`,
-`comparison_theta.png`):
-
-![Loss and slew comparison](assets/sizing/comparison_loss_slew.png)
-![θ trajectory comparison](assets/sizing/comparison_theta.png)
-
-The two trajectories agree to within the FNO-vs-SPICE per-step gap. FD-SPICE
-crosses 30 V/µs at step 4, FNO at step 5; both plateau by step ~40.
-Post-spec the FNO trajectory drifts slightly wider in $`\theta`$-space
-because the FNO's IFT gradient near the slew kink is a small-error estimate
-of the SPICE-measured slew gradient, and Adam momentum amplifies that bias
-for a few steps before decaying.
+Up to step 42 the two trajectories agree to within the FNO-vs-SPICE per-step
+gap: FD-SPICE crosses 30 V/µs at step 4, FNO at step 5, and both climb past
+spec under Adam momentum. The trajectories diverge at step 43, when the
+FNO-predicted $`I_\mathrm{tail}`$ reaches the 200 µW cap and the multi-spec
+hinge engages. The FNO has a small positive bias on $`I_\mathrm{tail}`$ at
+high $`V_\mathrm{bias}`$ (143 µW FNO vs 138.7 µW SPICE at the eventual final
+$`\theta`$), so its hinge engages at a slightly earlier $`\theta`$ than a
+true-SPICE oracle would. The FD-SPICE baseline never trips the hinge over
+the 50-step budget and stays bound-clamped on $`L`$. The two methods land
+in qualitatively different regions of the feasible set: FNO with $`L`$
+unpinned at 0.308 µm, FD-SPICE with $`L`$ at the 0.18 µm lower bound. Both
+satisfy both specs.
 
 | | FNO/IFT Adam | FD-SPICE Adam |
 |---|---|---|
 | $`W_\mathrm{diff}`$ | 3.638 µm | 3.581 µm |
-| $`W_\mathrm{mirror}`$ | 3.599 µm | 3.546 µm |
-| $`W_\mathrm{tail}`$ | 1.671 µm | 1.598 µm |
-| $`L`$ | 0.180 µm (bound) | 0.180 µm (bound) |
-| $`V_\mathrm{bias}`$ | 1.565 V | 1.495 V |
-| Slew @ θ (SPICE) | 53.78 V/µs | 51.17 V/µs |
-| Static power (SPICE) | 204 µW (4 % over cap) | 190 µW (5 % under cap) |
+| $`W_\mathrm{mirror}`$ | 3.606 µm | 3.546 µm |
+| $`W_\mathrm{tail}`$ | 1.592 µm | 1.598 µm |
+| $`L`$ | 0.308 µm | 0.180 µm (bound) |
+| $`V_\mathrm{bias}`$ | 1.537 V | 1.495 V |
+| Slew @ θ (SPICE) | 38.83 V/µs | 51.17 V/µs |
+| Static power (SPICE) | 138.7 µW (31 % under cap) | 190 µW (5 % under cap) |
 | Iters to spec crossing | 5 | 4 |
-| Circuit simulations consumed | ~1 (final validation only) | 300 |
-| Wall-clock | ~4.3 h on 1 GPU | ~92 min on 1 CPU |
+| Circuit simulations consumed | ~1 transient + 1 M5 DC per step (final SPICE validation only) | 6 SPICE OP + transient per step |
+| Wall-clock | ~4.5 h on 1 GPU | ~92 min on 1 CPU |
 
 What the comparison supports:
 
 - *Per-iteration circuit-simulation count.* FNO/IFT Adam consumes
-  approximately one circuit-simulation equivalent per Adam step: one forward
-  Newton solve; the IFT backward re-uses the converged Jacobian and adds 10
-  cheap FNO residual evaluations. FD-SPICE Adam consumes 6 full SPICE
-  simulations per step by construction. The per-iteration ratio is roughly
-  $`6\times`$ for this 5-variable problem, scaling linearly with the number
-  of optimisation variables. At Miller-opamp scale (~20 to 40 variables) or
-  multi-corner Monte Carlo (~100 variables) the FD-SPICE cost grows
-  proportionally; the FNO cost is constant per step. Whether that scaling
-  translates into total runtime advantage is a follow-up question.
+  approximately one circuit-simulation equivalent per Adam step: one
+  forward Newton solve for the transient, plus an M5 DC re-solve in the
+  power path. The IFT backward re-uses the converged transient Jacobian
+  and adds 10 cheap FNO residual evaluations. FD-SPICE Adam consumes 6 full
+  SPICE OP + transient simulations per step by construction (1 baseline +
+  5 forward-FD perturbations). The per-iteration ratio is roughly
+  $`6\times`$ for this 5-variable problem and scales linearly with the
+  number of optimisation variables. At Miller-opamp scale (~20 to 40
+  variables) or multi-corner Monte Carlo (~100 variables) the FD-SPICE
+  cost grows proportionally; the FNO cost is constant per step. Whether
+  that scaling translates into total runtime advantage is a follow-up
+  question.
 
 - *Wall-clock on this single 5-variable problem.* FD-SPICE Adam wins
-  (~92 min CPU vs ~4.3 h GPU) because a single NGSpice OP + transient
-  (~18 s) is faster than one FNO Newton + IFT backward (~5 min on GPU).
-  Per-iteration count does not translate into wall-clock at single-problem
-  scale on this PoC.
+  (~92 min CPU vs ~4.5 h GPU) because a single NGSpice OP + transient
+  (~18 s) is faster than one FNO Newton + IFT backward + M5 DC re-solve
+  (~5.4 min on GPU). Per-iteration count does not translate into
+  wall-clock at single-problem scale on this PoC.
 
-- *Design quality.* The FD-SPICE design lands slightly tighter on power
-  (190 vs 204 µW) because its loss sees SPICE's actual $`I_\mathrm{tail}`$
-  rather than the FNO's quasi-DC estimate. Both designs satisfy the slew
-  spec with margin. Re-simulation of the FNO design confirms a 0.35 %
-  slew gap; the optimiser did not steer $`\theta`$ into a high-FNO-error
-  region of the parameter space.
+- *Design quality.* Both methods satisfy both specs. The FD-SPICE design
+  retains more slew margin (51.2 V/µs at the cap-respecting final point)
+  because its 200 µW cap is never tripped under FD-SPICE gradients over
+  the 50-step budget. The FNO/IFT design lands at lower slew (38.83 V/µs)
+  and lower power (138.7 µW) because the FNO's small positive
+  $`I_\mathrm{tail}`$ bias engages the hinge earlier and steers $`L`$ off
+  the lower bound. Both end-points are inside the feasible region; they
+  represent different trade-offs between the two specs at the same loss
+  weighting.
+
+Multi-spec comparison overlays (FD-SPICE trajectory vs FNO/IFT
+multi-spec trajectory):
+
+![Loss and slew comparison (multi-spec)](assets/sizing/v3_jtheta_fix/comparison_loss_slew.png)
+![θ trajectory comparison (multi-spec)](assets/sizing/v3_jtheta_fix/comparison_theta.png)
 
 Reproduction of the comparison figure:
 
 ```bash
 python -m spino.circuit.plot_sizing_comparison \
-    --fno-dir runs/sizing/adam_full_lr5e-2 \
+    --fno-dir runs/sizing/adam_v3_jtheta_fix \
     --fd-dir runs/sizing/fd_spice_lr5e-2 \
-    --out-dir docs/assets/sizing
+    --out-dir docs/assets/sizing/v3_jtheta_fix
 ```
+
+---
+
+## Gradient-verification bounds
+
+Two independent gradient checks bracket the IFT path and the FNO surrogate
+fidelity separately. Both are exercised by
+`tests/circuit/test_circuit_gradient_ift.py::test_slew_grad_ift_and_surrogate_fidelity`
+at three pinned design points drawn from the trajectory above:
+$`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.9)`$,
+$`\theta_\mathrm{step5} = (3.283, 3.276, 1.294, 0.180, 1.193)`$, and
+$`\theta_\mathrm{final} = (3.638, 3.606, 1.592, 0.308, 1.537)`$. The
+metric is the slew gradient $`\partial \mathrm{SR} / \partial \theta`$
+(slew has nonzero sensitivity everywhere in the feasible region, whereas
+the full loss collapses to zero once both ReLU hinges go silent).
+
+**Test A (IFT plumbing).** Compares IFT-of-slew-via-FNO against central-FD
+of slew-via-FNO. Both differentiate the same FNO, so disagreement is
+attributable to the IFT machinery alone (Jacobian assembly,
+`linalg.solve`, Tikhonov regularisation, chain rule through
+`extract_metrics`).
+
+**Test B (surrogate fidelity).** Compares central-FD of slew-via-FNO
+against central-FD of slew-via-SPICE. Both use the same FD discretisation,
+so disagreement bounds the FNO surrogate's gradient error against SPICE
+ground truth.
+
+| $`\theta`$ point | $`L`$ (µm) | Test A (IFT vs FD-FNO) | Test B (FD-FNO vs FD-SPICE) | Status |
+|---|---:|---:|---:|---|
+| `init`  | 0.40 | 0.013 | 0.040 | PASS (both $`\le`$ strict targets 5 % / 20 %) |
+| `step5` | 0.18 | 0.069 | 1.902 | xfail (see notes below) |
+| `final` | 0.31 | 0.004 | 0.011 | PASS |
+
+Interior points ($`\theta_\mathrm{init}`$, $`\theta_\mathrm{final}`$) pass
+the strict 5 % and 20 % tolerances by an order of magnitude on Test A and
+B respectively. The `step5` point is the documented xfail; both
+divergences there have mechanical explanations.
+
+### Test A residual at `step5`: IFT-linearisation vs nonlinear FD at a bound
+
+At $`\theta_\mathrm{step5}`$, $`L`$ sits on the 0.18 µm PDK lower bound.
+The IFT path computes $`\partial F / \partial \theta`$ as a linearisation
+of the transient residual around the converged state $`v^\star`$. The
+central-FD-via-FNO comparison instead re-runs the full nonlinear
+compose (DC re-solve plus transient Newton) at $`\theta \pm \varepsilon`$.
+At a smooth interior point these agree to second order in
+$`\varepsilon`$; at a bound the central FD reduces to a one-sided
+bracket on $`L`$ and divides by the actual displacement, while the IFT
+sees a linearisation of $`F`$ that does not include the nonlinear DC
+re-solve. The two quantities are different objects mathematically. On
+the 5 θ-component slew gradient vector the gap measures 6.9 % relative
+L2, dominated by the $`L`$ component (IFT $`-85.9`$ vs FD-FNO $`-79.8`$);
+the other four components agree to 0.1 to 2 % each. This is not a code
+defect; the underlying `_jtheta_fd` divisor bug that originally inflated
+the IFT/FD disagreement at bounds by an additional factor of 2 has been
+fixed (see closing notes).
+
+### Test B residual at `step5`: FNO surrogate gradient at the training-distribution edge
+
+The FNO predicts $`\partial \mathrm{SR} / \partial L \approx -79.8`$ V/µs/µm
+at $`L = 0.18`$ µm. The SPICE central FD gives $`-7.6`$ V/µs/µm at the
+same point: an order of magnitude shallower. At interior $`L`$ values the
+surrogate agrees with SPICE on this derivative to within 4 % at
+$`\theta_\mathrm{init}`$ and 1 % at $`\theta_\mathrm{final}`$, so the
+divergence is localised to the lower-bound corner. The most plausible
+mechanism is training-distribution thinning at the geometry-bin edge:
+Sky130's MOSFET dataset is denser at canonical $`L`$ values
+($`0.18 / 0.4 / 0.5`$ µm) than along smooth interpolation between them,
+and the surrogate's local slope estimate at the floor is pulled by the
+nearest training samples rather than reflecting the true SPICE physics
+of the asymptotic short-channel regime. The other four components on
+the same gradient vector agree to within 20 % at `step5`; the divergence
+is on a single component at a single bound.
+
+Practical implication for the sizing loop: the multi-spec Adam trajectory
+spends 39 of its 50 steps (steps 4 through 42) with $`L`$ pinned on the
+0.18 µm bound, so the
+biased $`\partial \mathrm{SR} / \partial L`$ is on the gradient stack
+during that window. The slew-spec ReLU is inactive throughout that window
+(slew is above 30 V/µs after step 5), so the biased component contributes
+zero to the Adam update. The power-cap hinge at step 43 is driven by
+$`\partial P / \partial L`$ through the M5 FNO via the bilinear physics
+interpolation, a separate path that does not exhibit the same bias
+(power tracks SPICE to 3.5 % at $`\theta_\mathrm{final}`$). The Test B
+finding therefore lower-bounds the surrogate's worst-case gradient error
+at a PDK boundary but does not, in this specific run, degrade the
+optimised design.
 
 ---
 
@@ -241,34 +361,55 @@ python -m spino.circuit.sizing \
     --n-iters 50 --lr 5e-2 \
     --device cuda \
     --validate-spice \
-    --output-dir runs/sizing/adam_full_lr5e-2
+    --output-dir runs/sizing/adam_v3_jtheta_fix
 
 # 2. Plots
 python -m spino.circuit.plot_sizing_trajectory \
-    --run-dir runs/sizing/adam_full_lr5e-2
+    --run-dir runs/sizing/adam_v3_jtheta_fix
 ```
 
 Artefacts written:
-- `runs/sizing/adam_full_lr5e-2/trajectory.json`, 50-row Adam trajectory.
-- `runs/sizing/adam_full_lr5e-2/theta_final.json`, final $`\theta`$ vector.
-- `runs/sizing/adam_full_lr5e-2/spice_validation/summary.json`, SPICE
+- `runs/sizing/adam_v3_jtheta_fix/trajectory.json`, 50-row Adam trajectory.
+- `runs/sizing/adam_v3_jtheta_fix/theta_final.json`, final $`\theta`$ vector.
+- `runs/sizing/adam_v3_jtheta_fix/spice_validation/summary.json`, SPICE
   metrics at $`\theta_\mathrm{final}`$.
-- `runs/sizing/adam_full_lr5e-2/{loss_and_slew,theta_trajectory,fno_vs_spice}.png`,
+- `runs/sizing/adam_v3_jtheta_fix/{loss_and_slew,theta_trajectory,fno_vs_spice}.png`,
   figures.
+
+The tracked copies under `docs/assets/sizing/v3_jtheta_fix/` are the
+versioned references the doc links against.
 
 ---
 
 ## Closing notes
 
-The composition was differentiable on paper since Phase 3b. This run
-produces a gradient-optimised design point whose FNO-predicted slew matches
-SPICE within 0.4 % on re-simulation, at roughly $`6\times`$ lower
-per-iteration circuit-simulation cost than the FD-SPICE baseline on the
-same problem.
+The composition has been differentiable on paper since Phase 3b. The
+gradient sizing loop now exercises both the slew metric (through the IFT
+path from the transient solver) and the static power metric (through the
+M5 FNO and a bilinear BSIM physics interpolation on the geometry knobs).
+At the converged design point both specs are met with margin: slew 38.83
+V/µs SPICE against a 30 V/µs floor, power 138.7 µW SPICE against a 200 µW
+cap. The power-cap hinge engages at step 43 and produces a corrective
+response in $`(L, V_\mathrm{bias})`$ through the M5-FNO + bilinear
+physics path described above. The per-iteration circuit-simulation cost
+is roughly $`6\times`$ lower than the FD-SPICE baseline on this
+5-variable problem.
+
+A note on the trajectory archive. The canonical run is
+`runs/sizing/adam_v3_jtheta_fix`. An earlier multi-spec run
+(`adam_v2_real_itail`) used the same loss but a `_jtheta_fd` divisor that
+halved $`\partial F / \partial L`$ when $`L`$ was at the 0.18 µm bound.
+The bug was caught by the M2 IFT-vs-FD-FNO test at $`\theta_\mathrm{step5}`$
+(IFT $`-42.4`$ vs FD-FNO $`-79.6`$ on $`\partial \mathrm{slew}/\partial L`$);
+the fix divides by the actual perturbation displacement after PDK clamping.
+Trajectory impact on this specific run is small because the slew-ReLU was
+inactive whenever $`L`$ sat on the bound, gating the affected gradient
+component to zero in the loss. The v2 and v3 final designs agree to the
+fourth significant figure on slew, power, and $`\theta`$.
 
 Open items for follow-up work:
-- Multi-spec joint optimisation with active power, swing, gain, area
-  gradients.
+- Joint optimisation that also activates gradients on swing, gain, and
+  area, beyond the slew + power pair active here.
 - Larger topologies (Miller two-stage opamp) where the per-iteration
   advantage compounds with the optimisation-variable count.
 - Multi-corner robustness during optimisation, not just final-point

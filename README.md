@@ -183,9 +183,11 @@ the production checkpoint is unchanged. See
 
 | Result | Number |
 |---|---|
-| FNO-Adam-converged θ slew rate (FNO predicted / SPICE re-simulated) | 53.97 / 53.78 V/µs (0.35 % gap) |
+| FNO-Adam-converged θ slew rate (FNO predicted / SPICE re-simulated) | 41.0 / 38.83 V/µs (5.6 % gap, both above 30 V/µs spec) |
+| FNO-Adam-converged θ static power (FNO predicted / SPICE re-simulated) | 143 / 138.7 µW (3.5 % gap, both under 200 µW cap) |
 | Iters to spec crossing (FNO/IFT vs FD-SPICE Adam) | 5 vs 4 |
-| Circuit simulations per Adam step (FNO/IFT vs FD-SPICE) | ~1 vs 6 |
+| Circuit simulations per Adam step (FNO/IFT vs FD-SPICE) | ~1 transient + 1 M5 DC vs 6 |
+| Power-cap hinge engagement step (multi-spec gradient response) | step 43 (FNO/IFT) |
 
 Full methodology, trajectory plots, and the FD-SPICE comparison in
 [Gradient-based OTA sizing](docs/sizing.md).

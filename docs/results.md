@@ -458,29 +458,34 @@ $`\eta = 5 \times 10^{-2}`$, 50 iterations on one GPU.
 | Stage | Outcome |
 |---|---|
 | Spec convergence | Slew crosses 30 V/µs at step 5; loss saturates at 0. |
-| Trajectory plateau | $`\theta`$ stabilises by step ~40 (Adam momentum decay). |
-| Final $`\theta`$ | $`(3.638, 3.599, 1.671, 0.180, 1.565)`$; $`L`$ at lower bound. |
-| FNO vs SPICE on slew | 53.97 → 53.78 V/µs (0.35 % gap). |
-| FNO vs SPICE on power | 180 µW (placeholder) → 204.1 µW (4 % over the 200 µW cap, see caveat). |
+| Power-cap engagement | At step 43 the FNO-predicted power hits the 200 µW cap; the multi-spec hinge fires and the gradient pulls $`L`$ off the 0.18 µm lower bound. |
+| Final $`\theta`$ | $`(3.638, 3.606, 1.592, 0.308, 1.537)`$ µm/V; $`L`$ interior to the bound, both specs satisfied with margin. |
+| FNO vs SPICE on slew | 41.0 → 38.83 V/µs (5.6 % gap, FNO overestimates; well above 30 V/µs spec). |
+| FNO vs SPICE on power | 143 → 138.7 µW (3.5 % gap, 31 % under the 200 µW cap). |
 
-![Adam loss and slew vs step](assets/sizing/loss_and_slew.png)
-![FNO vs SPICE at θ_final](assets/sizing/fno_vs_spice.png)
+![Adam loss and slew vs step](assets/sizing/v3_jtheta_fix/loss_and_slew.png)
+![FNO vs SPICE at θ_final](assets/sizing/v3_jtheta_fix/fno_vs_spice.png)
 
-The 0.35 % FNO-vs-SPICE slew gap at the converged $`\theta`$ indicates the
-optimiser did not steer to a point where the surrogate disagrees with
-SPICE on the slew metric. The 4 % power overshoot has a different cause:
-the loss currently uses a placeholder $`I_\mathrm{tail}`$ (constant
-100 µA) rather than a true FNO DC-OP prediction, so the power-cap hinge
-never fires regardless of $`\theta`$, and the optimiser is free to drift
-toward higher $`V_\mathrm{bias}`$. SPICE on the converged sizing reports
-the true $`I_\mathrm{tail} = 113`$ µA (204 µW). Wiring a real FNO
-$`I_\mathrm{tail}`$ output into the loss and switching to a two-sided
-hinge with active power gradients is queued for follow-up work; details
-in [`sizing.md`](sizing.md) §SPICE validation.
+Both specs are met simultaneously through gradient response, not bound
+clamping: $`L`$ unpins at step 43 and the trajectory adjusts inside the
+feasible region. The 5.6 % slew gap reflects measurable FNO error in
+the parameter-space region the multi-spec pullback steers $`\theta`$
+into; it is in the non-conservative direction (FNO over-predicts slew)
+but stays well inside the 30 V/µs spec margin. The 3.5 % power gap is
+bounded by the M5 FNO fidelity envelope at $`V_\mathrm{bias} \approx 1.54`$ V.
+Method and the differentiable $`I_\mathrm{tail}`$ path (M5 FNO forward,
+bilinear BSIM physics interpolation, $`V_\mathrm{tail}`$ detached from
+autograd) are in [`sizing.md`](sizing.md) §SPICE validation.
 
 Full $`\theta`$ trajectory and reproduction commands in
 [`sizing.md`](sizing.md); figures under
-[`docs/assets/sizing/`](assets/sizing/).
+[`docs/assets/sizing/`](assets/sizing/). Per-θ-point gradient-verification
+bounds (IFT plumbing and FNO surrogate fidelity at three pinned θ from
+the trajectory) are reported in
+[`sizing.md` §"Gradient-verification bounds"](sizing.md#gradient-verification-bounds);
+the FNO's worst-case ∂slew/∂L bias of ~10× vs SPICE at the L = 0.18 µm
+bound is documented there and gated to zero contribution by the
+inactive slew ReLU during the bound-pinned trajectory window.
 
 ### FD-SPICE Adam baseline
 

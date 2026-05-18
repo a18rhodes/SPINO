@@ -312,3 +312,15 @@ Phase 4 (NFET refactor) cancelled -- invariance proven.
 - Do NOT hand-derive Jacobians. Use PyTorch autograd through the FNO forward pass.
 - Do NOT mix FNO-predicted and SPICE-computed currents in the same composition. All
   devices in a composed circuit must use their trained FNO operators for consistency.
+
+---
+
+## Deferred to follow-up (post-publication-readiness)
+
+- **Adam auto-stop for gradient sizing.** The 50-iter budget in the current
+  multi-spec run leaves $`\theta`$ still drifting on momentum after the
+  power-cap hinge engages at step 43. A gradient-norm threshold or a
+  moving-window loss-saturation criterion would replace the fixed budget
+  with a settled-design termination. Cheap (~30 LOC in
+  `spino/circuit/sizing.py::run_adam`); promotable from NICE to SHOULD if
+  reviewer feedback flags the fixed-budget framing.
