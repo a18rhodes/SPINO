@@ -88,10 +88,13 @@ _MA_TO_A_LOCAL = 1.0e-3
 # PDK validity bracket per theta component. Used by _jtheta_fd to fall back to
 # one-sided FD when a perturbation crosses a bound, so the gradient divisor
 # matches the actual displacement.
+# Layout: (W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias).
 _FD_THETA_CLAMP: tuple[tuple[float, float], ...] = (
     (0.1, 20.0),
     (0.1, 20.0),
     (0.1, 20.0),
+    (0.18, 1.0),
+    (0.18, 1.0),
     (0.18, 1.0),
     (0.5, 1.6),
 )
@@ -113,7 +116,9 @@ class OtaSizingProblem:
     :param w_diff_bounds: (min, max) W_diff in µm.
     :param w_mirror_bounds: (min, max) W_mirror in µm.
     :param w_tail_bounds: (min, max) W_tail in µm.
-    :param l_bounds: (min, max) L_common in µm (applied to all 5 transistors).
+    :param l_diff_bounds: (min, max) L_diff in µm (M1/M2 NFET diff pair channel length).
+    :param l_mirror_bounds: (min, max) L_mirror in µm (M3/M4 PFET current mirror).
+    :param l_tail_bounds: (min, max) L_tail in µm (M5 NFET tail source).
     :param vbias_bounds: (min, max) V_bias in V.
     :param slew_rate_min_v_per_us: Slew-rate spec lower bound (V/µs).
     :param power_max_uw: Static power upper bound (µW).
@@ -138,7 +143,9 @@ class OtaSizingProblem:
     w_diff_bounds: tuple[float, float] = (0.5, 8.0)
     w_mirror_bounds: tuple[float, float] = (0.5, 8.0)
     w_tail_bounds: tuple[float, float] = (0.5, 4.0)
-    l_bounds: tuple[float, float] = (0.18, 0.50)
+    l_diff_bounds: tuple[float, float] = (0.18, 0.50)
+    l_mirror_bounds: tuple[float, float] = (0.18, 0.50)
+    l_tail_bounds: tuple[float, float] = (0.18, 0.50)
     vbias_bounds: tuple[float, float] = (0.5, 1.6)
     slew_rate_min_v_per_us: float = 30.0
     power_max_uw: float = 200.0
@@ -157,13 +164,15 @@ class OtaSizingProblem:
 
     @property
     def lower_bounds(self) -> Tensor:
-        """Return θ lower-bound vector (5,)."""
+        """Return θ lower-bound vector (7,)."""
         return torch.tensor(
             [
                 self.w_diff_bounds[0],
                 self.w_mirror_bounds[0],
                 self.w_tail_bounds[0],
-                self.l_bounds[0],
+                self.l_diff_bounds[0],
+                self.l_mirror_bounds[0],
+                self.l_tail_bounds[0],
                 self.vbias_bounds[0],
             ],
             dtype=torch.float32,
@@ -171,13 +180,15 @@ class OtaSizingProblem:
 
     @property
     def upper_bounds(self) -> Tensor:
-        """Return θ upper-bound vector (5,)."""
+        """Return θ upper-bound vector (7,)."""
         return torch.tensor(
             [
                 self.w_diff_bounds[1],
                 self.w_mirror_bounds[1],
                 self.w_tail_bounds[1],
-                self.l_bounds[1],
+                self.l_diff_bounds[1],
+                self.l_mirror_bounds[1],
+                self.l_tail_bounds[1],
                 self.vbias_bounds[1],
             ],
             dtype=torch.float32,
@@ -238,27 +249,31 @@ def _device_with_physics(
 
 
 def _rebuild_devices(
-    theta_vals: tuple[float, float, float, float, float],
+    theta_vals: tuple[float, float, float, float, float, float, float],
     base_devices: tuple[FnoMosfetDevice, ...],
     nfet_strategy: DeviceStrategy,
     pfet_strategy: DeviceStrategy,
 ) -> tuple[FnoMosfetDevice, ...]:
-    """Rebuild all 5 OTA devices from (W_diff, W_mirror, W_tail, L, V_bias).
+    """Rebuild all 5 OTA devices from the 7-component design vector.
 
-    Re-queries the BSIM4 model card for each perturbed (W, L) pair.  The FNO
-    model weights are shared (not copied) with ``base_devices``.
+    Layout: ``(W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias)``.
+    M1/M2 share (W_diff, L_diff); M3/M4 share (W_mirror, L_mirror); M5 uses
+    (W_tail, L_tail). Re-queries the BSIM4 model card for each perturbed
+    (W, L) pair. The FNO model weights are shared (not copied) with
+    ``base_devices``.
 
-    :param theta_vals: Tuple (w_diff, w_mirror, w_tail, l, vbias) as Python floats.
+    :param theta_vals: Tuple ``(w_diff, w_mirror, w_tail, l_diff, l_mirror,
+        l_tail, vbias)`` as Python floats.
     :param base_devices: Baseline (M1…M5) devices carrying model and norm stats.
     :param nfet_strategy: NFET DeviceStrategy for BSIM queries.
     :param pfet_strategy: PFET DeviceStrategy for BSIM queries.
     :return: Tuple (M1, M2, M3, M4, M5) with updated physics_raw.
     """
-    w_diff, w_mirror, w_tail, l_um, _ = theta_vals
+    w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, _ = theta_vals
     m1, m2, m3, m4, m5 = base_devices
-    phys_diff = _read_curated_physics(nfet_strategy, w_diff, l_um)
-    phys_mirror = _read_curated_physics(pfet_strategy, w_mirror, l_um)
-    phys_tail = _read_curated_physics(nfet_strategy, w_tail, l_um)
+    phys_diff = _read_curated_physics(nfet_strategy, w_diff, l_diff)
+    phys_mirror = _read_curated_physics(pfet_strategy, w_mirror, l_mirror)
+    phys_tail = _read_curated_physics(nfet_strategy, w_tail, l_tail)
     return (
         _device_with_physics(m1, phys_diff),
         _device_with_physics(m2, phys_diff),
@@ -306,17 +321,18 @@ def _jtheta_fd(
     vinn_t: Tensor,
     problem: OtaSizingProblem,
 ) -> Tensor:
-    """Compute the (3T, 5) FD Jacobian ∂F/∂θ at the converged state.
+    """Compute the (3T, 7) FD Jacobian ∂F/∂θ at the converged state.
 
     For each θ_i, perturbs by ±eps, re-runs the DC solve (to update the
     initial condition), and evaluates the transient residual at v_flat_star.
 
-    :return: J_θ of shape ``(3T, 5)`` on CPU.
+    :return: J_θ of shape ``(3T, 7)`` on CPU.
     """
     n_state = v_flat_star.shape[0]
-    j_theta = torch.zeros(n_state, 5, dtype=torch.float32)
+    n_theta = len(_FD_THETA_CLAMP)
+    j_theta = torch.zeros(n_state, n_theta, dtype=torch.float32)
 
-    for i in range(5):
+    for i in range(n_theta):
         eps_i = max(abs(float(theta[i])) * problem.fd_eps_frac, 1e-4)
         low, high = _FD_THETA_CLAMP[i]
         base_val = float(theta[i].detach())
@@ -337,16 +353,18 @@ def _jtheta_fd(
         for sign in (+1, -1):
             t_vals = theta.detach().tolist()
             t_vals[i] = plus_val if sign == +1 else minus_val
-            w_diff, w_mirror, w_tail, l_um, vbias = t_vals
+            w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias = t_vals
             # Re-clamp the other components against their own brackets in case
             # they sit on a bound that an earlier optimiser step pushed them to.
             w_diff = float(np.clip(w_diff, _FD_THETA_CLAMP[0][0], _FD_THETA_CLAMP[0][1]))
             w_mirror = float(np.clip(w_mirror, _FD_THETA_CLAMP[1][0], _FD_THETA_CLAMP[1][1]))
             w_tail = float(np.clip(w_tail, _FD_THETA_CLAMP[2][0], _FD_THETA_CLAMP[2][1]))
-            l_um = float(np.clip(l_um, _FD_THETA_CLAMP[3][0], _FD_THETA_CLAMP[3][1]))
+            l_diff = float(np.clip(l_diff, _FD_THETA_CLAMP[3][0], _FD_THETA_CLAMP[3][1]))
+            l_mirror = float(np.clip(l_mirror, _FD_THETA_CLAMP[4][0], _FD_THETA_CLAMP[4][1]))
+            l_tail = float(np.clip(l_tail, _FD_THETA_CLAMP[5][0], _FD_THETA_CLAMP[5][1]))
 
             devices_pert = _rebuild_devices(
-                (w_diff, w_mirror, w_tail, l_um, vbias),
+                (w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias),
                 base_devices,
                 nfet_strategy,
                 pfet_strategy,
@@ -420,9 +438,9 @@ def _make_ift_function(
         ) -> Tensor:
             """Run Newton to convergence; save J_v and v_flat_star for backward."""
             theta_vals = tuple(float(x) for x in theta.detach().tolist())
-            w_diff, w_mirror, w_tail, l_um, vbias = theta_vals
+            w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias = theta_vals
             devices = _rebuild_devices(
-                (w_diff, w_mirror, w_tail, l_um, vbias),
+                (w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias),
                 base_devices,
                 nfet_strategy,
                 pfet_strategy,
@@ -473,19 +491,20 @@ def _make_ift_function(
                 ctx.problem,
             ).to(j_v.device)
 
-            # IFT solve: (3T, 3T) \ (3T, 5) with Tikhonov regularisation
+            # IFT solve: (3T, 3T) \ (3T, n_theta) with Tikhonov regularisation
+            n_theta = j_theta.shape[1]
             eye = torch.eye(j_v.shape[0], dtype=j_v.dtype, device=j_v.device)
             j_v_reg = j_v + _TIKHONOV_LAMBDA * eye
             try:
-                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)  # pylint: disable=not-callable  # (3T, 5)
+                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)  # pylint: disable=not-callable  # (3T, n_theta)
             except torch.linalg.LinAlgError:
                 logger.warning("IFT solve failed (singular J_v); returning zero gradient.")
-                return torch.zeros(5, device=theta.device), None
+                return torch.zeros(n_theta, device=theta.device), None
 
             # v_out is rows [2T : 3T] in the flattened state
-            dv_out_dtheta = dv_dtheta[2 * t_len : 3 * t_len, :]  # (T, 5)
+            dv_out_dtheta = dv_dtheta[2 * t_len : 3 * t_len, :]  # (T, n_theta)
             grad_out = grad_v_out.to(dv_out_dtheta.device)
-            grad_theta = (grad_out.unsqueeze(-1) * dv_out_dtheta).sum(0)  # (5,)
+            grad_theta = (grad_out.unsqueeze(-1) * dv_out_dtheta).sum(0)  # (n_theta,)
             return grad_theta.to(theta.device), None  # None for v_dc
 
     return _OtaTransientIFT
@@ -521,9 +540,9 @@ def compose_ota_differentiable(
         wired to θ, and the DC operating-point solution.
     """
     theta_vals = tuple(float(x) for x in theta.detach().tolist())
-    w_diff, w_mirror, w_tail, l_um, vbias = theta_vals
+    w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias = theta_vals
     devices = _rebuild_devices(
-        (w_diff, w_mirror, w_tail, l_um, vbias),
+        (w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias),
         base_devices,
         nfet_strategy,
         pfet_strategy,
@@ -559,15 +578,18 @@ def _eval_itail_through_fno(
 
     The result is a scalar tensor whose backward propagation captures:
 
-    * ∂I_tail/∂W_tail and ∂I_tail/∂L via bilinear interpolation of the curated
-      BSIM physics vector over a (W, L) 2x2 bracket around (theta[2], theta[3]);
+    * ∂I_tail/∂W_tail and ∂I_tail/∂L_tail via bilinear interpolation of the
+      curated BSIM physics vector over a (W_tail, L_tail) 2x2 bracket around
+      (theta[2], theta[5]);
     * ∂I_tail/∂V_bias via FNO autograd through the M5 ``Vg`` trajectory;
-    * ∂I_tail/∂{W_diff, W_mirror} = 0 (M5 has no dependency on these);
+    * ∂I_tail/∂{W_diff, W_mirror, L_diff, L_mirror} = 0 (M5 has no dependency
+      on the diff-pair or mirror geometry);
     * V_tail held detached from autograd, cutting the recursive
       ``V_tail = f(I_tail)`` feedback. The omitted V_tail-shift contribution is
       documented in ``docs/sizing.md``.
 
-    :param theta: ``(5,)`` design vector ``[W_diff, W_mirror, W_tail, L, V_bias]``
+    :param theta: ``(7,)`` design vector
+        ``[W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias]``
         with ``requires_grad=True``.
     :param dc_sol: Converged DC operating-point solution (float fields, used as a
         detached anchor for V_tail and as an i_tail_a diagnostic reference).
@@ -578,8 +600,8 @@ def _eval_itail_through_fno(
         to ``theta``.
     """
     w_tail = theta[2]
-    l_um = theta[3]
-    v_bias = theta[4]
+    l_um = theta[5]
+    v_bias = theta[6]
 
     w_center = float(w_tail.detach().item())
     l_center = float(l_um.detach().item())
@@ -725,14 +747,14 @@ def _load_base_state(
 ]:
     """Load model weights, norm stats, and build time grid.  Called once."""
     logger.info("Loading base OTA devices…")
-    w_diff, w_mirror, w_tail, l_um, _ = theta_init.tolist()
+    w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, _ = theta_init.tolist()
     base_devices = load_ota_5t_devices(
         diff_w_um=w_diff,
-        diff_l_um=l_um,
+        diff_l_um=l_diff,
         mirror_w_um=w_mirror,
-        mirror_l_um=l_um,
+        mirror_l_um=l_mirror,
         tail_w_um=w_tail,
-        tail_l_um=l_um,
+        tail_l_um=l_tail,
         nfet_checkpoint=problem.nfet_checkpoint,
         pfet_checkpoint=problem.pfet_checkpoint,
         nfet_dataset=problem.nfet_dataset,
@@ -860,16 +882,16 @@ def run_adam(
 
 def _spice_metrics_at(theta_vals: tuple[float, ...], problem: OtaSizingProblem) -> tuple[float, float, bool]:
     """Single-point NGSpice evaluation. Returns ``(slew_v_per_us, power_uw, converged)``."""
-    w_diff, w_mirror, w_tail, l_um, vbias = theta_vals
+    w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias = theta_vals
     metrics = simulate_ota_design_point(
         OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror),
         vdd=problem.vdd,
         vcm_v=problem.vcm,
         step_amp_v=problem.step_amp,
-        diff_l_um=l_um,
-        mirror_l_um=l_um,
+        diff_l_um=l_diff,
+        mirror_l_um=l_mirror,
         tail_w_um=w_tail,
-        tail_l_um=l_um,
+        tail_l_um=l_tail,
         vbias_v=vbias,
         t_step_start=problem.t_step_start,
         t_end=problem.t_end,
@@ -897,25 +919,26 @@ def fd_spice_gradient(
     """Forward finite-difference loss gradient via NGSpice.
 
     For each θ_i, runs SPICE at ``θ + eps_i e_i`` and finite-differences the
-    scalar loss. Cost: ``5 + 1 = 6`` SPICE evaluations per call (1 baseline,
-    5 perturbations). Returns the gradient and the baseline (slew, power, loss)
-    for logging.
+    scalar loss. Cost: ``n_theta + 1`` SPICE evaluations per call. Returns the
+    gradient and the baseline (slew, power, loss) for logging.
 
-    :param theta: Design vector ``(5,)``.
+    :param theta: Design vector ``(n_theta,)``; production layout is 7 elements
+        ``[W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias]``.
     :param problem: Sizing configuration.
     :param eps_rel: Relative perturbation; absolute eps = ``max(|θ_i| * eps_rel, 1e-4)``.
     :return: Tuple ``(grad, slew, power_uw, loss, sims_consumed)``.
     """
     base_vals = tuple(float(x) for x in theta.detach().tolist())
+    n_theta = len(base_vals)
     slew_base, power_base, converged = _spice_metrics_at(base_vals, problem)
     if not converged:
         logger.warning("FD-SPICE baseline did not converge at θ=%s; returning zero gradient.", base_vals)
-        return torch.zeros(5, dtype=theta.dtype), slew_base, power_base, float("nan"), 1
+        return torch.zeros(n_theta, dtype=theta.dtype), slew_base, power_base, float("nan"), 1
     loss_base = _scalar_loss(slew_base, power_base, problem)
 
-    grad = torch.zeros(5, dtype=theta.dtype)
+    grad = torch.zeros(n_theta, dtype=theta.dtype)
     sims = 1
-    for i in range(5):
+    for i in range(n_theta):
         eps = max(abs(base_vals[i]) * eps_rel, 1e-4)
         plus_vals = list(base_vals)
         plus_vals[i] += eps
@@ -1027,23 +1050,27 @@ def spice_validate(
     an argmax over a sweep. This is the apples-to-apples comparison against the
     FNO-predicted metrics at the same θ.
 
-    :param theta: Final design vector ``(5,)`` [W_diff, W_mirror, W_tail, L, V_bias].
+    :param theta: Final design vector ``(7,)``
+        ``[W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias]``.
     :param problem: Sizing problem configuration.
     :param output_dir: Directory for SPICE validation artefacts.
     :return: Dict with ``theta``, ``metrics``, and ``converged`` keys.
     """
     vals = theta.detach().tolist()
-    w_diff, w_mirror, w_tail, l_um, vbias = vals
+    w_diff, w_mirror, w_tail, l_diff, l_mirror, l_tail, vbias = vals
     out = output_dir / "spice_validation"
     out.mkdir(parents=True, exist_ok=True)
 
     point = OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror)
     logger.info(
-        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, L=%.3f, Vbias=%.3f)",
+        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, "
+        "L_diff=%.3f, L_mirror=%.3f, L_tail=%.3f, Vbias=%.3f)",
         w_diff,
         w_mirror,
         w_tail,
-        l_um,
+        l_diff,
+        l_mirror,
+        l_tail,
         vbias,
     )
     metrics = simulate_ota_design_point(
@@ -1051,10 +1078,10 @@ def spice_validate(
         vdd=problem.vdd,
         vcm_v=problem.vcm,
         step_amp_v=problem.step_amp,
-        diff_l_um=l_um,
-        mirror_l_um=l_um,
+        diff_l_um=l_diff,
+        mirror_l_um=l_mirror,
         tail_w_um=w_tail,
-        tail_l_um=l_um,
+        tail_l_um=l_tail,
         vbias_v=vbias,
         t_step_start=problem.t_step_start,
         t_end=problem.t_end,
@@ -1067,7 +1094,9 @@ def spice_validate(
             "w_diff_um": w_diff,
             "w_mirror_um": w_mirror,
             "w_tail_um": w_tail,
-            "l_um": l_um,
+            "l_diff_um": l_diff,
+            "l_mirror_um": l_mirror,
+            "l_tail_um": l_tail,
             "vbias_v": vbias,
         },
         "converged": bool(metrics.converged),
@@ -1093,16 +1122,16 @@ def spice_validate(
 @click.option(
     "--theta-init",
     type=str,
-    default="3.0,3.0,1.0,0.40,0.9",
+    default="3.0,3.0,1.0,0.40,0.40,0.40,0.9",
     show_default=True,
-    help="Comma-separated initial θ: W_diff,W_mirror,W_tail,L_um,V_bias",
+    help="Comma-separated initial θ: W_diff,W_mirror,W_tail,L_diff,L_mirror,L_tail,V_bias",
 )
 @click.option("--n-iters", type=int, default=200, show_default=True, help="Adam iterations.")
 @click.option("--lr", type=float, default=1e-3, show_default=True, help="Adam learning rate.")
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    default=Path("runs/sizing/adam_ota_5var"),
+    default=Path("runs/sizing/adam_ota_7var"),
     show_default=True,
 )
 @click.option("--slew-min", type=float, default=30.0, show_default=True, help="Slew-rate spec (V/µs).")
@@ -1140,8 +1169,11 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     theta_vals = [float(v) for v in theta_init.split(",")]
-    if len(theta_vals) != 5:
-        raise click.BadParameter("theta-init must have exactly 5 comma-separated values.")
+    if len(theta_vals) != 7:
+        raise click.BadParameter(
+            "theta-init must have exactly 7 comma-separated values: "
+            "W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias."
+        )
 
     torch_dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
     problem = OtaSizingProblem(

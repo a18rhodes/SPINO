@@ -73,11 +73,16 @@ _SKIP = pytest.mark.skipif(
 _W_DIFF = 3.0
 _W_MIRROR = 3.0
 _W_TAIL = 1.5
-_L_UM = 0.40
+_L_DIFF = 0.40
+_L_MIRROR = 0.40
+_L_TAIL = 0.40
 _V_BIAS = 1.2
 _EPS_UM = 0.015  # 1% of W_tail=1.5 µm
 
-_THETA_INIT = torch.tensor([_W_DIFF, _W_MIRROR, _W_TAIL, _L_UM, _V_BIAS], dtype=torch.float32)
+_THETA_INIT = torch.tensor(
+    [_W_DIFF, _W_MIRROR, _W_TAIL, _L_DIFF, _L_MIRROR, _L_TAIL, _V_BIAS],
+    dtype=torch.float32,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,11 +102,11 @@ def _make_problem(device: str = "cpu") -> OtaSizingProblem:
 def _load_base(problem: OtaSizingProblem):
     base_devices = load_ota_5t_devices(
         diff_w_um=_W_DIFF,
-        diff_l_um=_L_UM,
+        diff_l_um=_L_DIFF,
         mirror_w_um=_W_MIRROR,
-        mirror_l_um=_L_UM,
+        mirror_l_um=_L_MIRROR,
         tail_w_um=_W_TAIL,
-        tail_l_um=_L_UM,
+        tail_l_um=_L_TAIL,
         nfet_checkpoint=problem.nfet_checkpoint,
         pfet_checkpoint=problem.pfet_checkpoint,
         nfet_dataset=problem.nfet_dataset,
@@ -137,10 +142,10 @@ def _spice_slew(w_tail: float, problem: OtaSizingProblem) -> float:
         vdd=problem.vdd,
         vcm_v=problem.vcm,
         step_amp_v=problem.step_amp,
-        diff_l_um=_L_UM,
-        mirror_l_um=_L_UM,
+        diff_l_um=_L_DIFF,
+        mirror_l_um=_L_MIRROR,
         tail_w_um=w_tail,
-        tail_l_um=_L_UM,
+        tail_l_um=_L_TAIL,
         vbias_v=_V_BIAS,
         t_step_start=problem.t_step_start,
         t_end=problem.t_end,
@@ -237,11 +242,12 @@ def test_power_gradient_finite_all_theta() -> None:
     assert theta.grad is not None
     grad_np = theta.grad.detach().cpu().numpy()
     assert np.all(np.isfinite(grad_np)), f"non-finite power gradient: {grad_np}"
-    # W_diff (0) and W_mirror (1) do not enter M5 — gradient must be exactly zero.
-    assert grad_np[0] == 0.0, f"∂P/∂W_diff should be 0, got {grad_np[0]}"
-    assert grad_np[1] == 0.0, f"∂P/∂W_mirror should be 0, got {grad_np[1]}"
-    # W_tail (2), L (3), V_bias (4) should each carry a non-zero gradient.
-    for idx, name in [(2, "W_tail"), (3, "L"), (4, "V_bias")]:
+    # M5 has no dependency on W_diff (0), W_mirror (1), L_diff (3), or
+    # L_mirror (4) — those gradient components must be exactly zero.
+    for idx, name in [(0, "W_diff"), (1, "W_mirror"), (3, "L_diff"), (4, "L_mirror")]:
+        assert grad_np[idx] == 0.0, f"∂P/∂{name} should be 0, got {grad_np[idx]}"
+    # W_tail (2), L_tail (5), V_bias (6) should each carry a non-zero gradient.
+    for idx, name in [(2, "W_tail"), (5, "L_tail"), (6, "V_bias")]:
         assert abs(grad_np[idx]) > 0.0, f"∂P/∂{name} unexpectedly zero ({grad_np[idx]})"
 
 
@@ -324,10 +330,17 @@ _M2_TOL_TEST_B: float = 0.20
 # strictly against the tolerances above.
 _M2_BOUNDARY_THETA_NAME: str = "step5"
 
-_THETA_M2_POINTS: list[tuple[str, tuple[float, float, float, float, float]]] = [
-    ("init", (3.0, 3.0, 1.0, 0.40, 0.9)),
-    (_M2_BOUNDARY_THETA_NAME, (3.283, 3.276, 1.294, 0.180, 1.193)),
-    ("final", (3.638, 3.606, 1.592, 0.308, 1.537)),
+# Pinned theta points for the M2 gradient-verification test. Layout:
+# (W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias).
+#
+# The step5 and final values approximate the v3 trajectory at the locked-L
+# (single-L) parameterisation, padded with L_diff = L_mirror = L_tail. After
+# the n_theta = 7 Adam rerun lands, refresh these from the new trajectory
+# JSON.
+_THETA_M2_POINTS: list[tuple[str, tuple[float, float, float, float, float, float, float]]] = [
+    ("init", (3.0, 3.0, 1.0, 0.40, 0.40, 0.40, 0.9)),
+    (_M2_BOUNDARY_THETA_NAME, (3.283, 3.276, 1.294, 0.180, 0.180, 0.180, 1.193)),
+    ("final", (3.638, 3.606, 1.592, 0.308, 0.308, 0.308, 1.537)),
 ]
 
 
@@ -418,8 +431,9 @@ def _fd_slew_grad_fno(
     vinn_t,
     eps_rel: float = 0.01,
 ) -> np.ndarray:
-    grad = np.zeros(5)
-    for i in range(5):
+    n_theta = len(theta_vec)
+    grad = np.zeros(n_theta)
+    for i in range(n_theta):
         plus, minus, eps_used = _bracket_perturbation(theta_vec, i, eps_rel)
         slew_plus, _ = _slew_via_fno(tuple(plus), problem, base_devices, nfet_strat, pfet_strat, tg, vinp_t, vinn_t)
         slew_minus, _ = _slew_via_fno(tuple(minus), problem, base_devices, nfet_strat, pfet_strat, tg, vinp_t, vinn_t)
@@ -432,8 +446,9 @@ def _fd_slew_grad_spice(
     problem: OtaSizingProblem,
     eps_rel: float = 0.01,
 ) -> np.ndarray:
-    grad = np.zeros(5)
-    for i in range(5):
+    n_theta = len(theta_vec)
+    grad = np.zeros(n_theta)
+    for i in range(n_theta):
         plus_vals, minus_vals, eps_used = _bracket_perturbation(theta_vec, i, eps_rel)
 
         def _slew_at(vals):
@@ -444,10 +459,10 @@ def _fd_slew_grad_spice(
                 vcm_v=problem.vcm,
                 step_amp_v=problem.step_amp,
                 diff_l_um=vals[3],
-                mirror_l_um=vals[3],
+                mirror_l_um=vals[4],
                 tail_w_um=vals[2],
-                tail_l_um=vals[3],
-                vbias_v=vals[4],
+                tail_l_um=vals[5],
+                vbias_v=vals[6],
                 t_step_start=problem.t_step_start,
                 t_end=problem.t_end,
                 t_step=problem.t_step,

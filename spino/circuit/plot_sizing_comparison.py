@@ -36,7 +36,9 @@ _THETA_LABELS = (
     r"$W_\mathrm{diff}$ (µm)",
     r"$W_\mathrm{mirror}$ (µm)",
     r"$W_\mathrm{tail}$ (µm)",
-    r"$L$ (µm)",
+    r"$L_\mathrm{diff}$ (µm)",
+    r"$L_\mathrm{mirror}$ (µm)",
+    r"$L_\mathrm{tail}$ (µm)",
     r"$V_\mathrm{bias}$ (V)",
 )
 
@@ -110,16 +112,19 @@ def _plot_loss_slew(  # pylint: disable=too-many-locals
 def _plot_theta(  # pylint: disable=too-many-locals
     traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
 ) -> None:
-    """Overlay 5-panel θ trajectory."""
+    """Overlay 7-panel θ trajectory."""
     bounds = [
         problem.w_diff_bounds,
         problem.w_mirror_bounds,
         problem.w_tail_bounds,
-        problem.l_bounds,
+        problem.l_diff_bounds,
+        problem.l_mirror_bounds,
+        problem.l_tail_bounds,
         problem.vbias_bounds,
     ]
     palette = get_palette(dark=False)
-    fig, axes = plt.subplots(1, 5, figsize=(16, 3.4), constrained_layout=True, sharex=True)
+    n_panels = len(bounds)
+    fig, axes = plt.subplots(1, n_panels, figsize=(2.6 * n_panels, 3.4), constrained_layout=True, sharex=True)
     for i, ax in enumerate(axes):
         ax.plot(traj_fno.steps, traj_fno.theta[:, i], color=palette["pred"], lw=1.6, label=traj_fno.label)
         ax.plot(traj_fd.steps, traj_fd.theta[:, i], color=palette["pred_sweep"], lw=1.6, label=traj_fd.label, ls="--")

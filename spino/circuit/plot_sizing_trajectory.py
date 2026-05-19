@@ -36,7 +36,9 @@ _THETA_LABELS = (
     r"$W_\mathrm{diff}$ (µm)",
     r"$W_\mathrm{mirror}$ (µm)",
     r"$W_\mathrm{tail}$ (µm)",
-    r"$L$ (µm)",
+    r"$L_\mathrm{diff}$ (µm)",
+    r"$L_\mathrm{mirror}$ (µm)",
+    r"$L_\mathrm{tail}$ (µm)",
     r"$V_\mathrm{bias}$ (V)",
 )
 
@@ -111,16 +113,19 @@ def _plot_loss_and_slew(traj: _Trajectory, problem: OtaSizingProblem, out_path: 
 
 
 def _plot_theta_trajectory(traj: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:
-    """5-panel θ trajectory with bound lines."""
+    """7-panel θ trajectory with bound lines."""
     bounds = [
         problem.w_diff_bounds,
         problem.w_mirror_bounds,
         problem.w_tail_bounds,
-        problem.l_bounds,
+        problem.l_diff_bounds,
+        problem.l_mirror_bounds,
+        problem.l_tail_bounds,
         problem.vbias_bounds,
     ]
     palette = get_palette(dark=False)
-    fig, axes = plt.subplots(1, 5, figsize=(15, 3.2), constrained_layout=True, sharex=True)
+    n_panels = len(bounds)
+    fig, axes = plt.subplots(1, n_panels, figsize=(2.6 * n_panels, 3.2), constrained_layout=True, sharex=True)
     for i, ax in enumerate(axes):
         ax.plot(traj.steps, traj.theta[:, i], color=palette["pred"], lw=1.6)
         lo, hi = bounds[i]
