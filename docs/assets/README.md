@@ -29,7 +29,7 @@ the canonical references that survive a clean clone.
 | Triode fine-tune: r=0.9997, max\|ΔV\|=61.0 mV, slew 49.25/48.41 V/µs | [`ota_5t_fno_l040_exp07/summary.json`](ota_5t_fno_l040_exp07/summary.json) |
 | L=0.40 / L=0.50 SPICE characterisation: 7x7 (W_diff, W_mirror) sweeps | [`ota_5t_l040/summary.json`](ota_5t_l040/summary.json), [`ota_5t_l050/summary.json`](ota_5t_l050/summary.json) |
 
-## Gradient-based OTA sizing (multi-spec, v3)
+## Gradient-based OTA sizing (multi-spec, v3, n_θ = 5)
 
 | Claim | Backing file |
 |---|---|
@@ -38,6 +38,19 @@ the canonical references that survive a clean clone.
 | SPICE validation at θ_final: slew 38.83 V/µs, I_tail 77.1 µA, gain 34.11, swing 0.977 V | [`sizing/v3_jtheta_fix/spice_validation/summary.json`](sizing/v3_jtheta_fix/spice_validation/summary.json) |
 | Loss + slew curve, θ trajectory, FNO vs SPICE overlay | [`sizing/v3_jtheta_fix/loss_and_slew.png`](sizing/v3_jtheta_fix/loss_and_slew.png), [`sizing/v3_jtheta_fix/theta_trajectory.png`](sizing/v3_jtheta_fix/theta_trajectory.png), [`sizing/v3_jtheta_fix/fno_vs_spice.png`](sizing/v3_jtheta_fix/fno_vs_spice.png) |
 | FNO/IFT vs FD-SPICE comparison overlay (multi-spec) | [`sizing/v3_jtheta_fix/comparison_loss_slew.png`](sizing/v3_jtheta_fix/comparison_loss_slew.png), [`sizing/v3_jtheta_fix/comparison_theta.png`](sizing/v3_jtheta_fix/comparison_theta.png) |
+
+## Gradient-based OTA sizing (per-device L, v4, n_θ = 7)
+
+| Claim | Backing file |
+|---|---|
+| FNO/IFT 50-step trajectory at n_θ = 7 | [`sizing/v4_nt7/trajectory.json`](sizing/v4_nt7/trajectory.json) |
+| FNO/IFT final θ = (3.640, 3.562, 1.590, 0.180, 0.180, 0.318, 1.535) µm/V | [`sizing/v4_nt7/theta_final.json`](sizing/v4_nt7/theta_final.json) |
+| FNO/IFT SPICE validation: slew 43.67 V/µs, gain 15.55, power 144.8 µW, swing 0.774 V | [`sizing/v4_nt7/spice_validation/summary.json`](sizing/v4_nt7/spice_validation/summary.json) |
+| FD-SPICE 50-step trajectory at n_θ = 7 (400 SPICE sims, 8 per step) | [`sizing/v4_nt7/fd_spice/trajectory.json`](sizing/v4_nt7/fd_spice/trajectory.json) |
+| FD-SPICE final θ = (3.582, 3.537, 1.598, 0.180, 0.180, 0.180, 1.494) µm/V | [`sizing/v4_nt7/fd_spice/theta_final.json`](sizing/v4_nt7/fd_spice/theta_final.json) |
+| FD-SPICE SPICE validation: slew 51.16 V/µs, gain 14.92, power 190.1 µW, swing 0.759 V | [`sizing/v4_nt7/fd_spice/spice_validation/summary.json`](sizing/v4_nt7/fd_spice/spice_validation/summary.json) |
+| Per-step + trajectory plots (7-panel θ) | [`sizing/v4_nt7/loss_and_slew.png`](sizing/v4_nt7/loss_and_slew.png), [`sizing/v4_nt7/theta_trajectory.png`](sizing/v4_nt7/theta_trajectory.png), [`sizing/v4_nt7/fno_vs_spice.png`](sizing/v4_nt7/fno_vs_spice.png) |
+| FNO/IFT vs FD-SPICE overlay at n_θ = 7 | [`sizing/v4_nt7/comparison_loss_slew.png`](sizing/v4_nt7/comparison_loss_slew.png), [`sizing/v4_nt7/comparison_theta.png`](sizing/v4_nt7/comparison_theta.png) |
 
 ## Off-corner transferability spot check
 

@@ -281,6 +281,97 @@ loses to single-CPU FD-SPICE wall-clock by ~3x. The per-iteration scaling
 is what compounds with $`n_\theta`$; the absolute cost is what
 scaling-aware deployment decisions optimise against. Both are reported.
 
+### Measured scaling at $`n_\theta = 7`$ (per-device $`L`$)
+
+The OTA design vector splits the single channel length $`L`$ into
+$`(L_\mathrm{diff}, L_\mathrm{mirror}, L_\mathrm{tail})`$, lifting
+$`n_\theta`$ from 5 to 7 without changing the topology. The same Adam
+hyperparameters and initial condition apply
+($`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.40, 0.40, 0.9)`$,
+$`\eta = 5\times 10^{-2}`$, 50 iterations). FNO/IFT and FD-SPICE
+trajectories and SPICE re-validations at the converged points are
+archived under [`docs/assets/sizing/v4_nt7/`](assets/sizing/v4_nt7/)
+(FNO/IFT at the top level; FD-SPICE under
+[`v4_nt7/fd_spice/`](assets/sizing/v4_nt7/fd_spice/)).
+
+![Loss and slew vs Adam step, n_θ = 7](assets/sizing/v4_nt7/loss_and_slew.png)
+![θ trajectory, n_θ = 7 (7 panels)](assets/sizing/v4_nt7/theta_trajectory.png)
+![FNO vs SPICE at θ_final, n_θ = 7](assets/sizing/v4_nt7/fno_vs_spice.png)
+![FNO/IFT vs FD-SPICE overlay, n_θ = 7](assets/sizing/v4_nt7/comparison_loss_slew.png)
+![θ trajectory overlay (FNO/IFT vs FD-SPICE), n_θ = 7](assets/sizing/v4_nt7/comparison_theta.png)
+
+Per-iteration cost and final designs:
+
+| Metric | $`n_\theta = 5`$ (v3) | $`n_\theta = 7`$ (v4) |
+|---|---|---|
+| FNO/IFT per-step wall-clock | ~5.4 min | ~7.0 min (1.30x) |
+| Total FNO/IFT Adam wall-clock | ~4.5 h | ~5.7 h |
+| FD-SPICE per-step sim count (measured) | 6 | 8 |
+| FD-SPICE per-step wall-clock | ~110 s | ~145 s |
+| Per-iter FNO/IFT vs FD-SPICE sim ratio | 6x | 8x ($`n_\theta + 1`$) |
+| Spec-crossing step (FNO/IFT) | 5 | 5 |
+| Power-cap engagement step (FNO/IFT) | 43 | 43 |
+
+Final SPICE-re-validated metrics at $`\theta_\mathrm{final}`$:
+
+| | FNO/IFT v3 | FD-SPICE v3 | FNO/IFT v4 | FD-SPICE v4 |
+|---|---|---|---|---|
+| Slew (V/µs) | 38.83 | 51.17 | 43.67 | 51.16 |
+| Static power (µW) | 138.7 | 190.1 | 144.8 | 190.1 |
+| DC gain (V/V) | 34.1 | 14.9 | 15.5 | 14.9 |
+| Peak swing (V) | 0.977 | 0.759 | 0.774 | 0.759 |
+| $`L_\mathrm{diff}`$ (µm) | 0.308 (shared) | 0.180 (bound) | 0.180 (bound) | 0.180 (bound) |
+| $`L_\mathrm{mirror}`$ (µm) | 0.308 (shared) | 0.180 (bound) | 0.180 (bound) | 0.180 (bound) |
+| $`L_\mathrm{tail}`$ (µm) | 0.308 (shared) | 0.180 (bound) | 0.318 | 0.180 (bound) |
+| FNO-vs-SPICE slew gap | 5.6 % | (n/a) | 3.0 % | (n/a) |
+| FNO-vs-SPICE power gap | 3.5 % | (n/a) | 2.1 % | (n/a) |
+
+Final $`\theta`$ at $`n_\theta = 7`$ FNO/IFT:
+$`(W_\mathrm{diff}, W_\mathrm{mirror}, W_\mathrm{tail}, L_\mathrm{diff}, L_\mathrm{mirror}, L_\mathrm{tail}, V_\mathrm{bias}) = (3.640, 3.562, 1.590, 0.180, 0.180, 0.318, 1.535)`$
+µm/V. Only $`L_\mathrm{tail}`$ unpins from the 0.18 µm bound; both
+$`L_\mathrm{diff}`$ and $`L_\mathrm{mirror}`$ stay bound-clamped because
+the only active hinge after step 5 is the power cap, and
+$`\partial P / \partial L_\mathrm{diff} = \partial P / \partial L_\mathrm{mirror} = 0`$
+through the M5-only $`I_\mathrm{tail}`$ path. $`L_\mathrm{mirror}`$ does
+make a brief excursion to 0.486 µm at step 2 before the trajectory
+reverses and pushes it back to the bound. FD-SPICE at $`n_\theta = 7`$
+keeps all three $`L`$ at the bound across the full 50-step budget
+because its real-SPICE power never reaches the 200 µW cap and the
+slew-only descent direction has no reason to lift $`L`$.
+
+**Gain regression at minimum-$`L`$ corner.** DC gain at the converged
+design depends almost entirely on $`L_\mathrm{mirror}`$ (it sets M3/M4
+output impedance, which is the dominant gain element of this OTA).
+$`L_\mathrm{mirror}`$ at the 0.18 µm bound gives ~15 V/V; $`L_\mathrm{mirror}`$
+at ~0.30 µm gives ~34 V/V. Three of the four runs above land with
+$`L_\mathrm{mirror}`$ at the bound and report gain ~15 V/V. The v3
+FNO/IFT outlier (gain 34 V/V) is the one case where the multi-spec
+power-cap hinge unpinned the shared $`L`$ off the bound to 0.308 µm,
+which simultaneously lifted $`L_\mathrm{mirror}`$. Under the per-device
+$`L`$ split this coupling breaks: at $`n_\theta = 7`$ the hinge pulls
+back only on $`L_\mathrm{tail}`$ (the component that enters
+$`\partial P / \partial \theta`$), and $`L_\mathrm{mirror}`$ stays bound.
+
+The lesson is methodological: the current loss is slew + power only, so
+the optimiser is free to land at any $`L_\mathrm{mirror}`$ that meets
+both specs. With $`n_\theta = 5`$ the shared $`L`$ couples the three
+geometries and an indirect-hinge-induced unpin happened to also lift
+$`L_\mathrm{mirror}`$ into a high-gain region. With $`n_\theta = 7`$ that
+coupling is gone and the unconstrained $`L_\mathrm{mirror}`$ slides to
+the slew-favoured bound. Restoring DC gain to the 30+ V/V range requires
+adding a gain term to the loss (queued for follow-up work). The v3
+gain value should be read as an artefact of the shared-$`L`$
+parameterisation, not as a fundamental property of the FNO/IFT path.
+
+**Per-iteration scaling, now measured.** Two trajectories per method at
+the same problem, same hyperparameters, locked-pre-run budgets give two
+scaling points (5, 7) for each method. FNO/IFT per-step grows ~1.30x
+with column count (close to the analytic 1.40x = 7/5), FD-SPICE per-step
+grows 1.32x with sim count (8/6 = 1.33x analytic). The ratio of
+(FD-SPICE per-iter sim count) to (FNO/IFT per-iter cost) is 6x at
+$`n_\theta = 5`$ and 8x at $`n_\theta = 7`$. Linear-in-$`n_\theta`$
+scaling for FD-SPICE is now an observation rather than an extrapolation.
+
 Multi-spec comparison overlays (FD-SPICE trajectory vs FNO/IFT
 multi-spec trajectory):
 
