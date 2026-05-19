@@ -52,6 +52,15 @@ the canonical references that survive a clean clone.
 | Per-step + trajectory plots (7-panel θ) | [`sizing/v4_nt7/loss_and_slew.png`](sizing/v4_nt7/loss_and_slew.png), [`sizing/v4_nt7/theta_trajectory.png`](sizing/v4_nt7/theta_trajectory.png), [`sizing/v4_nt7/fno_vs_spice.png`](sizing/v4_nt7/fno_vs_spice.png) |
 | FNO/IFT vs FD-SPICE overlay at n_θ = 7 | [`sizing/v4_nt7/comparison_loss_slew.png`](sizing/v4_nt7/comparison_loss_slew.png), [`sizing/v4_nt7/comparison_theta.png`](sizing/v4_nt7/comparison_theta.png) |
 
+## FNO safe operating region (per-device ratio error)
+
+| Claim | Backing file |
+|---|---|
+| NFET safe region @ (W=6 µm, L=0.18 µm): τ=0.1 76 % / τ=0.3 87 % / τ=1.0 94 % coverage | [`safe_region/cs_amp_l018/summary.json`](safe_region/cs_amp_l018/summary.json) |
+| PFET safe region @ (W=4.5 µm, L=0.18 µm): τ=0.1 50 % / τ=0.3 80 % / τ=1.0 91 % coverage | [`safe_region/cs_amp_l018/summary.json`](safe_region/cs_amp_l018/summary.json) |
+| NFET / PFET heat maps with τ contours | [`safe_region/cs_amp_l018/nfet_core_L018_safe_region.png`](safe_region/cs_amp_l018/nfet_core_L018_safe_region.png), [`safe_region/cs_amp_l018/pfet_core_L018_safe_region.png`](safe_region/cs_amp_l018/pfet_core_L018_safe_region.png) |
+| Raw 91x91 grids (V_g, V_d, ids_spice, ids_fno, err_ratio) | [`safe_region/cs_amp_l018/nfet_core_L018_grid.npz`](safe_region/cs_amp_l018/nfet_core_L018_grid.npz), [`safe_region/cs_amp_l018/pfet_core_L018_grid.npz`](safe_region/cs_amp_l018/pfet_core_L018_grid.npz) |
+
 ## Off-corner transferability spot check
 
 | Claim | Backing file |

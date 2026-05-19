@@ -409,6 +409,71 @@ Artefacts: [`docs/assets/mosfet/nfet/mlp_ablation/`](assets/mosfet/nfet/mlp_abla
 
 ---
 
+## FNO safe operating region
+
+The production NFET and PFET FNOs make per-bin drain-current predictions
+whose accuracy is geometry- and bias-dependent. Probe 1 documents large
+ratio errors at specific corners of the (V_gs, V_ds) plane (e.g., the
+PFET 13.7 A spike at V_in ≈ 0.25 V on the CS amplifier VTC) and the M4
+triode-boundary gap in the OTA. This subsection characterises *where* in
+the (V_gs, V_ds) plane the surrogate is faithful enough to ground truth
+that an optimiser using the FNO is not exploiting model error.
+
+The metric is the per-bin ratio
+$`|I_\mathrm{FNO}-I_\mathrm{SPICE}|/\max(|I_\mathrm{SPICE}|, I_\mathrm{floor})`$
+with $`I_\mathrm{floor}=1\,\text{nA}`$ suppressing near-off division
+noise. The safe-operating region at tolerance $`\tau`$ is the locus where
+this ratio is at most $`\tau`$. Contours are reported at
+$`\tau \in \{0.1, 0.3, 1.0\}`$ on a 91x91 (V_g, V_d) grid spanning
+[0, 1.8] V at the IV cache geometries
+(NFET: W = 6 µm, L = 0.18 µm; PFET: W = 4.5 µm, L = 0.18 µm) used by the
+CS amplifier attribution.
+
+| Device | τ = 0.1 coverage | τ = 0.3 coverage | τ = 1.0 coverage |
+|---|---:|---:|---:|
+| sky130 NFET | 76.0 % | 87.0 % | 94.4 % |
+| sky130 PFET | 49.6 % | 79.5 % | 91.2 % |
+
+The NFET surrogate is faithful to within 10 % over 76 % of the (V_g, V_d)
+plane and within 30 % over 87 %. The PFET drops to 50 % coverage at the
+10 % threshold; the OTA's M4 PFET triode-boundary gap, the CS amplifier
+weak-inversion VTC mismatch, and the 13.7 A near-off spike all live in
+the unsafe complement on the PFET surface. The PFET safe region at
+$`\tau \le 0.3`$ (79.5 %) is the practical envelope for production
+composition runs at this geometry; outside it, the FNO's local slope is
+known to disagree with SPICE.
+
+![NFET safe-operating region (W=6 µm, L=0.18 µm)](assets/safe_region/cs_amp_l018/nfet_core_L018_safe_region.png)
+![PFET safe-operating region (W=4.5 µm, L=0.18 µm)](assets/safe_region/cs_amp_l018/pfet_core_L018_safe_region.png)
+
+Both maps render $`\log_{10}`$ of the ratio error and overlay $`\tau`$
+contours so the boundary between safe and unsafe regions is visible at a
+glance. Bounding-box numbers are coarse because the unsafe complement is
+not axis-aligned (the PFET, in particular, has a near-off thin band
+along $`V_g \approx V_s`$ that drags the bounding box to the full grid
+even though it occupies a small fraction of the plane).
+
+Caveat on geometry. The cached IV grid is at the CS amplifier's L = 0.18 µm
+geometry, not at the OTA sizing-converged L = 0.308 µm (v3) or
+L_diff = L_mirror = 0.180 µm with L_tail = 0.318 µm (v4). The L = 0.18
+surface is the worst-case sky130 core-bin geometry and is therefore an
+honest upper bound on the PFET error envelope; the OTA operating
+geometries sit further from training-data boundaries on the W and L axes
+and the error envelope is expected to be at least as tight.
+
+Reproduction and artefacts:
+
+```bash
+python -m spino.circuit.safe_region_probe \
+    --output-dir runs/safe_region/cs_amp_l018
+```
+
+Heat maps, per-device ratio-error .npz grids (raw FNO + SPICE +
+err_ratio arrays), and the coverage-bbox summary land under
+[`docs/assets/safe_region/cs_amp_l018/`](assets/safe_region/cs_amp_l018/).
+
+---
+
 ## Digital circuits: known limitation
 
 The inverter-chain composition path was evaluated as a digital extension using

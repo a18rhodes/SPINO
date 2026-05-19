@@ -1,0 +1,121 @@
+{
+  "iv_cache_dir": "/app/runs/attribution/cs_amp_fno_exp2",
+  "i_floor_a": 1e-09,
+  "tau_levels": [
+    0.1,
+    0.3,
+    1.0
+  ],
+  "devices": [
+    {
+      "device": "sky130 NFET",
+      "width_um": 6.0,
+      "length_um": 0.18,
+      "vs_v": 0.0,
+      "vb_v": 0.0,
+      "vg_range_v": [
+        0.0,
+        1.8
+      ],
+      "vd_range_v": [
+        0.0,
+        1.8
+      ],
+      "grid_points": 8281,
+      "tau_levels": [
+        {
+          "tau": 0.1,
+          "coverage_fraction": 0.7598116169544741,
+          "vg_bounding_box_v": [
+            0.06,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        },
+        {
+          "tau": 0.3,
+          "coverage_fraction": 0.869701726844584,
+          "vg_bounding_box_v": [
+            0.0,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        },
+        {
+          "tau": 1.0,
+          "coverage_fraction": 0.9444511532423621,
+          "vg_bounding_box_v": [
+            0.0,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        }
+      ],
+      "key": "nfet_core_L018"
+    },
+    {
+      "device": "sky130 PFET",
+      "width_um": 4.5,
+      "length_um": 0.18,
+      "vs_v": 1.8,
+      "vb_v": 1.8,
+      "vg_range_v": [
+        0.0,
+        1.8
+      ],
+      "vd_range_v": [
+        0.0,
+        1.8
+      ],
+      "grid_points": 8281,
+      "tau_levels": [
+        {
+          "tau": 0.1,
+          "coverage_fraction": 0.49607535321821034,
+          "vg_bounding_box_v": [
+            0.04,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        },
+        {
+          "tau": 0.3,
+          "coverage_fraction": 0.7953145755343558,
+          "vg_bounding_box_v": [
+            0.0,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        },
+        {
+          "tau": 1.0,
+          "coverage_fraction": 0.9120879120879121,
+          "vg_bounding_box_v": [
+            0.0,
+            1.8
+          ],
+          "vd_bounding_box_v": [
+            0.0,
+            1.8
+          ]
+        }
+      ],
+      "key": "pfet_core_L018"
+    }
+  ]
+}
