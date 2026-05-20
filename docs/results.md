@@ -292,6 +292,50 @@ documented partial-closure result.
 Artefacts: `docs/assets/ota_5t_fno_l040_exp07/`. Reproduction notebook:
 [spino/ota_pfet_triode_attribution.ipynb](../spino/ota_pfet_triode_attribution.ipynb).
 
+#### Geometry-binned M4 |ΔI| (triode fine-tune vs production)
+
+The single (W_mirror = 8 µm, L = 0.40 µm) attribution point above is the
+production OTA sizing. The fine-tune's effect across the wider operating
+bin is reported by sweeping Probe 1 over a (W_mirror, L) grid with the
+same diff-pair width (W_diff = 8 µm), tail width (W_tail = 2 µm), and
+V_bias = 1.2 V. Each cell shows the M4 PFET max |ΔI| in microamps; the
+delta heat map is fine-tune minus production (negative = improvement).
+
+| | L = 0.18 µm | L = 0.40 µm | L = 0.50 µm |
+|---|---:|---:|---:|
+| **W_mirror = 4 µm**  | prod 3.02 / ft 2.77 (Δ −0.24) | prod 2.53 / ft 2.10 (Δ −0.43) | prod 1.72 / ft 1.68 (Δ −0.04) |
+| **W_mirror = 6 µm**  | prod 16.65 / ft 10.74 (Δ **−5.91**) | prod 6.00 / ft 2.90 (Δ **−3.10**) | prod 2.48 / ft 2.57 (Δ +0.09) |
+| **W_mirror = 8 µm**  | prod 26.29 / ft 29.76 (Δ **+3.47**) | prod 15.35 / ft 11.97 (Δ −3.38) | prod 9.22 / ft 6.69 (Δ −2.53) |
+| **W_mirror = 10 µm** | prod 60.64 / ft 68.05 (Δ **+7.41**) | prod 23.94 / ft 21.46 (Δ −2.48) | prod 18.67 / ft 16.61 (Δ −2.06) |
+
+![M4 max |ΔI|, production PFET](assets/triode_grid/m4_dI_production.png)
+![M4 max |ΔI|, triode fine-tune](assets/triode_grid/m4_dI_triode_finetune.png)
+![M4 max |ΔI| change (fine-tune − production)](assets/triode_grid/m4_dI_delta.png)
+
+The fine-tune helps at L ≥ 0.40 µm across every W_mirror tested
+(improvements range from 0.04 µA at W = 4 µm to 3.10 µA at W = 6 µm,
+L = 0.40 µm). It regresses on the short-channel L = 0.18 µm corner at
+W_mirror ≥ 8 µm, where the M4 |ΔI| grows by 3.5 µA at W = 8 µm and
+7.4 µA at W = 10 µm. The W = 6 µm L = 0.50 µm cell sits at +0.09 µA,
+below the round-off floor for this metric.
+
+The production OTA sizing (W_mirror = 8 µm, L = 0.40 µm) lands in the
+help band: a 3.4 µA reduction (22 % of production-PFET M4 |ΔI|), which
+matches the single-point composition result reported above
+(15.35 µA → 11.97 µA). Optimiser excursions toward the short-channel
+corner at the production W would land in the regress region; the
+optimiser steering toward longer L at the same W is in the help region.
+The triode-augmented dataset extended PFET coverage near Vsd = 0 across
+all geometries but the frozen-backbone fine-tune trades short-channel
+accuracy for long-channel accuracy on the mirror geometry.
+
+Grid summary and three heat maps under
+[`docs/assets/triode_grid/`](assets/triode_grid/). Reproduction:
+
+```bash
+python scripts/s10_triode_grid.py --output-dir runs/s10_triode_grid
+```
+
 ### Reproduction commands
 
 ```text

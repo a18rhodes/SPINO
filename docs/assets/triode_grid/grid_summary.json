@@ -1,0 +1,190 @@
+{
+  "w_mirror_grid_um": [
+    4.0,
+    6.0,
+    8.0,
+    10.0
+  ],
+  "l_grid_um": [
+    0.18,
+    0.4,
+    0.5
+  ],
+  "diff_w_um": 8.0,
+  "tail_w_um": 2.0,
+  "vbias_v": 1.2,
+  "runs": {
+    "production": {
+      "wmirror4_l018": {
+        "M1_nfet_diffpair": 2.6202380618550177e-06,
+        "M2_nfet_diffpair": 1.2117657866973536e-05,
+        "M3_pfet_mirror_diode": 1.543386041989725e-06,
+        "M4_pfet_mirror_out": 3.0169790524451267e-06,
+        "M5_nfet_tail": 9.347261368237346e-06
+      },
+      "wmirror4_l040": {
+        "M1_nfet_diffpair": 2.9202034436446475e-06,
+        "M2_nfet_diffpair": 5.148414531340107e-06,
+        "M3_pfet_mirror_diode": 4.018368278134904e-07,
+        "M4_pfet_mirror_out": 2.5278896454464545e-06,
+        "M5_nfet_tail": 2.1482363087039217e-06
+      },
+      "wmirror4_l050": {
+        "M1_nfet_diffpair": 1.3292808967635319e-06,
+        "M2_nfet_diffpair": 3.833369013648918e-06,
+        "M3_pfet_mirror_diode": 4.948437113226549e-07,
+        "M4_pfet_mirror_out": 1.7187965879721592e-06,
+        "M5_nfet_tail": 5.09745505704754e-07
+      },
+      "wmirror6_l018": {
+        "M1_nfet_diffpair": 2.58245988608498e-06,
+        "M2_nfet_diffpair": 1.2397340407192062e-05,
+        "M3_pfet_mirror_diode": 9.48417028171266e-06,
+        "M4_pfet_mirror_out": 1.6651539954210155e-05,
+        "M5_nfet_tail": 9.347856322331204e-06
+      },
+      "wmirror6_l040": {
+        "M1_nfet_diffpair": 2.8540784156517627e-06,
+        "M2_nfet_diffpair": 4.92417834304304e-06,
+        "M3_pfet_mirror_diode": 2.061989237503151e-06,
+        "M4_pfet_mirror_out": 6.001548137392598e-06,
+        "M5_nfet_tail": 2.1511590087086254e-06
+      },
+      "wmirror6_l050": {
+        "M1_nfet_diffpair": 1.2236518309984568e-06,
+        "M2_nfet_diffpair": 3.278807904780129e-06,
+        "M3_pfet_mirror_diode": 9.681991065828055e-07,
+        "M4_pfet_mirror_out": 2.483463914695731e-06,
+        "M5_nfet_tail": 5.088134793230495e-07
+      },
+      "wmirror8_l018": {
+        "M1_nfet_diffpair": 2.5535140916842355e-06,
+        "M2_nfet_diffpair": 1.2551288431721285e-05,
+        "M3_pfet_mirror_diode": 1.1225076219660075e-05,
+        "M4_pfet_mirror_out": 2.628882385619357e-05,
+        "M5_nfet_tail": 9.345653443925501e-06
+      },
+      "wmirror8_l040": {
+        "M1_nfet_diffpair": 2.8262604119678986e-06,
+        "M2_nfet_diffpair": 4.793315230771072e-06,
+        "M3_pfet_mirror_diode": 5.550400515020955e-06,
+        "M4_pfet_mirror_out": 1.5353585064255452e-05,
+        "M5_nfet_tail": 2.1486222704155685e-06
+      },
+      "wmirror8_l050": {
+        "M1_nfet_diffpair": 1.2784554551079175e-06,
+        "M2_nfet_diffpair": 3.1465743600773958e-06,
+        "M3_pfet_mirror_diode": 2.2345822118925742e-06,
+        "M4_pfet_mirror_out": 9.21598148544153e-06,
+        "M5_nfet_tail": 5.071139602558916e-07
+      },
+      "wmirror10_l018": {
+        "M1_nfet_diffpair": 2.582951933651124e-06,
+        "M2_nfet_diffpair": 1.265116115861114e-05,
+        "M3_pfet_mirror_diode": 4.104033706642169e-05,
+        "M4_pfet_mirror_out": 6.063501479036563e-05,
+        "M5_nfet_tail": 9.33525872590148e-06
+      },
+      "wmirror10_l040": {
+        "M1_nfet_diffpair": 2.8106621566757785e-06,
+        "M2_nfet_diffpair": 4.71414361808476e-06,
+        "M3_pfet_mirror_diode": 9.028191657910227e-06,
+        "M4_pfet_mirror_out": 2.3942077526311016e-05,
+        "M5_nfet_tail": 2.146486584947115e-06
+      },
+      "wmirror10_l050": {
+        "M1_nfet_diffpair": 1.3393800113660858e-06,
+        "M2_nfet_diffpair": 3.0593156148949087e-06,
+        "M3_pfet_mirror_diode": 6.57893471524824e-06,
+        "M4_pfet_mirror_out": 1.8673366601928612e-05,
+        "M5_nfet_tail": 5.085473142983231e-07
+      }
+    },
+    "triode_finetune": {
+      "wmirror4_l018": {
+        "M1_nfet_diffpair": 2.6202380618550177e-06,
+        "M2_nfet_diffpair": 1.2117657866973536e-05,
+        "M3_pfet_mirror_diode": 1.146737643159071e-06,
+        "M4_pfet_mirror_out": 2.773729904369376e-06,
+        "M5_nfet_tail": 9.347261368237346e-06
+      },
+      "wmirror4_l040": {
+        "M1_nfet_diffpair": 2.9202034436446475e-06,
+        "M2_nfet_diffpair": 5.148414531340107e-06,
+        "M3_pfet_mirror_diode": 2.732945949443681e-07,
+        "M4_pfet_mirror_out": 2.0955972676220985e-06,
+        "M5_nfet_tail": 2.1482363087039217e-06
+      },
+      "wmirror4_l050": {
+        "M1_nfet_diffpair": 1.3292808967635319e-06,
+        "M2_nfet_diffpair": 3.833369013648918e-06,
+        "M3_pfet_mirror_diode": 3.7149308527802583e-07,
+        "M4_pfet_mirror_out": 1.682281641752951e-06,
+        "M5_nfet_tail": 5.09745505704754e-07
+      },
+      "wmirror6_l018": {
+        "M1_nfet_diffpair": 2.58245988608498e-06,
+        "M2_nfet_diffpair": 1.2397340407192062e-05,
+        "M3_pfet_mirror_diode": 4.4067274964600984e-06,
+        "M4_pfet_mirror_out": 1.0741289356172721e-05,
+        "M5_nfet_tail": 9.347856322331204e-06
+      },
+      "wmirror6_l040": {
+        "M1_nfet_diffpair": 2.8540784156517627e-06,
+        "M2_nfet_diffpair": 4.92417834304304e-06,
+        "M3_pfet_mirror_diode": 8.986045205006376e-07,
+        "M4_pfet_mirror_out": 2.9048041676155356e-06,
+        "M5_nfet_tail": 2.1511590087086254e-06
+      },
+      "wmirror6_l050": {
+        "M1_nfet_diffpair": 1.2236518309984568e-06,
+        "M2_nfet_diffpair": 3.278807904780129e-06,
+        "M3_pfet_mirror_diode": 1.3300307434036885e-06,
+        "M4_pfet_mirror_out": 2.568674866744275e-06,
+        "M5_nfet_tail": 5.088134793230495e-07
+      },
+      "wmirror8_l018": {
+        "M1_nfet_diffpair": 2.5535140916842355e-06,
+        "M2_nfet_diffpair": 1.2551288431721285e-05,
+        "M3_pfet_mirror_diode": 2.0177574539218874e-05,
+        "M4_pfet_mirror_out": 2.9762266399998528e-05,
+        "M5_nfet_tail": 9.345653443925501e-06
+      },
+      "wmirror8_l040": {
+        "M1_nfet_diffpair": 2.8262604119678986e-06,
+        "M2_nfet_diffpair": 4.793315230771072e-06,
+        "M3_pfet_mirror_diode": 6.016212012588046e-06,
+        "M4_pfet_mirror_out": 1.196947285866617e-05,
+        "M5_nfet_tail": 2.1486222704155685e-06
+      },
+      "wmirror8_l050": {
+        "M1_nfet_diffpair": 1.2784554551079175e-06,
+        "M2_nfet_diffpair": 3.1465743600773958e-06,
+        "M3_pfet_mirror_diode": 2.6535345031975717e-06,
+        "M4_pfet_mirror_out": 6.6890360942953075e-06,
+        "M5_nfet_tail": 5.071139602558916e-07
+      },
+      "wmirror10_l018": {
+        "M1_nfet_diffpair": 2.582951933651124e-06,
+        "M2_nfet_diffpair": 1.265116115861114e-05,
+        "M3_pfet_mirror_diode": 4.918406176546104e-05,
+        "M4_pfet_mirror_out": 6.804809510174596e-05,
+        "M5_nfet_tail": 9.33525872590148e-06
+      },
+      "wmirror10_l040": {
+        "M1_nfet_diffpair": 2.8106621566757785e-06,
+        "M2_nfet_diffpair": 4.71414361808476e-06,
+        "M3_pfet_mirror_diode": 1.1811616798826192e-05,
+        "M4_pfet_mirror_out": 2.1458877063709965e-05,
+        "M5_nfet_tail": 2.146486584947115e-06
+      },
+      "wmirror10_l050": {
+        "M1_nfet_diffpair": 1.3393800113660858e-06,
+        "M2_nfet_diffpair": 3.0593156148949087e-06,
+        "M3_pfet_mirror_diode": 9.708051251224357e-06,
+        "M4_pfet_mirror_out": 1.6609624702136405e-05,
+        "M5_nfet_tail": 5.085473142983231e-07
+      }
+    }
+  }
+}
