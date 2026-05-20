@@ -518,6 +518,75 @@ analog-style waveforms with gate and drain varying together. It does not include
 quasi-static fixed-gate drain sweeps or digital step families sufficient to teach
 clean conductive Jacobians at fixed bias.
 
+### MLP-composed inverter chain (off-diagonal hypothesis probe, inconclusive)
+
+The off-diagonal Jacobian hypothesis above motivated a direct probe: compose
+the per-timestep `MosfetMLP` baseline into the same chain solver and check
+whether the structurally diagonal autograd Jacobian eliminates the
+non-convergence. Per-timestep MLPs have exactly zero
+$`dI[t] / dV[t']`$ for $`t \ne t'`$ by construction, so if the FNO failure
+is driven by spurious off-diagonal entries the MLP composition should
+converge to physical voltages.
+
+PFET MLP h64 and h128 baselines were trained on the production PFET dataset
+(`sky130_pmos_48k_sweep_aug.h5`, 300 epochs, LpLoss, AdamW; matched to the
+existing NFET MLP baselines). Composition runs were executed at the same
+matched-inverter geometry as the FNO chain matrix and at three stage counts
+(N = 1, 2, 4). The result is inconclusive for a different reason than
+expected: the MLP forward pass itself breaks down at the static-bias inputs
+the chain DC Newton iteration produces internally.
+
+Direct measurement at the alternating-rail initial guess (the default chain
+DC init at $`V_\mathrm{in} = 0`$):
+
+| Backend | Cond(J) | $`|\text{diag}(J)|`$ (A/V) | $`\|\text{residual}\|_\infty`$ at init |
+|---|---|---|---|
+| FNO N=2 | 2.75 | $`(7.2 \times 10^{-5},\ 2.0 \times 10^{-4})`$ | $`4.2 \times 10^{-7}`$ A |
+| MLP h64 N=2 | NaN | NaN | NaN |
+| MLP h128 N=2 | $`8.6 \times 10^{15}`$ | $`(7.1 \times 10^{9},\ 8.3 \times 10^{-7})`$ | $`3.5 \times 10^{8}`$ A |
+
+The MLP h64 forward pass returns NaN at the rail-corner bias
+($`V_g = 0, V_d = 1.8`$ V on the NFET; $`V_g = 1.8, V_d = 0`$ V on the
+PFET). The MLP h128 forward pass is finite but predicts a 350-megaamp drain
+current and a $`7 \times 10^{9}`$ A/V conductance, an extrapolation about
+eleven orders of magnitude outside the physical scale of the training
+labels. Both are random-PWL-trained surrogates and the static-bias
+rail-corner is far outside their training-distribution support.
+
+At a less-extreme mid-supply init ($`V_\mathrm{node} = V_\mathrm{DD} / 2`$
+for all nodes) the symptom changes but does not resolve:
+
+| Backend | DC Newton outcome at mid-supply init | Final $`V_\mathrm{out}`$ (N=2) |
+|---|---|---|
+| MLP h64 | Newton converges in 32 iters | $`(1.09, 1.23)`$ V — non-physical (the chain should land at alternating rails) |
+| MLP h128 | Newton stalls at residual $`\approx 3.7`$ A after step 20 | clamped to $`(0, 0)`$ V |
+
+MLP h64 finds a smooth-but-wrong fixed point because its per-timestep
+response surface is consistent enough for Newton to converge but it is not
+the correct physical operating point. MLP h128 takes one well-conditioned
+mid-supply step and then iterates into the rail-explosion regime, after
+which the line search bails.
+
+The implication is that the off-diagonal Jacobian hypothesis cannot be
+cleanly tested with these MLP checkpoints. A faithful test would require
+an MLP trained explicitly on static-bias drain-current ground truth across
+the rail-corner regions (e.g., fixed-gate drain sweeps and digital
+step-family inputs), which is a separate data-generation and training
+effort outside the scope of this probe. The structural argument in the
+preceding paragraph remains the working interpretation of the FNO
+non-convergence; the MLP composition path adds the orthogonal finding that
+per-timestep surrogates trained on random-PWL distributions are
+OOD-fragile at the static-bias inputs Newton iteration produces, and
+therefore are not a drop-in substitute for the FNO in the chain solver
+even with the diagonal-only Jacobian advantage they were intended to
+exploit.
+
+Artefacts: heat-map-style Jacobian probe results and per-N compose
+summaries are under
+[`docs/assets/inv_chain/matrix_mlp_h64/`](assets/inv_chain/matrix_mlp_h64/)
+and
+[`docs/assets/inv_chain/matrix_mlp_h128/`](assets/inv_chain/matrix_mlp_h128/).
+
 ## Gradient-based 5T OTA sizing
 
 Adam optimises

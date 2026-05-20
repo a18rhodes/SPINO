@@ -1,0 +1,8 @@
+    sv = np.linalg.svd(jac_np, compute_uv=False)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/site-packages/numpy/linalg/_linalg.py", line 1851, in svd
+    s = _umath_linalg.svd(a, signature=signature)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/conda/lib/python3.11/site-packages/numpy/linalg/_linalg.py", line 154, in _raise_linalgerror_svd_nonconvergence
+    raise LinAlgError("SVD did not converge")
+numpy.linalg.LinAlgError: SVD did not converge

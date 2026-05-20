@@ -166,6 +166,20 @@ def _plot_final_overlay(
 @click.option("--nfet-checkpoint", type=click.Path(path_type=Path), default=str(DEFAULT_NFET_CHECKPOINT))
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=str(DEFAULT_PFET_CHECKPOINT))
 @click.option("--c-load-f", type=float, default=0.0, show_default=True)
+@click.option(
+    "--device-class",
+    type=click.Choice(["fno", "mlp"]),
+    default="fno",
+    show_default=True,
+    help="Composition backbone. 'mlp' loads MosfetMLP-backed wrappers (per-timestep, off-diagonal-free).",
+)
+@click.option(
+    "--mlp-hidden-dim",
+    type=int,
+    default=64,
+    show_default=True,
+    help="MosfetMLP hidden_dim when --device-class mlp. Production checkpoints: 64 (h64), 128 (h128).",
+)
 def main(  # pylint: disable=too-many-statements
     *,
     output_dir: Path,
@@ -184,6 +198,8 @@ def main(  # pylint: disable=too-many-statements
     nfet_checkpoint: Path,
     pfet_checkpoint: Path,
     c_load_f: float,
+    device_class: str,
+    mlp_hidden_dim: int,
 ) -> None:
     """
     Run SPICE transient + composed inverter-chain NR; write plots and summary.json.
@@ -226,16 +242,35 @@ def main(  # pylint: disable=too-many-statements
         "warm_op_iters": spice_op_b.iter_count,
         "warm_tran_iters": _spice_tran_b.iter_count,
     }
-    nfets, pfets = load_inverter_chain_devices(
-        n_stages=stages,
-        nfet_w_um=nfet_w,
-        nfet_l_um=nfet_l,
-        pfet_w_um=pfet_w,
-        pfet_l_um=pfet_l,
-        nfet_checkpoint=nfet_checkpoint,
-        pfet_checkpoint=pfet_checkpoint,
-        map_location=map_location,
-    )
+    if device_class == "mlp":
+        from spino.circuit.composition_mlp_adapter import (  # pylint: disable=import-outside-toplevel
+            MlpArchitecture,
+            load_inverter_chain_mlp_devices,
+        )
+
+        nfets, pfets = load_inverter_chain_mlp_devices(
+            n_stages=stages,
+            nfet_w_um=nfet_w,
+            nfet_l_um=nfet_l,
+            pfet_w_um=pfet_w,
+            pfet_l_um=pfet_l,
+            nfet_checkpoint=nfet_checkpoint,
+            pfet_checkpoint=pfet_checkpoint,
+            architecture=MlpArchitecture(hidden_dim=mlp_hidden_dim),
+            map_location=map_location,
+        )
+        logger.info("Loaded MLP-backed chain devices (hidden_dim=%d)", mlp_hidden_dim)
+    else:
+        nfets, pfets = load_inverter_chain_devices(
+            n_stages=stages,
+            nfet_w_um=nfet_w,
+            nfet_l_um=nfet_l,
+            pfet_w_um=pfet_w,
+            pfet_l_um=pfet_l,
+            nfet_checkpoint=nfet_checkpoint,
+            pfet_checkpoint=pfet_checkpoint,
+            map_location=map_location,
+        )
     nfet_lut = load_torch_partition_caps(nfet_cap_npz, is_pfet=False, map_location=map_location)
     pfet_lut = load_torch_partition_caps(pfet_cap_npz, is_pfet=True, map_location=map_location)
     dc_solver = ChainDcSolver(nfets, pfets, vdd=vdd)

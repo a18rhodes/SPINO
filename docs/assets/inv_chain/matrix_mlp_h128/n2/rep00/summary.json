@@ -1,0 +1,74 @@
+{
+  "topology": "inverter_chain",
+  "stages": 2,
+  "vdd_v": 1.8,
+  "metrics": {
+    "v_cross_v": 0.9,
+    "per_node": {
+      "v(n1)": {
+        "max_abs_delta_v": 1.6615026528228918,
+        "pearson_r": -0.04638770785096554,
+        "delay_cross_spice_s": 7.427569243792011e-08,
+        "delay_cross_fno_s": 7.499996002799695e-08,
+        "delay_cross_delta_s": 7.242675900768366e-10
+      },
+      "v(n2)": {
+        "max_abs_delta_v": 1.7650956557561668,
+        "pearson_r": -0.03691783748339241,
+        "delay_cross_spice_s": 7.500752402977183e-08,
+        "delay_cross_fno_s": 7.125231280911187e-08,
+        "delay_cross_delta_s": -3.755211220659965e-09
+      }
+    },
+    "final_output": {
+      "max_abs_delta_v": 1.7650956557561668,
+      "pearson_r": -0.03691783748339241,
+      "delay_cross_spice_s": 7.500752402977183e-08,
+      "delay_cross_fno_s": 7.125231280911187e-08,
+      "delay_cross_delta_s": -3.755211220659965e-09
+    }
+  },
+  "speedup": {
+    "spice_ms": {
+      "cold_solver_ms": 12123.755781998625,
+      "warm_solver_ms": 12338.550679996843,
+      "cold_op_iters": 6,
+      "cold_tran_iters": 462,
+      "warm_op_iters": 6,
+      "warm_tran_iters": 462
+    },
+    "fno_ms": {
+      "cold_solver_ms": 4945.429947983939,
+      "warm_solver_ms": 4451.432196015958,
+      "cold_dc_iters": 80,
+      "cold_tran_iters": 25,
+      "warm_dc_iters": 80,
+      "warm_tran_iters": 25
+    },
+    "notes": "cold_solver_ms is the first timed DC+transient pair after model load; warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
+  },
+  "solver": {
+    "cold_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    },
+    "warm_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    }
+  },
+  "stimulus": {
+    "pwl": "PWL(0 0 5e-08 0 1e-07 1.8 1.02e-06 1.8)",
+    "t_step_s": 5e-09,
+    "t_end_s": 1.02e-06,
+    "t_rise_mid_s": 1e-07
+  },
+  "partition_caps": {
+    "nfet_npz": "runs/inv_chain/spice_caps/partition_caps_nfet_synthetic.npz",
+    "pfet_npz": "runs/inv_chain/spice_caps/partition_caps_pfet_synthetic.npz"
+  }
+}

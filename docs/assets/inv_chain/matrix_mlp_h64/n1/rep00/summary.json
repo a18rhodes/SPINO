@@ -1,0 +1,67 @@
+{
+  "topology": "inverter_chain",
+  "stages": 1,
+  "vdd_v": 1.8,
+  "metrics": {
+    "v_cross_v": 0.9,
+    "per_node": {
+      "v(n1)": {
+        "max_abs_delta_v": 1.8002350188318221,
+        "pearson_r": -0.33472004882682765,
+        "delay_cross_spice_s": 7.419530057228324e-08,
+        "delay_cross_fno_s": NaN,
+        "delay_cross_delta_s": NaN
+      }
+    },
+    "final_output": {
+      "max_abs_delta_v": 1.8002350188318221,
+      "pearson_r": -0.33472004882682765,
+      "delay_cross_spice_s": 7.419530057228324e-08,
+      "delay_cross_fno_s": NaN,
+      "delay_cross_delta_s": NaN
+    }
+  },
+  "speedup": {
+    "spice_ms": {
+      "cold_solver_ms": 17686.14592801896,
+      "warm_solver_ms": 14219.999638997251,
+      "cold_op_iters": 5,
+      "cold_tran_iters": 453,
+      "warm_op_iters": 5,
+      "warm_tran_iters": 453
+    },
+    "fno_ms": {
+      "cold_solver_ms": 1477.4583409889601,
+      "warm_solver_ms": 1068.904077023035,
+      "cold_dc_iters": 80,
+      "cold_tran_iters": 25,
+      "warm_dc_iters": 80,
+      "warm_tran_iters": 25
+    },
+    "notes": "cold_solver_ms is the first timed DC+transient pair after model load; warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
+  },
+  "solver": {
+    "cold_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    },
+    "warm_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    }
+  },
+  "stimulus": {
+    "pwl": "PWL(0 0 5e-08 0 1e-07 1.8 1.02e-06 1.8)",
+    "t_step_s": 5e-09,
+    "t_end_s": 1.02e-06,
+    "t_rise_mid_s": 1e-07
+  },
+  "partition_caps": {
+    "nfet_npz": "runs/inv_chain/spice_caps/partition_caps_nfet_synthetic.npz",
+    "pfet_npz": "runs/inv_chain/spice_caps/partition_caps_pfet_synthetic.npz"
+  }
+}

@@ -79,6 +79,9 @@ the canonical references that survive a clean clone.
 | N=4: DC ✓ (5 iters), transient ✗ (25 cap), max\|ΔV\|=1.778 V | [`inv_chain/matrix/n4/rep00/summary.json`](inv_chain/matrix/n4/rep00/summary.json) |
 | Aggregate across N | [`inv_chain/matrix/aggregate_summary.json`](inv_chain/matrix/aggregate_summary.json) |
 | Per-stage final-output overlay vs SPICE | [`inv_chain/matrix/n{1,2,4}/rep00/final_output_overlay.png`](inv_chain/matrix/) |
+| MLP-h64 composition at N=1 (DC non-converge, max\|ΔV\|=1.80 V, fake fixed point at mid-supply init) | [`inv_chain/matrix_mlp_h64/n1/rep00/summary.json`](inv_chain/matrix_mlp_h64/n1/rep00/summary.json) |
+| MLP-h128 composition at N=1, 2, 4 (DC non-converge, transient stuck at IC) | [`inv_chain/matrix_mlp_h128/n{1,2,4}/rep00/summary.json`](inv_chain/matrix_mlp_h128/) |
+| Jacobian probe at chain DC init (FNO vs MLP-h64 vs MLP-h128, N=2, V_in=0 rail init) | [`inv_chain/jacobian_probe/`](inv_chain/jacobian_probe/) |
 
 ## Standalone device operators
 

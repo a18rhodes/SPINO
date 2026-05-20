@@ -1,0 +1,88 @@
+{
+  "topology": "inverter_chain",
+  "stages": 4,
+  "vdd_v": 1.8,
+  "metrics": {
+    "v_cross_v": 0.9,
+    "per_node": {
+      "v(n1)": {
+        "max_abs_delta_v": 1.0777340192771399,
+        "pearson_r": 0.5676038848928903,
+        "delay_cross_spice_s": 7.427566068964274e-08,
+        "delay_cross_fno_s": NaN,
+        "delay_cross_delta_s": NaN
+      },
+      "v(n2)": {
+        "max_abs_delta_v": 1.8066834714468183,
+        "pearson_r": 0.742217383633075,
+        "delay_cross_spice_s": 7.502141459767805e-08,
+        "delay_cross_fno_s": NaN,
+        "delay_cross_delta_s": NaN
+      },
+      "v(n3)": {
+        "max_abs_delta_v": 1.65674214047864,
+        "pearson_r": -0.7059043962176074,
+        "delay_cross_spice_s": 7.501243467545724e-08,
+        "delay_cross_fno_s": NaN,
+        "delay_cross_delta_s": NaN
+      },
+      "v(n4)": {
+        "max_abs_delta_v": 1.6720120201559694,
+        "pearson_r": 0.786335328363339,
+        "delay_cross_spice_s": 7.500808372989549e-08,
+        "delay_cross_fno_s": NaN,
+        "delay_cross_delta_s": NaN
+      }
+    },
+    "final_output": {
+      "max_abs_delta_v": 1.6720120201559694,
+      "pearson_r": 0.786335328363339,
+      "delay_cross_spice_s": 7.500808372989549e-08,
+      "delay_cross_fno_s": NaN,
+      "delay_cross_delta_s": NaN
+    }
+  },
+  "speedup": {
+    "spice_ms": {
+      "cold_solver_ms": 12472.305256000254,
+      "warm_solver_ms": 12346.40038901125,
+      "cold_op_iters": 11,
+      "cold_tran_iters": 470,
+      "warm_op_iters": 11,
+      "warm_tran_iters": 470
+    },
+    "fno_ms": {
+      "cold_solver_ms": 17904.8573730106,
+      "warm_solver_ms": 17963.94975599833,
+      "cold_dc_iters": 80,
+      "cold_tran_iters": 25,
+      "warm_dc_iters": 80,
+      "warm_tran_iters": 25
+    },
+    "notes": "cold_solver_ms is the first timed DC+transient pair after model load; warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
+  },
+  "solver": {
+    "cold_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    },
+    "warm_pass": {
+      "dc_converged": false,
+      "dc_iters": 80,
+      "transient_converged": false,
+      "transient_iters": 25
+    }
+  },
+  "stimulus": {
+    "pwl": "PWL(0 0 5e-08 0 1e-07 1.8 1.02e-06 1.8)",
+    "t_step_s": 5e-09,
+    "t_end_s": 1.02e-06,
+    "t_rise_mid_s": 1e-07
+  },
+  "partition_caps": {
+    "nfet_npz": "runs/inv_chain/spice_caps/partition_caps_nfet_synthetic.npz",
+    "pfet_npz": "runs/inv_chain/spice_caps/partition_caps_pfet_synthetic.npz"
+  }
+}

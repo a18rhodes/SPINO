@@ -34,6 +34,14 @@ and produce oscillating, non-physical Newton updates. Solver tolerances,
 iteration budgets, and damping changes did not turn the inverter chain into an
 acceptance-quality result.
 
+A direct probe of this hypothesis (compose the per-timestep `MosfetMLP`
+baseline into the same chain solver; its autograd Jacobian is structurally
+diagonal by construction) was inconclusive: the MLP's per-timestep forward
+pass is not stable at the static-bias rail-corner inputs the chain Newton
+iteration produces internally, so the test never reaches a regime where
+off-diagonals would matter. Details and Jacobian-probe numbers are in
+[`docs/results.md` §"MLP-composed inverter chain"](results.md#mlp-composed-inverter-chain-off-diagonal-hypothesis-probe-inconclusive).
+
 ## Topology and netlists
 
 Use :func:`~spino.circuit.topologies.build_inverter_chain` (and
