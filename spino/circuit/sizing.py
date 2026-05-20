@@ -915,19 +915,30 @@ def fd_spice_gradient(
     problem: OtaSizingProblem,
     *,
     eps_rel: float = 0.01,
+    fd_order: str = "forward",
 ) -> tuple[Tensor, float, float, float, int]:
-    """Forward finite-difference loss gradient via NGSpice.
+    """Finite-difference loss gradient via NGSpice.
 
-    For each θ_i, runs SPICE at ``θ + eps_i e_i`` and finite-differences the
-    scalar loss. Cost: ``n_theta + 1`` SPICE evaluations per call. Returns the
-    gradient and the baseline (slew, power, loss) for logging.
+    For each θ_i, runs SPICE at perturbations of θ and finite-differences the
+    scalar loss. Cost per call:
+
+    * ``fd_order='forward'``: ``n_theta + 1`` SPICE evaluations
+      (1 baseline + ``n_theta`` forward perturbations). O(eps) accurate.
+    * ``fd_order='central'``: ``2 * n_theta + 1`` SPICE evaluations
+      (1 baseline + ``n_theta`` plus + ``n_theta`` minus perturbations).
+      O(eps^2) accurate; matches the discretisation the IFT path uses
+      internally inside ``_jtheta_fd``.
 
     :param theta: Design vector ``(n_theta,)``; production layout is 7 elements
         ``[W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias]``.
     :param problem: Sizing configuration.
     :param eps_rel: Relative perturbation; absolute eps = ``max(|θ_i| * eps_rel, 1e-4)``.
+    :param fd_order: ``"forward"`` (default, production) or ``"central"`` (used
+        for the discretisation-fairness control study).
     :return: Tuple ``(grad, slew, power_uw, loss, sims_consumed)``.
     """
+    if fd_order not in ("forward", "central"):
+        raise ValueError(f"fd_order must be 'forward' or 'central'; got {fd_order!r}")
     base_vals = tuple(float(x) for x in theta.detach().tolist())
     n_theta = len(base_vals)
     slew_base, power_base, converged = _spice_metrics_at(base_vals, problem)
@@ -945,11 +956,26 @@ def fd_spice_gradient(
         slew_p, power_p, conv_p = _spice_metrics_at(tuple(plus_vals), problem)
         sims += 1
         if not conv_p:
-            logger.warning("FD-SPICE perturbation %d did not converge; setting grad_i=0.", i)
+            logger.warning("FD-SPICE +eps perturbation %d did not converge; setting grad_i=0.", i)
             grad[i] = 0.0
             continue
         loss_p = _scalar_loss(slew_p, power_p, problem)
-        grad[i] = (loss_p - loss_base) / eps
+        if fd_order == "forward":
+            grad[i] = (loss_p - loss_base) / eps
+            continue
+        minus_vals = list(base_vals)
+        minus_vals[i] -= eps
+        slew_m, power_m, conv_m = _spice_metrics_at(tuple(minus_vals), problem)
+        sims += 1
+        if not conv_m:
+            logger.warning(
+                "FD-SPICE -eps perturbation %d did not converge; falling back to forward FD for this component.",
+                i,
+            )
+            grad[i] = (loss_p - loss_base) / eps
+            continue
+        loss_m = _scalar_loss(slew_m, power_m, problem)
+        grad[i] = (loss_p - loss_m) / (2.0 * eps)
     return grad, slew_base, power_base, loss_base, sims
 
 
@@ -960,11 +986,14 @@ def run_fd_spice_adam(  # pylint: disable=too-many-locals
     n_iters: int = 50,
     lr: float = 5e-2,
     output_dir: Path,
+    fd_order: str = "forward",
 ) -> Tensor:
-    """Adam loop with forward-FD SPICE gradients (no FNO surrogate).
+    """Adam loop with FD-SPICE gradients (no FNO surrogate).
 
     Same hyperparameters and loss as :func:`run_adam`. Per-step cost:
-    6 SPICE simulations (1 baseline + 5 perturbations).
+
+    * ``fd_order='forward'``: ``n_theta + 1`` SPICE simulations.
+    * ``fd_order='central'``: ``2 * n_theta + 1`` SPICE simulations.
 
     Writes ``trajectory.json`` and ``theta_final.json`` to ``output_dir``.
 
@@ -982,7 +1011,7 @@ def run_fd_spice_adam(  # pylint: disable=too-many-locals
     for step in range(n_iters):
         optimizer.zero_grad()
         t0 = time_module.perf_counter()
-        grad, slew, power_uw, loss_val, sims = fd_spice_gradient(theta, problem)
+        grad, slew, power_uw, loss_val, sims = fd_spice_gradient(theta, problem, fd_order=fd_order)
         sims_total += sims
 
         if not np.isfinite(loss_val):
@@ -1151,6 +1180,14 @@ def spice_validate(
 )
 @click.option("--validate-spice", is_flag=True, default=False, help="Run SPICE validation at final θ.")
 @click.option("--pdk-root", type=str, default=None, help="Override PDK root.")
+@click.option(
+    "--fd-order",
+    type=click.Choice(["forward", "central"]),
+    default="forward",
+    show_default=True,
+    help="FD discretisation order for --mode fd-spice. Forward = n_theta + 1 sims/iter (production). "
+    "Central = 2*n_theta + 1 sims/iter (matches the IFT internal FD; used for the control study).",
+)
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     mode: str,
     theta_init: str,
@@ -1164,6 +1201,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     pfet_checkpoint: Path | None,
     validate_spice: bool,
     pdk_root: str | None,
+    fd_order: str,
 ) -> None:
     """Gradient-based 5T OTA sizing: IFT-FNO (``adam-fno``) or FD-SPICE baseline (``fd-spice``)."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -1189,7 +1227,14 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
     if mode == "adam-fno":
         final_theta = run_adam(problem, theta_init=theta_t, n_iters=n_iters, lr=lr, output_dir=output_dir)
     else:  # fd-spice
-        final_theta = run_fd_spice_adam(problem, theta_init=theta_t, n_iters=n_iters, lr=lr, output_dir=output_dir)
+        final_theta = run_fd_spice_adam(
+            problem,
+            theta_init=theta_t,
+            n_iters=n_iters,
+            lr=lr,
+            output_dir=output_dir,
+            fd_order=fd_order,
+        )
 
     if validate_spice:
         summary = spice_validate(final_theta, problem, output_dir)

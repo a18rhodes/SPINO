@@ -253,6 +253,48 @@ What the comparison supports:
   represent different trade-offs between the two specs at the same loss
   weighting.
 
+### FD-SPICE forward vs central control
+
+The FD-SPICE baseline uses one-sided forward FD because doubling its
+per-step cost was not affordable for the 50-step canonical run. The
+IFT path's internal `_jtheta_fd` uses central FD, so a reviewer can
+reasonably ask whether the FNO/IFT-vs-FD-SPICE per-iter ratio is
+inflated by an unfair-by-construction FD discretisation. To answer this
+directly, the FD-SPICE Adam loop was rerun with `--fd-order central`
+on the first 10 Adam steps from the same $`\theta_\mathrm{init}`$ used
+by the canonical run. Per-step cost rises from 8 SPICE simulations
+(forward, $`n_\theta + 1`$ at $`n_\theta = 7`$) to 15 SPICE simulations
+(central, $`2 n_\theta + 1`$); total cost over 10 steps is 150 SPICE
+sims vs the canonical 80.
+
+The two trajectories agree closely. Step 0 is exact (Adam's first step
+is $`\eta \cdot \mathrm{sign}(\text{grad})`$, which is unchanged when
+forward and central agree on per-component gradient sign, which they
+do at every component at $`\theta_\mathrm{init}`$). Drift accumulates
+slowly thereafter. At step 9 the largest per-component drift on
+$`\theta`$ is **1.7 %** (on $`V_\mathrm{bias}`$), and the
+forward-vs-central slew gap is **+2.2 %** (forward 41.47 V/µs vs
+central 42.38 V/µs). Both trajectories cross the 30 V/µs spec at step
+4 and continue in the same direction through step 9. The L_diff and
+L_tail components reach the 0.18 µm bound at step 4 and stay bound on
+both runs.
+
+![FD-SPICE forward vs central, first 10 Adam steps](assets/sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png)
+
+The forward-FD bias in the FD-SPICE baseline is therefore small at the
+Adam-trajectory horizon that matters for this work. The 6x and 8x
+per-iter ratios reported in the scaling table below are not an artefact
+of forward-vs-central asymmetry: replacing forward FD with central FD
+on the SPICE side would roughly double the FD-SPICE sim count per step
+(15 instead of 8 at $`n_\theta = 7`$) while leaving the trajectory
+within 1-2 % of the forward-FD run. The IFT/FNO advantage compounds
+with $`n_\theta`$, not with the choice of FD order.
+
+Artefacts: trajectory JSON at
+[`docs/assets/sizing/v4_nt7/fd_spice_central/trajectory.json`](assets/sizing/v4_nt7/fd_spice_central/trajectory.json);
+overlay PNG at
+[`docs/assets/sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png`](assets/sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png).
+
 ### Per-iteration circuit-simulation scaling
 
 The headline contribution is per-iteration circuit-simulation count, not

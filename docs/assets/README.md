@@ -51,6 +51,7 @@ the canonical references that survive a clean clone.
 | FD-SPICE SPICE validation: slew 51.16 V/µs, gain 14.92, power 190.1 µW, swing 0.759 V | [`sizing/v4_nt7/fd_spice/spice_validation/summary.json`](sizing/v4_nt7/fd_spice/spice_validation/summary.json) |
 | Per-step + trajectory plots (7-panel θ) | [`sizing/v4_nt7/loss_and_slew.png`](sizing/v4_nt7/loss_and_slew.png), [`sizing/v4_nt7/theta_trajectory.png`](sizing/v4_nt7/theta_trajectory.png), [`sizing/v4_nt7/fno_vs_spice.png`](sizing/v4_nt7/fno_vs_spice.png) |
 | FNO/IFT vs FD-SPICE overlay at n_θ = 7 | [`sizing/v4_nt7/comparison_loss_slew.png`](sizing/v4_nt7/comparison_loss_slew.png), [`sizing/v4_nt7/comparison_theta.png`](sizing/v4_nt7/comparison_theta.png) |
+| FD-SPICE forward-vs-central control (first 10 steps, max θ drift 1.7 %, slew Δ +2.2 %) | [`sizing/v4_nt7/fd_spice_central/trajectory.json`](sizing/v4_nt7/fd_spice_central/trajectory.json), [`sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png`](sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png) |
 
 ## FNO safe operating region (per-device ratio error)
 
