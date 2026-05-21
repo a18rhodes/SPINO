@@ -53,6 +53,19 @@ the canonical references that survive a clean clone.
 | FNO/IFT vs FD-SPICE overlay at n_θ = 7 | [`sizing/v4_nt7/comparison_loss_slew.png`](sizing/v4_nt7/comparison_loss_slew.png), [`sizing/v4_nt7/comparison_theta.png`](sizing/v4_nt7/comparison_theta.png) |
 | FD-SPICE forward-vs-central control (first 10 steps, max θ drift 1.7 %, slew Δ +2.2 %) | [`sizing/v4_nt7/fd_spice_central/trajectory.json`](sizing/v4_nt7/fd_spice_central/trajectory.json), [`sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png`](sizing/v4_nt7/fd_spice_central/fd_forward_vs_central.png) |
 
+## Performance-surrogate baseline (Uhlmann route)
+
+| Claim | Backing file |
+|---|---|
+| SPICE training set: 1000 LHS samples, 100 % converged | [`uhlmann_surrogate/training_set/samples.json`](uhlmann_surrogate/training_set/samples.json) |
+| Surrogate test R²: slew 0.9978, power 0.9986, swing 0.9771 | [`uhlmann_surrogate/surrogate/test_metrics.json`](uhlmann_surrogate/surrogate/test_metrics.json) |
+| Held-out gradient R² overall 0.9638 with W_tail = 0.14 (load-bearing degradation) | [`uhlmann_surrogate/surrogate/test_metrics.json`](uhlmann_surrogate/surrogate/test_metrics.json) |
+| Surrogate training history | [`uhlmann_surrogate/surrogate/train_history.json`](uhlmann_surrogate/surrogate/train_history.json) |
+| Uhlmann Adam 50-step trajectory (< 1 s wall-clock) | [`uhlmann_surrogate/adam/trajectory.json`](uhlmann_surrogate/adam/trajectory.json) |
+| Uhlmann final θ (L_mirror at upper bound 0.50 µm, slew 47.5 V/µs SPICE, power 175.6 µW SPICE, gain 23.0 V/V SPICE) | [`uhlmann_surrogate/adam/spice_validation/summary.json`](uhlmann_surrogate/adam/spice_validation/summary.json) |
+| Three-way Adam overlay (FNO/IFT vs FD-SPICE vs Uhlmann) | [`sizing/v4_nt7/three_way/three_way_loss_slew_power.png`](sizing/v4_nt7/three_way/three_way_loss_slew_power.png), [`sizing/v4_nt7/three_way/three_way_theta.png`](sizing/v4_nt7/three_way/three_way_theta.png) |
+| Uhlmann seed-variance: 5 surrogate seeds × 3 θ_init, L_mirror 8/15 lower bound, 5/15 upper bound, 2/15 interior, gain spread 12.1–27.4 V/V | [`uhlmann_surrogate/seed_variance/aggregate.json`](uhlmann_surrogate/seed_variance/aggregate.json), [`uhlmann_surrogate/seed_variance/seed_variance.png`](uhlmann_surrogate/seed_variance/seed_variance.png) |
+
 ## FNO safe operating region (per-device ratio error)
 
 | Claim | Backing file |

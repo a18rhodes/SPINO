@@ -1,0 +1,21 @@
+{
+  "theta": {
+    "w_diff_um": 3.574460506439209,
+    "w_mirror_um": 3.580813407897949,
+    "w_tail_um": 1.5980018377304077,
+    "l_diff_um": 0.18000000715255737,
+    "l_mirror_um": 0.5,
+    "l_tail_um": 0.18000000715255737,
+    "vbias_v": 1.493072748184204
+  },
+  "converged": true,
+  "metrics": {
+    "converged": true,
+    "slew_rate_v_per_us": 47.4903033928163,
+    "slew_time_ns": 28.399999999999896,
+    "peak_swing_v": 1.0514927953863002,
+    "static_current_a": 9.755239380444122e-05,
+    "dc_gain_v_per_v": 22.99814485540284,
+    "quiescent_n_out_v": 0.3962467106101377
+  }
+}

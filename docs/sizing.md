@@ -518,6 +518,251 @@ optimised design.
 
 ---
 
+## Performance-surrogate baseline (Uhlmann route)
+
+The closest gradient-based prior art for analog sizing is the
+performance-surrogate NN route (Uhlmann et al., MLCAD'23, ref [16] in
+`docs/related_work.md`): train an MLP from the design vector
+$`\theta`$ to the SPICE-measured performance metrics and backpropagate
+through the learned abstraction inside an Adam loop. The contribution
+distinct from SPINO is *where the gradient lives*. Uhlmann's gradients
+flow through a learned scalar map of circuit behaviour; SPINO's
+gradients flow through FNO device operators inside the KCL residual.
+Same problem, two mechanisms.
+
+### Generalisation scope (what gets amortised)
+
+The Uhlmann surrogate is **per-topology and per-spec**: it learns
+$`\theta_{\text{this 5T OTA}} \to (\text{slew, power, swing})`$ from
+SPICE evaluations of *this specific circuit*. Changing the topology
+(e.g., 5T OTA → Miller two-stage opamp) invalidates the surrogate.
+Changing the spec set (e.g., adding gain to the loss) requires either
+retraining with the new output head or accepting that the
+non-modelled metric is uncontrolled. Each new circuit family pays the
+SPICE-training-set cost again (5 hours on one CPU for this 1000-sample
+set; the cost grows with $`n_\theta`$ if the new topology has more
+design variables).
+
+SPINO's FNO operators are at the **device level**:
+$`(V_g(t), V_d(t), V_s(t), V_b(t), \text{BSIM params}) \to I_d(t)`$.
+A topology change is a new KCL composition; the operators are reused
+without retraining. The amortisation is across topologies rather than
+across exploration of one topology. The two routes amortise different
+quantities, so the per-iter cost comparison below is honest only within
+a single circuit family.
+
+### Training set
+
+1000 design vectors were sampled via Latin Hypercube over the
+`OtaSizingProblem` 7-component bounding box and evaluated with
+`simulate_ota_design_point`. All 1000 SPICE runs converged. The
+collected distribution covers both spec boundaries: 311 samples meet
+the slew spec, 920 meet the power cap, and 234 meet both. Slew spans
+0.02–86.69 V/µs (mean 22.81) and power spans 0.04–366.84 µW (mean
+82.73), so the slew-kink at 30 V/µs and the power-cap at 200 µW are
+both well-represented without explicit kink-aware oversampling.
+
+The training set is at
+[`docs/assets/uhlmann_surrogate/training_set/samples.json`](assets/uhlmann_surrogate/training_set/samples.json).
+Wall-clock to collect the set on one CPU: 5h 14min (18.8 s/sample).
+
+### Surrogate MLP
+
+A 4-layer MLP (7 → 128 → 128 → 128 → 3, GELU activations, ~50 K
+parameters) maps $`\theta`$ to (slew, power, swing). Inputs and
+outputs are z-scored against the training-set statistics. Training:
+3000 epochs, AdamW, cosine-annealed lr starting at 3e-3, 85 % / 15 %
+train / test split. Held-out test R² on raw metrics:
+
+| Output | Test R² |
+|---|---|
+| Slew rate | 0.9978 |
+| Static power | 0.9986 |
+| Peak swing | 0.9771 |
+
+Predicting the metrics is the easy half of the Uhlmann route; the load-
+bearing question is whether the *gradient* the optimiser consumes is
+faithful to the SPICE-truth gradient. The held-out gradient R² compares
+$`\partial \mathrm{slew}_\mathrm{surrogate} / \partial \theta`$
+(autograd through the MLP) against
+$`\partial \mathrm{slew}_\mathrm{SPICE} / \partial \theta`$
+(central-FD-SPICE) on 12 held-out points (12 × 7 × 2 = 168 SPICE sims):
+
+| Component | Gradient R² |
+|---|---|
+| $`W_\mathrm{diff}`$ | 0.9587 |
+| $`W_\mathrm{mirror}`$ | 0.9270 |
+| $`W_\mathrm{tail}`$ | **0.1446** |
+| $`L_\mathrm{diff}`$ | 0.8584 |
+| $`L_\mathrm{mirror}`$ | 0.7480 |
+| $`L_\mathrm{tail}`$ | 0.8180 |
+| $`V_\mathrm{bias}`$ | 0.9881 |
+| **Overall (concatenated)** | **0.9638** |
+
+The slew gradient on $`W_\mathrm{tail}`$ has R² = 0.14: the surrogate
+predicts slew accurately and yet its $`\partial \mathrm{slew} / \partial W_\mathrm{tail}`$
+is essentially uncorrelated with SPICE-truth. Predicting the metric
+well does not imply predicting the *gradient* well, and this becomes
+a feasible-region steering issue for Adam.
+
+Surrogate training history and test metrics:
+[`docs/assets/uhlmann_surrogate/surrogate/`](assets/uhlmann_surrogate/surrogate/).
+
+### Three-way Adam comparison
+
+The same Adam loss (slew ReLU hinge + power ReLU hinge), same
+$`\theta_\mathrm{init} = (3.0, 3.0, 1.0, 0.40, 0.40, 0.40, 0.9)`$,
+same lr = 5e-2, same 50-iteration budget — three gradient mechanisms:
+
+| Final design (SPICE re-simulated) | FNO/IFT v4 | FD-SPICE v4 | Uhlmann (seed = 0)* |
+|---|---|---|---|
+| $`W_\mathrm{diff}`$ (µm) | 3.640 | 3.582 | 3.574 |
+| $`W_\mathrm{mirror}`$ (µm) | 3.562 | 3.537 | 3.581 |
+| $`W_\mathrm{tail}`$ (µm) | 1.590 | 1.598 | 1.598 |
+| $`L_\mathrm{diff}`$ (µm) | 0.180 (bound) | 0.180 (bound) | 0.180 (bound) |
+| $`L_\mathrm{mirror}`$ (µm) | 0.180 (bound) | 0.180 (bound) | **0.500 (bound)** |
+| $`L_\mathrm{tail}`$ (µm) | 0.318 | 0.180 (bound) | 0.180 (bound) |
+| $`V_\mathrm{bias}`$ (V) | 1.535 | 1.494 | 1.493 |
+| SPICE slew (V/µs) | 43.67 | 51.16 | 47.49 |
+| SPICE power (µW) | 144.8 | 190.1 | 175.6 |
+| SPICE DC gain (V/V) | 15.5 | 14.9 | **23.0** |
+| SPICE peak swing (V) | 0.774 | 0.759 | **1.051** |
+| Per-iter cost | 1 transient + 1 M5 DC | 8 SPICE OPs | 1 MLP forward + backward |
+| Wall-clock for 50 iters | ~5.7 h GPU | ~95 min CPU | **< 1 s** |
+| SPICE training set | none | none | **5h 14min CPU (1000 sims)** |
+
+*The Uhlmann column reports one (surrogate seed, $`\theta_\mathrm{init}`$)
+combination. The $`L_\mathrm{mirror}`$ = 0.500 µm landing and the 23.0 V/V
+gain that comes with it are not robust: under five surrogate seeds and three
+$`\theta_\mathrm{init}`$ perturbations the same Adam loop lands
+$`L_\mathrm{mirror}`$ at the lower bound 8/15 times, the upper bound 5/15
+times, and at an interior value 2/15 times, with DC gain spread 12.1–27.4
+V/V. See § "Seed-variance test" below.
+
+![Three-way Adam comparison: loss, slew, power](assets/sizing/v4_nt7/three_way/three_way_loss_slew_power.png)
+![Three-way θ trajectories](assets/sizing/v4_nt7/three_way/three_way_theta.png)
+
+The Uhlmann Adam loop is essentially free once the surrogate is
+trained (50 forward + backward passes through a 50K-parameter MLP).
+The cost is amortised over the 5-hour SPICE training-set collection,
+which is a one-time investment per circuit topology. Beyond the
+training set, the surrogate adds no SPICE simulations to the
+optimisation; the FNO/IFT and FD-SPICE routes pay simulation cost per
+Adam step.
+
+The final designs disagree on $`L_\mathrm{mirror}`$. FNO/IFT and
+FD-SPICE both leave $`L_\mathrm{mirror}`$ at the 0.18 µm lower bound;
+Uhlmann pushes it to the 0.50 µm upper bound. The surrogate gradient
+on $`L_\mathrm{mirror}`$ is faithful to SPICE only to R² = 0.75, and
+the resulting Adam trajectory steers $`\theta`$ in a direction the
+two simulator-grounded routes do not. The SPICE re-simulation at the
+Uhlmann-converged point confirms both specs are met with margin
+(slew 47.5 V/µs vs 30 floor, power 175.6 µW vs 200 cap) and reports
+DC gain 23.0 V/V — higher than the FNO/IFT (15.5) or FD-SPICE (14.9)
+final points, because longer $`L_\mathrm{mirror}`$ lifts M3/M4 output
+impedance.
+
+### Seed-variance test
+
+The headline row above reports a single (surrogate fit, $`\theta_\mathrm{init}`$)
+combination. The L_mirror landing and the corresponding DC gain change
+materially under different surrogate weight initialisations and
+$`\theta_\mathrm{init}`$ perturbations, so the headline row is one draw from
+a wider distribution. To bound that distribution, the surrogate was
+retrained at five RNG seeds {0, 7, 13, 17, 42} on the same 1000-sample
+SPICE training set (different MLP weight inits and train/test splits) and
+Adam was run at each surrogate against three $`\theta_\mathrm{init}`$
+labels (canonical, under-slew-low-W, over-slew-high-L). Each run was
+SPICE-validated at $`\theta_\mathrm{final}`$. 15 runs total; all converged,
+all met both specs.
+
+| Final $`L_\mathrm{mirror}`$ outcome | Count (of 15) |
+|---|---|
+| Lower bound (0.180 µm) | 8 |
+| Upper bound (0.500 µm) | 5 |
+| Interior (0.18–0.50, exclusive) | 2 |
+
+Spread across the 15 runs:
+
+| Quantity | Min | Mean | Max | Std |
+|---|---|---|---|---|
+| Final $`L_\mathrm{mirror}`$ (µm) | 0.180 | 0.294 | 0.500 | 0.141 |
+| SPICE slew (V/µs) | 34.07 | 45.05 | 53.68 | — |
+| SPICE power (µW) | 106.08 | 166.45 | 189.89 | — |
+| SPICE DC gain (V/V) | 12.13 | 17.89 | 27.35 | 4.32 |
+
+![Seed-variance bar chart: L_mirror, gain, slew across 15 runs](assets/uhlmann_surrogate/seed_variance/seed_variance.png)
+
+The canonical $`\theta_\mathrm{init}`$ alone gives a split of 3/5 upper
+bound, 1/5 lower bound, 1/5 interior across the five surrogate seeds.
+The original "Uhlmann lands $`L_\mathrm{mirror}`$ at upper bound, gain
+23 V/V" result was therefore one outcome from a multimodal landscape,
+not a reproducible property of the method. The Uhlmann route reliably
+finds a feasible design — every one of the 15 runs satisfies both
+specs — but DC gain varies from 12.1 to 27.4 V/V across runs and is
+not controlled by the slew+power-only loss.
+
+### Headline interpretation
+
+Combining the per-iter cost numbers above with the seed-variance
+finding: the Uhlmann route arrives at a feasible design with one MLP
+forward+backward per Adam step (3-4 orders of magnitude cheaper per
+iteration than either simulator-grounded path) but at the cost of a
+one-time SPICE training-set collection that does not amortise across
+topologies, and a per-component gradient-fidelity envelope that varies
+from 0.99 ($`V_\mathrm{bias}`$) to 0.14 ($`W_\mathrm{tail}`$). Design
+quality on metrics inside the loss is met reproducibly; design quality
+on metrics outside the loss (e.g., DC gain) is governed by surrogate
+seed and $`\theta_\mathrm{init}`$ basin selection rather than by
+physics. SPINO's FNO/IFT route routes gradients through the FNO inside
+the KCL residual: the design quality on out-of-loss metrics is governed
+by the FNO surrogate fidelity, which is bounded per-bin by the safe-
+operating-region characterisation
+([`docs/results.md` § FNO safe operating region](results.md#fno-safe-operating-region)).
+Neither route dominates; they differ in where the gradient noise lives,
+which non-loss metrics inherit the bias, and what amortises across new
+circuits.
+
+Artefacts:
+[`docs/assets/uhlmann_surrogate/adam/`](assets/uhlmann_surrogate/adam/)
+holds the surrogate-Adam trajectory and SPICE validation;
+[`docs/assets/uhlmann_surrogate/surrogate/`](assets/uhlmann_surrogate/surrogate/)
+holds the test metrics and training history. The trained surrogate
+checkpoint lives at `runs/s11_uhlmann/surrogate/uhlmann_surrogate.pt`
+(gitignored; regenerable with the reproduction commands below).
+
+Reproduction:
+
+```bash
+# 1. Collect SPICE training set (one-time, ~5 h on one CPU).
+python -m scripts.s11_collect_spice_training_set \
+    --n-samples 1000 --seed 42 \
+    --output-dir runs/s11_uhlmann/training_set
+
+# 2. Train the Uhlmann surrogate (~30 min on GPU; includes 12-point
+#    gradient R² check that adds ~50 min of SPICE evaluation).
+python -m scripts.s11_train_uhlmann_surrogate \
+    --samples runs/s11_uhlmann/training_set/samples.json \
+    --output-dir runs/s11_uhlmann/surrogate
+
+# 3. Adam through the surrogate (< 1 s; SPICE validation adds ~20 s).
+python -m scripts.s11_uhlmann_adam \
+    --surrogate runs/s11_uhlmann/surrogate/uhlmann_surrogate.pt \
+    --theta-init "3.0,3.0,1.0,0.40,0.40,0.40,0.9" \
+    --n-iters 50 --lr 5e-2 \
+    --validate-spice \
+    --output-dir runs/s11_uhlmann/adam
+
+# 4. Render three-way comparison plots.
+python -m scripts.s11_three_way_compare \
+    --fno-dir docs/assets/sizing/v4_nt7 \
+    --fd-dir docs/assets/sizing/v4_nt7/fd_spice \
+    --uhlmann-dir runs/s11_uhlmann/adam \
+    --out-dir docs/assets/sizing/v4_nt7/three_way
+```
+
+---
+
 ## Reproduction
 
 ```bash

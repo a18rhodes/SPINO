@@ -1,0 +1,437 @@
+{
+  "surrogate_seeds": [
+    0,
+    7,
+    13,
+    17,
+    42
+  ],
+  "theta_init_labels": {
+    "canonical": "3.0,3.0,1.0,0.40,0.40,0.40,0.9",
+    "under_slew_low_w": "2.0,2.0,0.8,0.40,0.40,0.40,0.8",
+    "over_slew_high_l": "4.0,4.0,1.5,0.50,0.50,0.50,1.1"
+  },
+  "n_runs": 15,
+  "runs": [
+    {
+      "surrogate_seed": 0,
+      "theta_init_label": "canonical",
+      "theta_init": [
+        3.0,
+        3.0,
+        1.0,
+        0.4,
+        0.4,
+        0.4,
+        0.9
+      ],
+      "theta_final": [
+        3.582028865814209,
+        2.87107515335083,
+        1.597260594367981,
+        0.18000000715255737,
+        0.18000000715255737,
+        0.18000000715255737,
+        1.49546480178833
+      ],
+      "surrogate_test_r2_slew": 0.9972320152560011,
+      "spice_slew_v_per_us": 50.69072350415659,
+      "spice_power_uw": 189.09207616327527,
+      "spice_dc_gain_v_per_v": 14.983786169648114,
+      "spice_peak_swing_v": 0.7754463698918811,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 0,
+      "theta_init_label": "under_slew_low_w",
+      "theta_init": [
+        2.0,
+        2.0,
+        0.8,
+        0.4,
+        0.4,
+        0.4,
+        0.8
+      ],
+      "theta_final": [
+        2.9543118476867676,
+        2.4533565044403076,
+        1.7716706991195679,
+        0.18000000715255737,
+        0.24908234179019928,
+        0.18000000715255737,
+        1.600000023841858
+      ],
+      "surrogate_test_r2_slew": 0.9972320152560011,
+      "spice_slew_v_per_us": 44.591675612098456,
+      "spice_power_uw": 179.64371330029596,
+      "spice_dc_gain_v_per_v": 15.430618798975212,
+      "spice_peak_swing_v": 0.8915365996616484,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 0,
+      "theta_init_label": "over_slew_high_l",
+      "theta_init": [
+        4.0,
+        4.0,
+        1.5,
+        0.5,
+        0.5,
+        0.5,
+        1.1
+      ],
+      "theta_final": [
+        4.4367899894714355,
+        3.648430824279785,
+        1.9255988597869873,
+        0.18000000715255737,
+        0.5,
+        0.2590146064758301,
+        1.5459585189819336
+      ],
+      "surrogate_test_r2_slew": 0.9972320152560011,
+      "spice_slew_v_per_us": 53.676844085033295,
+      "spice_power_uw": 185.17471596519277,
+      "spice_dc_gain_v_per_v": 27.34527226900549,
+      "spice_peak_swing_v": 1.0561457926074653,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 7,
+      "theta_init_label": "canonical",
+      "theta_init": [
+        3.0,
+        3.0,
+        1.0,
+        0.4,
+        0.4,
+        0.4,
+        0.9
+      ],
+      "theta_final": [
+        3.5638818740844727,
+        3.5416626930236816,
+        1.5982162952423096,
+        0.18000000715255737,
+        0.5,
+        0.18000000715255737,
+        1.4904032945632935
+      ],
+      "surrogate_test_r2_slew": 0.9970234285537379,
+      "spice_slew_v_per_us": 47.231763619017,
+      "spice_power_uw": 174.94234264080237,
+      "spice_dc_gain_v_per_v": 22.880680567644898,
+      "spice_peak_swing_v": 1.0526701161597216,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 7,
+      "theta_init_label": "under_slew_low_w",
+      "theta_init": [
+        2.0,
+        2.0,
+        0.8,
+        0.4,
+        0.4,
+        0.4,
+        0.8
+      ],
+      "theta_final": [
+        2.824275016784668,
+        2.8289921283721924,
+        1.6695680618286133,
+        0.18000000715255737,
+        0.2877972424030304,
+        0.18000000715255737,
+        1.600000023841858
+      ],
+      "surrogate_test_r2_slew": 0.9970234285537379,
+      "spice_slew_v_per_us": 42.960405363120316,
+      "spice_power_uw": 172.3422477360637,
+      "spice_dc_gain_v_per_v": 16.15469689388303,
+      "spice_peak_swing_v": 0.9259563151339403,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 7,
+      "theta_init_label": "over_slew_high_l",
+      "theta_init": [
+        4.0,
+        4.0,
+        1.5,
+        0.5,
+        0.5,
+        0.5,
+        1.1
+      ],
+      "theta_final": [
+        4.3542046546936035,
+        4.673118591308594,
+        1.7744888067245483,
+        0.18000000715255737,
+        0.18000000715255737,
+        0.40047672390937805,
+        1.4116783142089844
+      ],
+      "surrogate_test_r2_slew": 0.9970234285537379,
+      "spice_slew_v_per_us": 44.97715001007128,
+      "spice_power_uw": 135.1741344298322,
+      "spice_dc_gain_v_per_v": 17.365083371411835,
+      "spice_peak_swing_v": 0.7603284046280367,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 13,
+      "theta_init_label": "canonical",
+      "theta_init": [
+        3.0,
+        3.0,
+        1.0,
+        0.4,
+        0.4,
+        0.4,
+        0.9
+      ],
+      "theta_final": [
+        3.6394307613372803,
+        3.6179940700531006,
+        1.6722215414047241,
+        0.18000000715255737,
+        0.5,
+        0.18000000715255737,
+        1.566360354423523
+      ],
+      "surrogate_test_r2_slew": 0.9976663783941806,
+      "spice_slew_v_per_us": 49.394976113073824,
+      "spice_power_uw": 188.43048872286965,
+      "spice_dc_gain_v_per_v": 22.72993738423732,
+      "spice_peak_swing_v": 1.049723253132866,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 13,
+      "theta_init_label": "under_slew_low_w",
+      "theta_init": [
+        2.0,
+        2.0,
+        0.8,
+        0.4,
+        0.4,
+        0.4,
+        0.8
+      ],
+      "theta_final": [
+        2.951246738433838,
+        2.5750091075897217,
+        1.7868133783340454,
+        0.18000000715255737,
+        0.18126651644706726,
+        0.18000000715255737,
+        1.600000023841858
+      ],
+      "surrogate_test_r2_slew": 0.9976663783941806,
+      "spice_slew_v_per_us": 44.77818514903211,
+      "spice_power_uw": 187.63064409269427,
+      "spice_dc_gain_v_per_v": 12.127585873054391,
+      "spice_peak_swing_v": 0.7699299327609104,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 13,
+      "theta_init_label": "over_slew_high_l",
+      "theta_init": [
+        4.0,
+        4.0,
+        1.5,
+        0.5,
+        0.5,
+        0.5,
+        1.1
+      ],
+      "theta_final": [
+        4.226387977600098,
+        4.620841026306152,
+        1.6925897598266602,
+        0.29463332891464233,
+        0.18000000715255737,
+        0.49033138155937195,
+        1.3379825353622437
+      ],
+      "surrogate_test_r2_slew": 0.9976663783941806,
+      "spice_slew_v_per_us": 34.07348483097243,
+      "spice_power_uw": 106.07943401728508,
+      "spice_dc_gain_v_per_v": 19.476785565963645,
+      "spice_peak_swing_v": 0.7863643999615061,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 17,
+      "theta_init_label": "canonical",
+      "theta_init": [
+        3.0,
+        3.0,
+        1.0,
+        0.4,
+        0.4,
+        0.4,
+        0.9
+      ],
+      "theta_final": [
+        3.565847635269165,
+        3.366051435470581,
+        1.5973762273788452,
+        0.18000000715255737,
+        0.18000000715255737,
+        0.18000000715255737,
+        1.4878357648849487
+      ],
+      "surrogate_test_r2_slew": 0.9891349147881545,
+      "spice_slew_v_per_us": 50.74073956474089,
+      "spice_power_uw": 188.6516734998853,
+      "spice_dc_gain_v_per_v": 14.871938248319436,
+      "spice_peak_swing_v": 0.7630936988652491,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 17,
+      "theta_init_label": "under_slew_low_w",
+      "theta_init": [
+        2.0,
+        2.0,
+        0.8,
+        0.4,
+        0.4,
+        0.4,
+        0.8
+      ],
+      "theta_final": [
+        2.923304557800293,
+        2.1295857429504395,
+        1.7758675813674927,
+        0.18000000715255737,
+        0.5,
+        0.18000000715255737,
+        1.600000023841858
+      ],
+      "surrogate_test_r2_slew": 0.9891349147881545,
+      "spice_slew_v_per_us": 34.2630065700773,
+      "spice_power_uw": 162.11665892259163,
+      "spice_dc_gain_v_per_v": 13.249907356788203,
+      "spice_peak_swing_v": 1.0579850293037247,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 17,
+      "theta_init_label": "over_slew_high_l",
+      "theta_init": [
+        4.0,
+        4.0,
+        1.5,
+        0.5,
+        0.5,
+        0.5,
+        1.1
+      ],
+      "theta_final": [
+        4.255329608917236,
+        4.715239524841309,
+        1.680662989616394,
+        0.2680452764034271,
+        0.18000000715255737,
+        0.4529271721839905,
+        1.3600612878799438
+      ],
+      "surrogate_test_r2_slew": 0.9891349147881545,
+      "spice_slew_v_per_us": 36.400399658217665,
+      "spice_power_uw": 111.82900280754511,
+      "spice_dc_gain_v_per_v": 19.38815999248476,
+      "spice_peak_swing_v": 0.781189788332674,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 42,
+      "theta_init_label": "canonical",
+      "theta_init": [
+        3.0,
+        3.0,
+        1.0,
+        0.4,
+        0.4,
+        0.4,
+        0.9
+      ],
+      "theta_final": [
+        3.5772948265075684,
+        3.362399101257324,
+        1.5976834297180176,
+        0.18000000715255737,
+        0.4376884400844574,
+        0.18000000715255737,
+        1.4934478998184204
+      ],
+      "surrogate_test_r2_slew": 0.9955490897537753,
+      "spice_slew_v_per_us": 48.3732995316931,
+      "spice_power_uw": 176.88798104156095,
+      "spice_dc_gain_v_per_v": 22.714304806411768,
+      "spice_peak_swing_v": 1.0310558102762428,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 42,
+      "theta_init_label": "under_slew_low_w",
+      "theta_init": [
+        2.0,
+        2.0,
+        0.8,
+        0.4,
+        0.4,
+        0.4,
+        0.8
+      ],
+      "theta_final": [
+        3.0170769691467285,
+        2.3411030769348145,
+        1.823522925376892,
+        0.18000000715255737,
+        0.18000000715255737,
+        0.18000000715255737,
+        1.600000023841858
+      ],
+      "surrogate_test_r2_slew": 0.9955490897537753,
+      "spice_slew_v_per_us": 45.350693359166144,
+      "spice_power_uw": 189.89193570140432,
+      "spice_dc_gain_v_per_v": 12.189527222074382,
+      "spice_peak_swing_v": 0.7733919145478498,
+      "spice_converged": true
+    },
+    {
+      "surrogate_seed": 42,
+      "theta_init_label": "over_slew_high_l",
+      "theta_init": [
+        4.0,
+        4.0,
+        1.5,
+        0.5,
+        0.5,
+        0.5,
+        1.1
+      ],
+      "theta_final": [
+        4.366942405700684,
+        4.339990139007568,
+        1.7817331552505493,
+        0.18000000715255737,
+        0.18000000715255737,
+        0.3467446565628052,
+        1.4236284494400024
+      ],
+      "surrogate_test_r2_slew": 0.9955490897537753,
+      "spice_slew_v_per_us": 48.17901217685127,
+      "spice_power_uw": 148.868721550749,
+      "spice_dc_gain_v_per_v": 17.427157788180143,
+      "spice_peak_swing_v": 0.7597385815218518,
+      "spice_converged": true
+    }
+  ]
+}

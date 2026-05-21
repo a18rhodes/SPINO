@@ -113,7 +113,16 @@ through precomputed gm/ID lookup tables [17]. The first four approaches treat SP
 an opaque oracle.
 Lyu et al. [15] inject gradient information but only at the performance-metric level,
 via adjoint post-processing of a black-box SPICE call. Uhlmann et al. [16] introduce end-to-end differentiability but route it through a learned
-performance abstraction. Ghosh et al. [17] use ML for the spec-to-size map directly,
+performance abstraction. A like-for-like reimplementation of the Uhlmann route on the
+same 5T OTA problem and the same Adam loss as SPINO (LHS-sampled 1000-point SPICE
+training set, 4-layer MLP from θ to (slew, power, swing), autograd-through-MLP gradients)
+is reported in `docs/sizing.md` § "Performance-surrogate baseline (Uhlmann route)";
+the surrogate's per-component gradient R² ranges from 0.99 ($`V_\mathrm{bias}`$) to 0.14
+($`W_\mathrm{tail}`$) on held-out points, and the converged design disagrees with the
+FNO/IFT and FD-SPICE routes on $`L_\mathrm{mirror}`$ (Uhlmann pushes it to the 0.50 µm
+upper bound; the others leave it at 0.18 µm). Surrogate per-iter cost is essentially
+free (one MLP forward+backward, < 0.02 s) but pre-amortises a one-time 5 h SPICE
+training-set collection. Ghosh et al. [17] use ML for the spec-to-size map directly,
 bypassing the circuit-physics simulator entirely. SPINO targets a lower level, namely
 FNO device operators inside KCL; gradients are w.r.t.
 device geometry through the Newton-Raphson residual itself, not through an external
