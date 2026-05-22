@@ -104,6 +104,7 @@ the canonical references that survive a clean clone.
 | sky130 NFET production figures, transfer / output / subthreshold parity | [`mosfet/nfet/`](mosfet/nfet/) |
 | sky130 PFET production figures | [`mosfet/pfet/`](mosfet/pfet/) |
 | MLP ablation (h64 / h128 / FNO) on NFET dataset | [`mosfet/nfet/mlp_ablation/`](mosfet/nfet/mlp_ablation/) |
+| MLP ablation multi-seed: h64 n=3 Fast R² −2.48 ± 1.37, h128 n=3 −2.29 ± 2.22 (capacity direction within seed noise) | [`mosfet/nfet/mlp_ablation/seed_variance/aggregate.json`](mosfet/nfet/mlp_ablation/seed_variance/aggregate.json), [`mosfet/nfet/mlp_ablation/seed_variance/fast_r2_per_capacity.png`](mosfet/nfet/mlp_ablation/seed_variance/fast_r2_per_capacity.png) |
 | Diode operator, single rectifier and adversarial parity | [`diode/`](diode/) |
 | RC operator parity, chirp / noise / log-uniform | [`simple_rc/`](simple_rc/) |
 

@@ -594,6 +594,13 @@ def run_mosfet_training(
     type=click.Choice(["sky130_nmos", "sky130_pmos"]),
     help="Device strategy for SPICE evaluation sweeps (determines bias points, sweep directions).",
 )
+@click.option(
+    "--seed",
+    type=int,
+    default=0,
+    show_default=True,
+    help="RNG seed for torch + numpy. Sets MLP weight init / FNO init / minibatch sampling.",
+)
 def main(
     dataset_path,
     experiment_name,
@@ -617,7 +624,14 @@ def main(
     freeze_backbone,
     geometry_filter,
     strategy_name,
+    seed,
 ):
+    import numpy as _np  # local import to avoid touching top-level imports
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    _np.random.seed(seed)
+    logger.info("Random seed set to %d (torch + cuda + numpy).", seed)
     run_mosfet_training(
         dataset_path=dataset_path,
         experiment_name=experiment_name,

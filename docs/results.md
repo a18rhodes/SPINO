@@ -397,32 +397,48 @@ Two capacity levels were evaluated (h64: 32K params, h128: 58K params) against t
 FNO (1.28M params). Fast Dataset R² is averaged over 64 fixed-seed samples from the training
 distribution; SPICE metrics use deterministic ramp sweeps.
 
-**Methodology note.** All reported metrics in this section (and throughout this document) come
-from single-seed training runs. The MLP-vs-FNO comparison instead controls for tuning effort via
-the capacity sweep h64 → h128: increasing MLP capacity *worsens* Fast Dataset R² (−4.42 → −5.43),
-which rules out the "you didn't tune the MLP" rebuttal. The argument for the FNO architecture
-choice is therefore structural — quasi-static MLPs cannot aggregate cross-timestep information,
-which the random-PWL evaluation requires — rather than dependent on training-seed variance.
+**Methodology.** Each MLP capacity level was trained at three RNG seeds
+(0, 1, 2) on the same 76K NFET dataset; the numbers below are mean ± std
+across the three runs. The FNO is reported as a single production fit
+because the MLP-vs-FNO claim is about whether *any* per-timestep
+representation generalises to random-PWL waveforms; the seed-variance test
+characterises the *MLP* family rather than refuting a specific FNO seed.
 
-| Metric | MLP h64 | MLP h128 | FNO (production) |
+| Metric | MLP h64 (n=3) | MLP h128 (n=3) | FNO (production) |
 |---|---|---|---|
-| Fast Dataset R² (64-sample avg) | -4.42 | -5.43 | **0.9879** |
-| SPICE Transfer R² | 0.9990 | 0.9989 | **0.9995** |
-| SPICE Transfer SubTh-R² | **0.9856** | 0.9631 | 0.9861 |
-| SPICE Output R² | 0.9456 | 0.9763 | **0.9960** |
-| Speedup vs SPICE | 863x | 6501x | 473x |
+| Fast Dataset R² (64-sample avg) | −2.48 ± 1.37 | −2.29 ± 2.22 | **0.9879** |
+| SPICE Transfer R² | 0.9990 ± 0.0002 | 0.9982 ± 0.0007 | **0.9995** |
+| SPICE Transfer SubTh-R² | 0.9192 ± 0.0743 | 0.9384 ± 0.0491 | **0.9861** |
+| SPICE Output R² | 0.9626 ± 0.0121 | 0.9774 ± 0.0093 | **0.9960** |
 
-The MLP matches FNO on controlled ramp sweeps (Transfer R² ≥ 0.999) but fails catastrophically
-on arbitrary PWL waveforms (Fast Dataset R² ≈ −4 to −5). The gap **worsens** with more capacity,
-ruling out underfitting as the cause. FNO spectral mixing acts as a **waveform-shape regularizer**:
-by aggregating information across the full input trajectory, it generalizes to the diverse waveform
-types present in the training distribution. This effect is empirically necessary even though
-MOSFET physics does not require temporal dependencies.
+The headline finding holds across seeds: MLPs at both capacities fail
+catastrophically on random PWL waveforms (Fast Dataset R² between roughly
+−1 and −5 across the six retrains) while the FNO holds 0.99. The
+order-of-magnitude gap is the load-bearing result; the FNO's
+cross-timestep aggregation is empirically necessary for the random-PWL
+distribution even though MOSFET physics is quasi-static.
 
-The ablation also confirms that the inverter-chain failure (see below) is attributable to spurious
-FNO off-diagonal Jacobian terms, not to a deficiency in the FNO's expressive capacity. An MLP
-surrogate would produce an exactly diagonal Jacobian — but MLP fails on the waveform distribution
-that makes it a viable surrogate in the first place.
+The previously published claim that "Fast Dataset R² *worsens* with
+capacity (h64 −4.42 → h128 −5.43), ruling out underfitting" does not
+survive the multi-seed retest. Single-seed h64 −4.42 and h128 −5.43 were
+both outliers from the seed-0 run (the most pessimistic draw at each
+capacity); under n=3 the per-capacity means are −2.48 and −2.29 and the
+std bars overlap heavily, so the capacity direction is within seed noise.
+The underfitting-rebuttal does not have a clean closure via the capacity
+sweep on this dataset; the structural argument has to rest on the
+order-of-magnitude FNO-vs-MLP gap and the quasi-static-cannot-aggregate
+reasoning rather than on a monotone capacity trend.
+
+Seed-variance bar chart and per-run JSON under
+[`docs/assets/mosfet/nfet/mlp_ablation/seed_variance/`](assets/mosfet/nfet/mlp_ablation/seed_variance/).
+
+The ablation also informs the inverter-chain attribution (see below).
+The structural claim there — that FNO off-diagonal Jacobian terms drive
+the digital non-convergence — was directly probed by composing a MosfetMLP
+(structurally diagonal Jacobian) into the same chain solver; that probe
+was inconclusive for different reasons (the per-timestep MLP forward pass
+is unstable at static-bias rail corners), reported in
+[§ Digital circuits → MLP-composed inverter chain](#mlp-composed-inverter-chain-off-diagonal-hypothesis-probe-inconclusive).
 
 #### Fast dataset (random PWL waveforms)
 
