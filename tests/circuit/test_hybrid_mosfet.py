@@ -2,6 +2,12 @@
 Unit tests for :mod:`spino.circuit.hybrid_mosfet`.
 
 Ensures autograd flows through the FNO branch only where the bad-region mask is false.
+
+The wrapper under test is dormant scaffolding (see the module docstring of
+``spino.circuit.hybrid_mosfet``). No committed pipeline calls it; the published
+L=0.18 VTC attribution uses scalar ``brentq`` on the IV cache directly in
+``spino/attribution.ipynb`` Stage 7. These tests guard the masking and autograd
+contract so a future transient-substitution path can adopt it cleanly.
 """
 
 from __future__ import annotations

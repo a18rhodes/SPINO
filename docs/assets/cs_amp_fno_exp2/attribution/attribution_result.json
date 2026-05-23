@@ -29,11 +29,11 @@
     },
     "probe_2_kcl_residual": {
       "isolates": "KCL imbalance at pinned SPICE V_out vs pinned FNO V_out",
-      "ratio_spice_over_fno": 268.0,
       "spice_pinned_kcl_max_a": 1.963172690011561e-05,
-      "spice_pinned_kcl_rms_a": 1.8544826161814854e-05,
+      "spice_pinned_kcl_rms_a": 1.8563034122888825e-05,
       "fno_pinned_kcl_max_a": 7.325267858959705e-08,
-      "fno_pinned_kcl_rms_a": 1.5938697472961394e-08
+      "fno_pinned_kcl_rms_a": 1.595434698681286e-08,
+      "ratio_spice_over_fno": 268.0
     },
     "probe_3_substitution": {
       "outcome": "Not executable",
@@ -52,19 +52,27 @@
     "probe_1_iv_error": {
       "isolates": "FNO vs SPICE drain current at each VTC bias point (fixed SPICE terminals)",
       "nfet_ratio_bad_over_good": 4551.5,
-      "pfet_ratio_bad_over_good": 3709.9,
-      "pfet_spike_note": "At Vin~0.25V (VSG~0.33V) FNO predicts ~13.7A vs SPICE 785pA \u2014 catastrophic near-off failure"
+      "pfet_ratio_bad_over_good_mean_capped": 3709.9,
+      "pfet_median_rel_err_bad": 14.174097370676344,
+      "pfet_median_rel_err_good": 0.05333008061084077,
+      "pfet_geomean_rel_err_bad": 59.931250390018434,
+      "pfet_geomean_rel_err_good": 0.051811958538313774,
+      "pfet_spike_note": "At Vin~0.25V (VSG~0.33V) FNO predicts ~13.7A vs SPICE 785pA - catastrophic near-off failure. PFET mean-capped ratio reflects 1000x clip; median and geomean are the robust alternatives."
     },
     "substitution": {
       "isolates": "brentq KCL solve on SPICE IV cache in bad region; FNO in good region",
       "threshold_vin_v": 0.5,
       "fno_mean_err_bad_mv": 176.01508889101405,
       "hybrid_mean_err_bad_mv": 4.3531966905065556,
-      "collapse_fraction_bad": 0.975,
+      "fno_max_err_bad_mv": 379.73294879718344,
+      "hybrid_max_err_bad_mv": 18.718609048022692,
+      "collapse_fraction_bad_mean": 0.975,
+      "collapse_fraction_bad_max": 0.951,
       "fno_mean_err_good_mv": 6.529137554165242,
       "hybrid_mean_err_good_mv": 6.529137554165242,
-      "collapse_fraction_good": 0.0
+      "collapse_fraction_good_mean": 0.0,
+      "good_region_note": "Good region (Vin >= threshold) is never routed to the SPICE cache by construction; collapse_fraction_good_mean ~ 0 confirms the gate is wired, not a separate empirical finding."
     },
-    "conclusion": "97.5% mean V_out error collapse in bad region (Vin < 0.5V); good region uses pure FNO above the threshold by construction (gating invariant). Weak-inversion IV error is causal for VTC failure with strong specificity. Both NFET (~4500x relative error ratio) and PFET (~3700x capped mean ratio; uncapped mean ratio dominated by the Vin~0.30 V spike) fail in the same bias region."
+    "conclusion": "Bad-region V_out error collapses by 97.5% on the mean (176.0 -> 4.35 mV) and 95.1% on the max (379.7 -> 18.72 mV) under brentq KCL substitution. Good-region error is unchanged by construction (gate routes only bad-region points to the cache). NFET shows a 4552x bad/good relative-Id ratio; PFET median bad-region relative-Id error is 14.2 vs good 0.053 (mean-capped ratio is a 1000x clip artefact). Weak-inversion IV error is causal for VTC failure with strong specificity."
   }
 }

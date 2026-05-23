@@ -167,10 +167,17 @@ and sweeps gate/drain downward.
 | sky130 PMOS | Transfer (W=1 µm, L=0.18 µm) | 0.9965 | -- |
 | sky130 PMOS | Output (W=1 µm, L=0.18 µm) | 0.9656 | -- |
 | sky130 PMOS | Subthreshold (W=1 µm, L=0.18 µm) | 0.9523 | -- |
-| CS amp composition (L=0.18, CUDA) | Transient vs SPICE | 0.99748 (Pearson r) | Max \|ΔV\| = 25.78 mV |
+| CS amp composition (L=0.18, CUDA) | Transient vs SPICE | 0.99748 (Pearson r) | Max \|ΔV\| = 25.78 mV‡ |
 | CS amp composition (L=0.40, CUDA) | Transient vs SPICE | 0.99981 (Pearson r) | Max \|ΔV\| = 2.392 mV |
 | OTA composition (L=0.40, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.7 mV† |
 | OTA composition (L=0.50, CUDA) | Transient vs SPICE | 0.9997 (Pearson r) | Max \|ΔV\| = 68.9 mV† |
+
+‡CS amp L=0.18 is a cross-bin stress geometry: transient `R^2` is negative (−2.66)
+while Pearson `r` and DC are within tolerance. Causal decomposition routes the
+gap to weak-inversion IV error in the bad region (V_in < 0.50 V); VTC brentq
+substitution collapses bad-region mean error 97.5 % (176.0 → 4.4 mV) and max
+error 95.1 % (379.7 → 18.7 mV). Full probe chain in
+[Composition error attribution](docs/attribution.md).
 
 †OTA shape-fidelity passes at both L: Pearson r = 0.9997, slew rate within 1 % (L=0.40)
 and 5 % (L=0.50) of SPICE, NR transient iters 11–12 of a 25-iter budget. The max|ΔV|

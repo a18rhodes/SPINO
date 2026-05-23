@@ -5,9 +5,21 @@ When terminal voltages fall in a *bad* region, drain current is taken from a
 pre-computed NGSpice IV cache (``npz``); otherwise the production FNO is used.
 Gradients through the tabulated path are zero by design.
 
-The class is **scaffolding** for a future whole-window transient substitution
-(Probe 3) path; the published L=0.18 VTC attribution uses scalar ``brentq`` on the
-IV cache directly in ``spino/attribution.ipynb`` Stage 7, not this wrapper.
+**Dormant code path.** No committed pipeline calls this wrapper. It was built
+for the transient Probe 3 substitution but that probe is documented as "Not
+executable" in
+``docs/assets/cs_amp_fno_exp2/attribution/attribution_result.json``: with a
+narrow Vgs threshold the bad mask never triggers along the transient trajectory,
+and with a broad threshold NR diverges because the FNO Jacobian disagrees with
+the SPICE-cache currents at every timestep. The published L=0.18 VTC
+attribution substitution path uses scalar ``brentq`` on the IV cache directly
+in ``spino/attribution.ipynb`` Stage 7 (the cell labelled "Stage 7 - Cell 1"),
+not this wrapper. Kept as a reference scaffold for a future whole-window
+transient substitution that would need a consistent Jacobian story (e.g.
+SPICE-cache finite-difference Jacobians); that work is not in scope here.
+``tests/circuit/test_hybrid_mosfet.py`` exercises the masking and autograd
+contract only; it is **not** evidence that this class participates in any
+published result.
 """
 
 from __future__ import annotations
