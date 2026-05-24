@@ -93,12 +93,17 @@ differs, but the IV surface is uniformly bad in this band).
 A **brentq** KCL solve using the SPICE IV cache in the bad region (pure FNO held
 above `V_in = 0.5` V by construction) collapses **mean** `|V_out,FNO - V_out,SPICE|`
 in that band from **176 mV** to **4.4 mV** (**97.5%** reduction). In the same band,
-**max** `|V_out,FNO - V_out,SPICE|` falls from **379.7 mV** to **18.7 mV** (**95.1%** reduction). The
-good-region row in [`docs/results.md`](results.md) is a **gating invariant**: the
-hybrid curve is **identical to FNO** for `V_in >= 0.5` V by code construction, so
-"0.0% collapse" there is a sanity check that the bad-region `brentq` substitution
-does not leak into the good band — not evidence that SPICE IV was applied in the
-good band and had no effect.
+**max** `|V_out,FNO - V_out,SPICE|` falls from **379.7 mV** to **18.7 mV** (**95.1%** reduction).
+Shape fidelity collapses with the absolute error: bad-region Pearson `r` over `V_out`
+drops from the full-sweep `r = 0.9929` to **`r = 0.865`** for the pure FNO, and the
+hybrid recovers it to **`r = 0.9996`** in the same band. The full-sweep number is
+dominated by the wide swing of the good-region transfer curve and masks the
+bad-region shape failure; the substitution closes both the magnitude and shape gaps
+together. The good-region row in [`docs/results.md`](results.md) is a **gating
+invariant**: the hybrid curve is **identical to FNO** for `V_in >= 0.5` V by code
+construction, so "0.0% collapse" there is a sanity check that the bad-region
+`brentq` substitution does not leak into the good band — not evidence that SPICE IV
+was applied in the good band and had no effect.
 
 The archived `summary.json` does not record per-sweep-point DC Newton iteration
 histograms for the VTC curve; at this geometry scalar DC OP for each `V_in` is the

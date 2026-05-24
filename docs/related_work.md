@@ -19,9 +19,12 @@ trajectories together with a 29-parameter BSIM conditioning vector, $(V(t),
 \boldsymbol{\theta}) \to I(t)$, over arbitrary random piecewise-linear (PWL) waveforms,
 with the conditioning injected through a Variable-Conditioning Feature-wise Linear
 Modulation (VCFiLM) pathway. The multilayer perceptron (MLP) ablation (Fast Dataset
-R² ≈ −5 vs. FNO R² ≈ 0.988) demonstrates that per-timestep quasi-static models collapse
-on this waveform distribution, and that scaling MLP capacity widens rather than narrows
-the gap (h64: −4.42 → h128: −5.43). The requirement is not driven by MOSFET physics,
+R² ≈ −2 to −3 across n=3 seeds vs. FNO R² ≈ 0.988) demonstrates that per-timestep
+quasi-static models collapse on this waveform distribution. The MLP h64 (−2.48 ± 1.37)
+and h128 (−2.29 ± 2.22) seed means have overlapping std bars, so the capacity-direction
+argument from the original single-seed run (h64: −4.42, h128: −5.43) is retracted; the
+order-of-magnitude FNO-vs-MLP gap on random PWL stands on its own. The requirement is
+not driven by MOSFET physics,
 which is quasi-static at practical simulation windows (transit time and displacement
 currents both negligible); instead, the cross-timestep aggregation acts as a
 waveform-shape regularizer (as documented in docs/results.md).

@@ -25,12 +25,23 @@ parameter sweeps, and gradient-based topology search during analog design.
 
 Four device operators have been trained and validated against NGSPICE ground truth:
 
-| Operator | Conditioning | Peak R² | Documentation |
-|---|---|---|---|
-| Linear RC | Dimensionless $`\lambda`$ | 0.9999 | [RC Circuit](docs/rc.md) |
-| Shockley Diode | Dimensionless $`\lambda`$ + direct injection | 0.9999 | [Diode](docs/diode.md) |
-| sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | [NFET](docs/nfet.md) |
-| sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | [PFET](docs/pfet.md) |
+| Operator | Conditioning | Best Ramp R² | Weakest SubTh R² | Documentation |
+|---|---|---|---|---|
+| Linear RC | Dimensionless $`\lambda`$ | 0.9999 | -- | [RC Circuit](docs/rc.md) |
+| Shockley Diode | Dimensionless $`\lambda`$ + direct injection | 0.9999 | -- | [Diode](docs/diode.md) |
+| sky130 NMOS | VCFiLM (29-param BSIM) | 0.9995 | 0.9113 (xlarge) | [NFET](docs/nfet.md) |
+| sky130 PMOS | VCFiLM (29-param BSIM) | 0.9999 | -3.05 (medium), -2.48 (xlarge)\* | [PFET](docs/pfet.md) |
+
+\*PMOS medium/xlarge subthreshold R² is a known arcsinh-compression
+measurement artefact at those geometries (small subthreshold dynamic range
+under the production target normalisation), not a pure model-quality
+collapse; ramp R² stays > 0.999 at the same geometries. Same arcsinh
+compression in the NMOS case is mostly absorbed by the Phase-2 fine-tune
+(xlarge SubTh-R² 0.86 → 0.91). The CS-amp `L=0.18` VTC failure and the
+OTA M4 `Vds ≈ 0` triode-boundary residual both live near these
+weakest-cell regions — see
+[Composition error attribution](docs/attribution.md) and
+[OTA composition attribution](docs/results.md#pfet-triode-boundary-fine-tune-partial-gate-closure).
 
 The work is documented in a set of notes:
 
@@ -68,12 +79,12 @@ optimizer, and epoch budget, at two capacity levels (32 K and 58 K parameters). 
 ramp sweeps — the kind of inputs MOSFET compact models are traditionally validated against —
 the MLP matches the FNO at Transfer R² ≥ 0.999. On random PWL waveforms drawn from the
 training distribution (the same distribution that drives Newton-Raphson circuit composition),
-the MLP collapses to Fast Dataset R² ≈ **−4 to −5**, while the FNO holds **0.99**. The gap
-*widens* with MLP capacity (h64: −4.42, h128: −5.43), ruling out underfitting as the cause.
-FNO temporal mixing is therefore acting as a waveform-shape regularizer rather than a
-physically necessary modelling choice — a structural argument the capacity sweep makes
-cleanly without requiring multi-seed variance characterisation. Full table, figures, and
-discussion in [Analog composition results — MLP ablation](docs/results.md#mlp-ablation-architecture-defense).
+the MLP collapses to Fast Dataset R² ≈ **−2 to −3** (n=3 seed mean, h64: −2.48 ± 1.37,
+h128: −2.29 ± 2.22), while the FNO holds **0.99**. The h64/h128 seed std bars overlap;
+the single-seed "gap widens with capacity" framing does not survive the n=3 retest and is
+retracted. The structural argument rests on the order-of-magnitude FNO-vs-MLP gap on
+random PWL alone, not on the MLP capacity direction. Full table, figures, and discussion
+in [Analog composition results — MLP ablation](docs/results.md#mlp-ablation-architecture-defense).
 
 ---
 

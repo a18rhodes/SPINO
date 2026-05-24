@@ -57,7 +57,13 @@
       "pfet_median_rel_err_good": 0.05333008061084077,
       "pfet_geomean_rel_err_bad": 59.931250390018434,
       "pfet_geomean_rel_err_good": 0.051811958538313774,
-      "pfet_spike_note": "At Vin~0.25V (VSG~0.33V) FNO predicts ~13.7A vs SPICE 785pA - catastrophic near-off failure. PFET mean-capped ratio reflects 1000x clip; median and geomean are the robust alternatives."
+      "pfet_near_off_spike": {
+        "vin_v": 0.25,
+        "fno_id_a": -13.696849822998047,
+        "spice_id_a": 7.854436281646573e-10,
+        "note": "Catastrophic near-off failure: FNO predicts ~A-scale drain current vs SPICE ~pA at VSG~0.33V. Values reproduce from vtc_probe1_iv_error.npz alongside this JSON."
+      },
+      "pfet_robustness_note": "PFET mean-capped ratio reflects a per-point 1000x clip; median and geomean over the raw relative-Id are the robust alternatives."
     },
     "substitution": {
       "isolates": "brentq KCL solve on SPICE IV cache in bad region; FNO in good region",
@@ -69,10 +75,13 @@
       "collapse_fraction_bad_mean": 0.975,
       "collapse_fraction_bad_max": 0.951,
       "fno_mean_err_good_mv": 6.529137554165242,
-      "hybrid_mean_err_good_mv": 6.529137554165242,
-      "collapse_fraction_good_mean": 0.0,
-      "good_region_note": "Good region (Vin >= threshold) is never routed to the SPICE cache by construction; collapse_fraction_good_mean ~ 0 confirms the gate is wired, not a separate empirical finding."
+      "good_region_gate_invariant": true,
+      "good_region_note": "Good region (Vin >= threshold) is never routed to the SPICE cache by construction; hybrid V_out is byte-identical to FNO V_out there. The hybrid_mean_err_good_mv / collapse_fraction_good_mean fields from earlier schema have been dropped as they were structurally zero rather than independent measurements.",
+      "vtc_pearson_r_full": 0.9929450590266834,
+      "vtc_pearson_r_bad_fno": 0.8650518634139315,
+      "vtc_pearson_r_bad_hybrid": 0.9996436916440654,
+      "pearson_r_note": "Full-sweep Pearson r masks the bad-region shape collapse. Restricting to Vin < threshold drops FNO r from ~0.99 to ~0.87 and the hybrid recovers it to ~1.00, mirroring the |DeltaV_out| collapse."
     },
-    "conclusion": "Bad-region V_out error collapses by 97.5% on the mean (176.0 -> 4.35 mV) and 95.1% on the max (379.7 -> 18.72 mV) under brentq KCL substitution. Good-region error is unchanged by construction (gate routes only bad-region points to the cache). NFET shows a 4552x bad/good relative-Id ratio; PFET median bad-region relative-Id error is 14.2 vs good 0.053 (mean-capped ratio is a 1000x clip artefact). Weak-inversion IV error is causal for VTC failure with strong specificity."
+    "conclusion": "Bad-region V_out error collapses by 97.5% on the mean (176.0 -> 4.35 mV) and 95.1% on the max (379.7 -> 18.72 mV) under brentq KCL substitution. Bad-region Pearson r over V_out also collapses: FNO 0.865 vs hybrid 1.000 (full-sweep r masks this at 0.9929). Good-region error is unchanged by construction (gate routes only bad-region points to the cache). NFET shows a 4552x bad/good relative-Id ratio; PFET median bad-region relative-Id error is 14.2 vs good 0.053 (mean-capped ratio is a 1000x clip artefact); the PFET near-off spike at Vin=0.25 V is FNO -13.7 A vs SPICE +7.85e-10 A. Weak-inversion IV error is causal for VTC failure with strong specificity."
   }
 }
