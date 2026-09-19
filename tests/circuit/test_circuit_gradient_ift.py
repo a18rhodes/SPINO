@@ -52,14 +52,7 @@ _NFET_CKPT = DEFAULT_NFET_CHECKPOINT
 _PFET_CKPT = DEFAULT_PFET_CHECKPOINT
 _NFET_DS = DEFAULT_NFET_DATASET
 _PFET_DS = DEFAULT_PFET_DATASET
-_INTEGRATION_READY = (
-    _NGSPICE_AVAILABLE
-    and _PDK_AVAILABLE
-    and _NFET_CKPT.exists()
-    and _PFET_CKPT.exists()
-    and _NFET_DS.exists()
-    and _PFET_DS.exists()
-)
+_INTEGRATION_READY = _NGSPICE_AVAILABLE and _PDK_AVAILABLE and _NFET_CKPT.exists() and _PFET_CKPT.exists() and _NFET_DS.exists() and _PFET_DS.exists()
 
 _SKIP = pytest.mark.skipif(
     not _INTEGRATION_READY,
@@ -284,9 +277,7 @@ def test_full_loss_gradient_finite_all_theta() -> None:
     base_devices, nfet_strat, pfet_strat, tg, vinp_t, vinn_t = _load_base(problem)
 
     theta = _THETA_INIT.clone().requires_grad_(True)
-    v_out, dc_sol = compose_ota_differentiable(
-        theta, problem, base_devices, nfet_strat, pfet_strat, tg, vinp_t, vinn_t
-    )
+    v_out, dc_sol = compose_ota_differentiable(theta, problem, base_devices, nfet_strat, pfet_strat, tg, vinp_t, vinn_t)
     i_tail = _eval_itail_through_fno(theta, dc_sol, base_devices, nfet_strat)
     metrics = extract_metrics(v_out, tg, dc_sol, problem, i_tail_tensor=i_tail)
     loss = loss_fn(metrics, problem)
@@ -389,7 +380,7 @@ _FD_THETA_CLAMP: tuple[tuple[float, float], ...] = (
     (0.1, 20.0),  # W_mirror
     (0.1, 20.0),  # W_tail
     (0.18, 1.0),  # L
-    (0.5, 1.6),   # V_bias
+    (0.5, 1.6),  # V_bias
 )
 
 
@@ -524,9 +515,5 @@ def test_slew_grad_ift_and_surrogate_fidelity(name: str, theta_vec: tuple[float,
             f"See docs/sizing.md §'Gradient-verification bounds'."
         )
 
-    assert (
-        rel_a <= _M2_TOL_TEST_A
-    ), f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
-    assert (
-        rel_b <= _M2_TOL_TEST_B
-    ), f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"
+    assert rel_a <= _M2_TOL_TEST_A, f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
+    assert rel_b <= _M2_TOL_TEST_B, f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"

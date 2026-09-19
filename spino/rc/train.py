@@ -70,9 +70,7 @@ def run_experiment(
     # 3. Model & Optimization
     model = get_model()
     optimizer = torch.optim.AdamW(model.parameters(), lr=starting_lr, weight_decay=adam_weight_decay)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6
-    )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=fine_tune_epochs, T_mult=1, eta_min=1e-6)
     loss_fn = GenericDimensionlessPhysicsLoss(
         sobolev_weight=target_sobolev_weight,
         physics_weight=target_physics_weight,

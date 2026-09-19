@@ -78,9 +78,7 @@ def test_plot_vtc_writes_png(vtc, tmp_path):
 
 def test_plot_step_response_writes_png(transient, tmp_path):
     design = DesignPoint(nfet_w_um=1.0, pfet_w_um=2.0)
-    output = plot_step_response(
-        transient, tmp_path / "step.png", design=design, metrics=_metrics(settling=1e-6), t_step_start=1e-7
-    )
+    output = plot_step_response(transient, tmp_path / "step.png", design=design, metrics=_metrics(settling=1e-6), t_step_start=1e-7)
     assert output.exists()
 
 

@@ -93,14 +93,10 @@ def _initialize_training_components(
     :return: Tuple of (model, optimizer, scheduler, loss_fn).
     """
     if model_type == "vcfilm":
-        model = MosfetVCFiLMFNO(
-            input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
-        ).cuda()
+        model = MosfetVCFiLMFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
         logger.info("Initialized MosfetVCFiLMFNO (Voltage-Conditioned FiLM architecture)")
     elif model_type == "film":
-        model = MosfetFiLMFNO(
-            input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
-        ).cuda()
+        model = MosfetFiLMFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
         logger.info("Initialized MosfetFiLMFNO (FiLM architecture)")
     elif model_type == "mlp":
         model = MosfetMLP(input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width).cuda()
@@ -110,9 +106,7 @@ def _initialize_training_components(
         logger.info("Initialized MosfetFNO (Concat architecture)")
 
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6
-    )
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6)
     if loss_type == "mse":
         loss_fn = ArcSinhMSELoss().cuda()
         logger.info("Using ArcSinhMSELoss (plain MSE in arcsinh space, no denominator)")
@@ -129,9 +123,7 @@ def _initialize_training_components(
         if vg_mean is None or vg_std is None:
             logger.warning("vg_mean/vg_std not provided, using defaults from 40K dataset")
             vg_mean, vg_std = 0.755, 0.476
-        loss_fn = RegionAdaptiveLoss(
-            subth_weight=loss_scale_ma, sat_weight=loss_exponent, vg_mean=vg_mean, vg_std=vg_std
-        ).cuda()
+        loss_fn = RegionAdaptiveLoss(subth_weight=loss_scale_ma, sat_weight=loss_exponent, vg_mean=vg_mean, vg_std=vg_std).cuda()
         logger.info(
             "Using RegionAdaptiveLoss: subth_weight=%.2f, sat_weight=%.2f, vg_norm_threshold=%.3f",
             loss_scale_ma,
@@ -232,9 +224,7 @@ def _train_epoch(model, loader, optimizer, scheduler, loss_fn):
     return total_loss / batch_count
 
 
-def _check_early_stopping(
-    loss_history, patience_counter, avg_loss, early_stop_patience, early_stop_threshold, writer, epoch
-):
+def _check_early_stopping(loss_history, patience_counter, avg_loss, early_stop_patience, early_stop_threshold, writer, epoch):
     """
     Checks if early stopping should be triggered.
 
@@ -288,9 +278,7 @@ def _run_periodic_evaluation(model, dataset, path_config, run_name, writer, epoc
     plt.close(fig_iv)
 
 
-def run_final_evaluations(
-    model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"
-):
+def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"):
     """
     Executes all final evaluation procedures after training.
 
@@ -488,13 +476,9 @@ def run_mosfet_training(
             _freeze_backbone(model)
             trainable_params = [p for p in model.parameters() if p.requires_grad]
             optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6
-            )
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6)
             logger.info("Optimizer rebuilt with %d trainable parameter groups", len(trainable_params))
-        early_stopping_enabled, loss_history, patience_counter = _initialize_early_stopping(
-            warm_restart_count, early_stop_patience, early_stop_threshold
-        )
+        early_stopping_enabled, loss_history, patience_counter = _initialize_early_stopping(warm_restart_count, early_stop_patience, early_stop_threshold)
         logger.info("Starting Training Loop...")
         avg_loss = float("nan")
         final_epoch = n_epochs - 1
@@ -566,9 +550,7 @@ def run_mosfet_training(
 @click.option("--early-stop-threshold", default=1e-5, help="Minimum loss change rate to consider as improvement.")
 @click.option("--loss-scale-ma", default=0.01, help="For 'weighted': scale_mA. For 'region_adaptive': subth_weight.")
 @click.option("--loss-exponent", default=2.0, help="For 'weighted': exponent. For 'region_adaptive': sat_weight.")
-@click.option(
-    "--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training."
-)
+@click.option("--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training.")
 @click.option(
     "--model-type",
     default="concat",
@@ -627,6 +609,7 @@ def main(
     seed,
 ):
     import numpy as _np  # local import to avoid touching top-level imports
+
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)

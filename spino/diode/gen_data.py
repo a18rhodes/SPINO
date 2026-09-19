@@ -93,13 +93,15 @@ class DiodeParameters:
         :return: Tensor of shape [5, length].
         """
         return torch.tensor(
-            np.stack([
-                np.full(length, lambda_val),
-                np.full(length, np.log10(self.R_val)),
-                np.full(length, np.log10(self.C_val)),
-                np.full(length, np.log10(self.Is_val)),
-                np.full(length, self.N_val),
-            ]),
+            np.stack(
+                [
+                    np.full(length, lambda_val),
+                    np.full(length, np.log10(self.R_val)),
+                    np.full(length, np.log10(self.C_val)),
+                    np.full(length, np.log10(self.Is_val)),
+                    np.full(length, self.N_val),
+                ]
+            ),
             dtype=torch.float32,
         )
 
@@ -199,9 +201,7 @@ class InfiniteSpiceDiodeDataset(IterableDataset):
     # Phase 3: Post-Processing & Normalization
     # =========================================================================
 
-    def _process_results(
-        self, analysis, source_times: np.ndarray, source_amps: np.ndarray, params: DiodeParameters
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def _process_results(self, analysis, source_times: np.ndarray, source_amps: np.ndarray, params: DiodeParameters) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Interpolates raw SPICE results to fixed grid and normalizes tensors.
 
@@ -287,6 +287,7 @@ class InfiniteSpiceDiodeDataset(IterableDataset):
 # ---------------------------------------------------------------------------
 # Dimensionless Dataset (new)
 # ---------------------------------------------------------------------------
+
 
 def _sample_diode_parameters() -> DiodeParameters:
     """

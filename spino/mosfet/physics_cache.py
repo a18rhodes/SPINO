@@ -38,15 +38,13 @@ class PhysicsCache:
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS physics_cache (
                     cache_key TEXT PRIMARY KEY,
                     tensor_data BLOB NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """
-            )
+            """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_created ON physics_cache(created_at)")
             conn.commit()
 

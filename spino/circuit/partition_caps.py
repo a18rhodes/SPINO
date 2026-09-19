@@ -248,12 +248,7 @@ class TorchPartitionCapGrid(torch.nn.Module):
         c01 = grid2d[i, j + 1]
         c10 = grid2d[i + 1, j]
         c11 = grid2d[i + 1, j + 1]
-        out = (
-            (1 - tx) * (1 - ty) * c00
-            + (1 - tx) * ty * c01
-            + tx * (1 - ty) * c10
-            + tx * ty * c11
-        )
+        out = (1 - tx) * (1 - ty) * c00 + (1 - tx) * ty * c01 + tx * (1 - ty) * c10 + tx * ty * c11
         return out.reshape(shape)
 
     def forward(self, g1: Tensor, g2: Tensor) -> tuple[Tensor, Tensor, Tensor]:

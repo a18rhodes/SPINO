@@ -164,7 +164,11 @@ class TestOtaDcSolver:
         """Solver reaches tolerance and returns node voltages inside (0, VDD)."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaDcSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vcm_v=_VCM,
             vbias_v=_VBIAS,
@@ -183,7 +187,11 @@ class TestOtaDcSolver:
         """With Vinp=Vinn=Vcm the left and output arms converge to equal voltages."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaDcSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vcm_v=_VCM,
             vbias_v=_VBIAS,
@@ -194,15 +202,17 @@ class TestOtaDcSolver:
         )
         sol = solver.solve()
         assert sol.report.converged
-        assert abs(sol.v_left_v - sol.v_out_v) < 1e-4, (
-            f"Arm asymmetry too large: v_left={sol.v_left_v:.6f}, v_out={sol.v_out_v:.6f}"
-        )
+        assert abs(sol.v_left_v - sol.v_out_v) < 1e-4, f"Arm asymmetry too large: v_left={sol.v_left_v:.6f}, v_out={sol.v_out_v:.6f}"
 
     def test_residual_norm_decreases(self, ota_devices) -> None:
         """Newton iterations reduce the KCL residual from a deliberately bad start."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaDcSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vcm_v=_VCM,
             vbias_v=_VBIAS,
@@ -222,7 +232,11 @@ class TestOtaDcSolver:
         """Passing an explicit v_init does not raise and still converges."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaDcSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vcm_v=_VCM,
             vbias_v=_VBIAS,
@@ -249,7 +263,11 @@ class TestOtaTransientSolver:
         """Returns ``(3,)`` DC op-point from the mock devices."""
         m1, m2, m3, m4, m5 = ota_devices
         sol = OtaDcSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vcm_v=_VCM,
             vbias_v=_VBIAS,
@@ -264,7 +282,11 @@ class TestOtaTransientSolver:
         """Constant Vinp=Vinn=Vcm leaves trajectories near the DC point."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaTransientSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vbias_v=_VBIAS,
             c_load_f=0.0,
@@ -285,7 +307,11 @@ class TestOtaTransientSolver:
         """Constant stimulus must keep each node within 1 mV of DC value."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaTransientSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vbias_v=_VBIAS,
             c_load_f=0.0,
@@ -298,18 +324,18 @@ class TestOtaTransientSolver:
         vinn_t = torch.full((n_t,), _VCM)
         sol = solver.solve(time_s, vinp_t, vinn_t, dc_solution)
         assert sol.report.converged
-        torch.testing.assert_close(
-            sol.v_tail_v, torch.full((n_t,), dc_solution[0].item()), atol=1e-3, rtol=0.0
-        )
-        torch.testing.assert_close(
-            sol.v_out_v, torch.full((n_t,), dc_solution[2].item()), atol=1e-3, rtol=0.0
-        )
+        torch.testing.assert_close(sol.v_tail_v, torch.full((n_t,), dc_solution[0].item()), atol=1e-3, rtol=0.0)
+        torch.testing.assert_close(sol.v_out_v, torch.full((n_t,), dc_solution[2].item()), atol=1e-3, rtol=0.0)
 
     def test_minimum_two_timesteps_required(self, ota_devices, dc_solution) -> None:
         """Passing a single-sample time grid raises ValueError."""
         m1, m2, m3, m4, m5 = ota_devices
         solver = OtaTransientSolver(
-            m1, m2, m3, m4, m5,
+            m1,
+            m2,
+            m3,
+            m4,
+            m5,
             vdd=_VDD,
             vbias_v=_VBIAS,
         )

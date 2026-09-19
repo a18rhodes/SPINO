@@ -22,6 +22,7 @@ from spino.rc.solve import solve_rc_ode
 ### Basic IC Spectrum Test
 # Tests the model on a variety of RC time constants (Tau) and evaluates R² performance.
 
+
 # %%
 def evaluate_ic_spectrum(model, device="cuda", dark: bool = True, display=False):
     model.eval()
@@ -129,9 +130,11 @@ def evaluate_ic_spectrum(model, device="cuda", dark: bool = True, display=False)
         plt.show()
     return (fig, r2_data)
 
+
 # %% [markdown]
 ### Adversarial Stress Test
 # Tests the model under challenging scenarios, including corner frequency, white noise, and resolution changes.
+
 
 # %%
 def evaluate_adversarial_spectrum(model, device="cuda", dark: bool = True, display=False):

@@ -640,13 +640,7 @@ Vb b 0 {pwl_b}
         :param netlist_body: SPICE netlist without .end directive.
         :return: Parsed simulation data or None on failure.
         """
-        deck_content = (
-            f"{netlist_body}"
-            f".tran {self.sim_step} {self.t_end}\n"
-            ".option strict_errorhandling=0\n"
-            ".option savecurrents\n"
-            ".end\n"
-        )
+        deck_content = f"{netlist_body}" f".tran {self.sim_step} {self.t_end}\n" ".option strict_errorhandling=0\n" ".option savecurrents\n" ".end\n"
         success, parsed_data = run_ngspice(
             deck_content,
             output_mode=OutputMode.RAW_FILE,
@@ -747,9 +741,7 @@ Vb b 0 {pwl_b}
             }
         return self.strategy.sample_terminal_voltages(self._generate_pwl_voltage)
 
-    def _interpolate_terminal_voltages(
-        self, terminal_voltages: dict[str, tuple[np.ndarray, np.ndarray]]
-    ) -> dict[str, np.ndarray]:
+    def _interpolate_terminal_voltages(self, terminal_voltages: dict[str, tuple[np.ndarray, np.ndarray]]) -> dict[str, np.ndarray]:
         """
         Resamples voltage waveforms onto uniform time grid.
 
@@ -826,7 +818,7 @@ Vb b 0 {pwl_b}
         """
         if self.variable_t_end:
             log_t_end = np.random.uniform(np.log10(self.t_end_min), np.log10(self.t_end_max))
-            self.t_end = 10.0 ** log_t_end
+            self.t_end = 10.0**log_t_end
             self.sim_step = self.t_end / (self.t_steps * 2.0)
         while True:
             width_um, length_um = self._sample_device_geometry()
@@ -995,12 +987,7 @@ class PreGeneratedMosfetDataset(Dataset):
         raw_physics = self.physics[:]
         w_vals = raw_physics[:, 0]
         l_vals = raw_physics[:, 1]
-        mask = (
-            (w_vals >= geo_bin.w_range[0])
-            & (w_vals <= geo_bin.w_range[1])
-            & (l_vals >= geo_bin.l_range[0])
-            & (l_vals <= geo_bin.l_range[1])
-        )
+        mask = (w_vals >= geo_bin.w_range[0]) & (w_vals <= geo_bin.w_range[1]) & (l_vals >= geo_bin.l_range[0]) & (l_vals <= geo_bin.l_range[1])
         total = len(mask)
         self._valid_indices = np.where(mask)[0]
         self.num_samples = len(self._valid_indices)
@@ -1089,7 +1076,7 @@ def debug_visualize(
         t_end=1e-6,
     )
     logger.info("Generating Sample...")
-    (inputs, current_tensor) = next(iter(dataset))
+    inputs, current_tensor = next(iter(dataset))
     v_terminals, physics_params = inputs
     logger.info("Shapes verified:")
     logger.info("  Volts:   %s (Expected: 4, 1024)", v_terminals.shape)
@@ -1101,9 +1088,7 @@ def debug_visualize(
     source_voltage = v_terminals[2].numpy()
     drain_current_ma = current_tensor[0].numpy()
     device_params = _extract_device_parameters(physics_params)
-    _create_diagnostic_plot(
-        time_axis_us, gate_voltage, drain_voltage, source_voltage, drain_current_ma, device_params, filename
-    )
+    _create_diagnostic_plot(time_axis_us, gate_voltage, drain_voltage, source_voltage, drain_current_ma, device_params, filename)
 
 
 def _extract_device_parameters(physics_params: torch.Tensor) -> dict[str, float]:
@@ -1147,9 +1132,7 @@ def _create_diagnostic_plot(
     :param device_params: Device geometry and threshold voltage.
     :param filename: Output file path.
     """
-    logger.info(
-        "Sample Params: W=%su, L=%su, Vth0=%sV", device_params["width"], device_params["length"], device_params["vth0"]
-    )
+    logger.info("Sample Params: W=%su, L=%su, Vth0=%sV", device_params["width"], device_params["length"], device_params["vth0"])
     plt.style.use("dark_background")
     _, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
     ax1.plot(time_us, gate_v, label="Vg", color="lime")
@@ -1226,21 +1209,14 @@ def generate_offline_dataset(
         with h5py.File(output_path, "r") as f:
             existing_samples = f["voltages"].shape[0]
             if f["voltages"].chunks is None:
-                raise ValueError(
-                    f"Cannot append to {output_path}: datasets are not chunked. "
-                    "Use --overwrite to recreate with chunked storage."
-                )
-        logger.info(
-            "Appending to existing dataset: %d samples → %d samples", existing_samples, existing_samples + num_samples
-        )
+                raise ValueError(f"Cannot append to {output_path}: datasets are not chunked. " "Use --overwrite to recreate with chunked storage.")
+        logger.info("Appending to existing dataset: %d samples → %d samples", existing_samples, existing_samples + num_samples)
     elif output_file.exists() and overwrite:
         logger.info("Overwriting existing dataset: %s", output_path)
         output_file.unlink()
     samples_per_worker = num_samples // num_workers
     remainder = num_samples % num_workers
-    logger.info(
-        "Generating %d samples with %d workers (%d samples/worker)", num_samples, num_workers, samples_per_worker
-    )
+    logger.info("Generating %d samples with %d workers (%d samples/worker)", num_samples, num_workers, samples_per_worker)
     temp_dir = Path(output_path).parent / f"temp_generation_{uuid.uuid4().hex[:8]}"
     temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1263,9 +1239,7 @@ def generate_offline_dataset(
             )
             with h5py.File(temp_file, "w") as f:
                 voltages_ds = f.create_dataset("voltages", shape=(num_samples_worker, 4, t_steps), dtype="float32")
-                physics_ds = f.create_dataset(
-                    "physics", shape=(num_samples_worker, ParameterSchema.input_dim()), dtype="float32"
-                )
+                physics_ds = f.create_dataset("physics", shape=(num_samples_worker, ParameterSchema.input_dim()), dtype="float32")
                 current_ds = f.create_dataset("current", shape=(num_samples_worker, 1, t_steps), dtype="float32")
                 for i in range(num_samples_worker):
                     (voltages, physics), current = dataset.generate_sample()
@@ -1314,9 +1288,7 @@ def generate_offline_dataset(
             f_out["physics"].resize((total_samples, ParameterSchema.input_dim()))
             f_out["current"].resize((total_samples, 1, t_steps))
         else:
-            f_out.create_dataset(
-                "voltages", shape=(num_samples, 4, t_steps), dtype="float32", maxshape=(None, 4, t_steps), chunks=True
-            )
+            f_out.create_dataset("voltages", shape=(num_samples, 4, t_steps), dtype="float32", maxshape=(None, 4, t_steps), chunks=True)
             f_out.create_dataset(
                 "physics",
                 shape=(num_samples, ParameterSchema.input_dim()),
@@ -1324,9 +1296,7 @@ def generate_offline_dataset(
                 maxshape=(None, ParameterSchema.input_dim()),
                 chunks=True,
             )
-            f_out.create_dataset(
-                "current", shape=(num_samples, 1, t_steps), dtype="float32", maxshape=(None, 1, t_steps), chunks=True
-            )
+            f_out.create_dataset("current", shape=(num_samples, 1, t_steps), dtype="float32", maxshape=(None, 1, t_steps), chunks=True)
         offset = existing_samples
         for temp_file in temp_files:
             with h5py.File(temp_file, "r") as f_in:
@@ -1384,15 +1354,9 @@ def merge_geometry_bins(
             logger.info("  %s: %d samples (bin=%s)", bin_file, n, f.attrs.get("geometry_bin", "unknown"))
     logger.info("Merging %d files into %s (%d total samples)", len(bin_files), output_path, total_samples)
     with h5py.File(output_path, "w") as f_out:
-        voltages_ds = f_out.create_dataset(
-            "voltages", shape=(total_samples, 4, t_steps), dtype="float32", maxshape=(None, 4, t_steps), chunks=True
-        )
-        physics_ds = f_out.create_dataset(
-            "physics", shape=(total_samples, physics_dim), dtype="float32", maxshape=(None, physics_dim), chunks=True
-        )
-        current_ds = f_out.create_dataset(
-            "current", shape=(total_samples, 1, t_steps), dtype="float32", maxshape=(None, 1, t_steps), chunks=True
-        )
+        voltages_ds = f_out.create_dataset("voltages", shape=(total_samples, 4, t_steps), dtype="float32", maxshape=(None, 4, t_steps), chunks=True)
+        physics_ds = f_out.create_dataset("physics", shape=(total_samples, physics_dim), dtype="float32", maxshape=(None, physics_dim), chunks=True)
+        current_ds = f_out.create_dataset("current", shape=(total_samples, 1, t_steps), dtype="float32", maxshape=(None, 1, t_steps), chunks=True)
         offset = 0
         for bin_file in bin_files:
             with h5py.File(bin_file, "r") as f_in:

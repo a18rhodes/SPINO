@@ -17,7 +17,13 @@ from pathlib import Path
 import numpy as np
 from numpy.typing import NDArray
 
-__all__ = ["parse_ngspice_raw", "run_ngspice", "run_ngspice_capture_log", "spice_temp_workspace", "OutputMode"]
+__all__ = [
+    "parse_ngspice_raw",
+    "run_ngspice",
+    "run_ngspice_capture_log",
+    "spice_temp_workspace",
+    "OutputMode",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +122,11 @@ def _execute_ngspice(cmd: list[str], timeout: float) -> subprocess.CompletedProc
             stderr=stderr,
         )
         if result.returncode != 0:
-            logger.error("NGSpice exited with code %d. stderr: %s", result.returncode, stderr.strip())
+            logger.error(
+                "NGSpice exited with code %d. stderr: %s",
+                result.returncode,
+                stderr.strip(),
+            )
             return None
         return result
     except subprocess.TimeoutExpired:
@@ -164,9 +174,7 @@ def _run_raw_file_mode(spice_file: Path, workspace: Path, timeout: float) -> tup
     return success, parsed
 
 
-def _run_raw_file_mode_with_log(
-    spice_file: Path, workspace: Path, timeout: float
-) -> tuple[bool, dict | None, str]:
+def _run_raw_file_mode_with_log(spice_file: Path, workspace: Path, timeout: float) -> tuple[bool, dict | None, str]:
     """
     Executes NGSpice in raw-file mode and returns the captured stdout.
 
@@ -213,7 +221,9 @@ def run_ngspice_capture_log(
         return _run_raw_file_mode_with_log(spice_file, workspace, timeout)
 
 
-def parse_ngspice_raw(file_path: Path) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]] | None:
+def parse_ngspice_raw(
+    file_path: Path,
+) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]] | None:
     """
     Parses an NGSpice binary raw file into time-series data.
 
@@ -303,9 +313,7 @@ def _decode_binary_data(raw_bytes: bytes, n_vars: int, n_points: int) -> NDArray
     return data.reshape((n_points, n_vars))
 
 
-def _organize_results(
-    data: NDArray[np.float64], var_names: list[str]
-) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]]:
+def _organize_results(data: NDArray[np.float64], var_names: list[str]) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]]:
     """
     Organizes simulation data into time and node dictionaries.
 
@@ -313,7 +321,10 @@ def _organize_results(
     :param var_names: Variable names corresponding to columns.
     :return: Dictionary with 'time' and 'nodes' keys.
     """
-    result: dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]] = {"time": None, "nodes": {}}
+    result: dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]] = {
+        "time": None,
+        "nodes": {},
+    }
     for idx, name in enumerate(var_names):
         clean_name = name.lower()
         if clean_name == _TIME_VARIABLE_NAME:

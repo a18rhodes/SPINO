@@ -62,9 +62,7 @@ logger = logging.getLogger(__name__)
     default="",
     help="Suffix to append to tensorboard log dir (e.g. for hyperparameter variants).",
 )
-@click.option(
-    "--trim-eval", default=DEFAULT_TRIM_EVAL, help="Timesteps to discard from eval start (SPICE .op artifact)."
-)
+@click.option("--trim-eval", default=DEFAULT_TRIM_EVAL, help="Timesteps to discard from eval start (SPICE .op artifact).")
 @click.option(
     "--model-type",
     default="vcfilm",

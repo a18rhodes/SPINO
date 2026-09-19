@@ -104,9 +104,7 @@ def main():
     logger.info("Samples: %d", args.samples)
     logger.info("Strategy: %s", args.strategy)
     logger.info("Waveform mode: %s", args.waveform_mode)
-    logger.info(
-        "Geometry: %s%s", args.geometry_bin or (f"{args.w_bin}x{args.l_bin}" if args.w_bin else "uniform"), bin_info
-    )
+    logger.info("Geometry: %s%s", args.geometry_bin or (f"{args.w_bin}x{args.l_bin}" if args.w_bin else "uniform"), bin_info)
     if args.geometry_bin:
         gbin = GEOMETRY_BINS[args.geometry_bin]
         logger.info("  W range: [%.2f, %.2f] um", *gbin.w_range)

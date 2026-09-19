@@ -239,10 +239,7 @@ def _generate_figure(
     type=float,
     default=_DEFAULT_C_LOAD,
     show_default=True,
-    help=(
-        "Load capacitance at n_out (F). Defines the slew metric: "
-        "slew_rate = I_tail / c_load. Must match the value used in compose_ota."
-    ),
+    help=("Load capacitance at n_out (F). Defines the slew metric: " "slew_rate = I_tail / c_load. Must match the value used in compose_ota."),
 )
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
 def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
@@ -323,8 +320,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
     selected_point, selected_metrics = select_ota_design_point(sweep, rule)
     logger.info(
-        "Selected: Wdiff=%.2f µm, Wmirror=%.2f µm  |  "
-        "slew=%.2f V/µs  t_slew=%.0f ns  swing=%.3f V  Idd=%.3e A  gain=%.1f V/V",
+        "Selected: Wdiff=%.2f µm, Wmirror=%.2f µm  |  " "slew=%.2f V/µs  t_slew=%.0f ns  swing=%.3f V  Idd=%.3e A  gain=%.1f V/V",
         selected_point.diff_w_um,
         selected_point.mirror_w_um,
         selected_metrics.slew_rate_v_per_us,

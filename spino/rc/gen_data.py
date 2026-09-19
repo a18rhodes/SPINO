@@ -17,6 +17,7 @@ from spino.rc.solve import solve_rc_ode
 ### Basic Non-Dimensional Data Generator
 # Generates data normalized by physics principles.
 
+
 # %%
 def generate_dimensionless_data(n_samples=2000, t_steps=2048, device="cuda"):
     """

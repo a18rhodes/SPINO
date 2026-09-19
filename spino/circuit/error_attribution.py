@@ -31,6 +31,7 @@ def _resample_transient_vout(
     vout = np.interp(fno_time, spice_tran.time, spice_tran.variables[_SPICE_OUT])
     return vout, fno_time
 
+
 logger = logging.getLogger(__name__)
 
 __all__ = [

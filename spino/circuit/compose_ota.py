@@ -311,8 +311,8 @@ def _plot_diagnostic_parity(
     # (node_key, ylabel, description, fno_array, spice_array)
     nodes = [
         ("n_tail", r"$V_\mathrm{tail}$ (V)", "M5 drain / diff-pair sources", fno_v_tail, spice_v_tail),
-        ("n_left", r"$V_\mathrm{left}$ (V)", "M3 diode drain / M4 gate",     fno_v_left, spice_v_left),
-        ("n_out",  r"$V_\mathrm{out}$ (V)",  "single-ended output",           fno_v_out,  spice_v_out),
+        ("n_left", r"$V_\mathrm{left}$ (V)", "M3 diode drain / M4 gate", fno_v_left, spice_v_left),
+        ("n_out", r"$V_\mathrm{out}$ (V)", "single-ended output", fno_v_out, spice_v_out),
     ]
 
     fig, axes = plt.subplots(3, 2, figsize=(12.0, 9.0))
@@ -478,9 +478,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     )
 
     time_np = np.arange(0.0, t_end, t_step, dtype=np.float32)
-    vinp_np, vinn_np = _build_input_trajectories(
-        time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp
-    )
+    vinp_np, vinn_np = _build_input_trajectories(time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp)
 
     logger.info("Running FNO transient solver (T=%d timesteps)…", len(time_np))
     tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
