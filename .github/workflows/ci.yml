@@ -5,6 +5,7 @@ on:
     branches: ["**"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -40,7 +41,7 @@ jobs:
         run: poetry run pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Format check (black)
-        run: poetry run black --check .
+        run: poetry run black --check --verbose --config pyproject.toml .
 
       - name: Import order check (isort)
         run: poetry run isort --check-only .
