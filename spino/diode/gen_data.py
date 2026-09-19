@@ -201,7 +201,9 @@ class InfiniteSpiceDiodeDataset(IterableDataset):
     # Phase 3: Post-Processing & Normalization
     # =========================================================================
 
-    def _process_results(self, analysis, source_times: np.ndarray, source_amps: np.ndarray, params: DiodeParameters) -> tuple[torch.Tensor, torch.Tensor]:
+    def _process_results(
+        self, analysis, source_times: np.ndarray, source_amps: np.ndarray, params: DiodeParameters
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Interpolates raw SPICE results to fixed grid and normalizes tensors.
 

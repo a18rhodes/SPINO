@@ -300,9 +300,7 @@ def test_resolution_invariance(
     for geom in GEOMETRIES:
         console.print(f"  Generating hi-res SPICE for {geom.name} at {hi_res_steps} steps...")
         raw_steps_hi = hi_res_steps + TRIM
-        local_ds = InfiniteSpiceMosfetDataset(
-            strategy_name=strategy_name, t_steps=raw_steps_hi, t_end=REFERENCE_T_END
-        )
+        local_ds = InfiniteSpiceMosfetDataset(strategy_name=strategy_name, t_steps=raw_steps_hi, t_end=REFERENCE_T_END)
         ec = local_ds.strategy.eval_config
         times_pwl, vg_vals, vd_vals = instantiate_pwl(pwl, REFERENCE_T_END)
         time_grid_hi = np.linspace(0, REFERENCE_T_END, raw_steps_hi)
@@ -370,6 +368,7 @@ def load_model(model_path: str) -> torch.nn.Module:
     :return: Model in eval mode on ``DEVICE``.
     """
     from spino.mosfet.model import MosfetVCFiLMFNO
+
     model = MosfetVCFiLMFNO(input_param_dim=29, embedding_dim=16, modes=256, width=64)
     state_dict = torch.load(model_path, map_location=DEVICE, weights_only=False)
     model.load_state_dict(state_dict)
@@ -436,7 +435,9 @@ def main() -> None:
         console.print(f"  [yellow]Time-scale FAIL -> {cfg['label']} may need lambda.[/yellow]")
         console.print("  Displacement currents or transient effects are non-negligible.")
     elif ts_pass and not rs_pass:
-        console.print(f"  [yellow]Resolution FAIL -> {cfg['label']} needs canonical-grid resampling at inference.[/yellow]")
+        console.print(
+            f"  [yellow]Resolution FAIL -> {cfg['label']} needs canonical-grid resampling at inference.[/yellow]"
+        )
         console.print("  Spectral filters are grid-coupled. Multi-resolution training or resampling needed.")
     else:
         console.print(f"  [red]Both FAIL -> {cfg['label']} needs full dimensionless formulation.[/red]")

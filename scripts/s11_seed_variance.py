@@ -166,7 +166,13 @@ def _plot(records: list[_RunRecord], output_dir: Path) -> None:
     default=Path("runs/s11_uhlmann/seed_variance"),
     show_default=True,
 )
-@click.option("--surrogate-seeds", type=str, default="0,7,13,17,42", show_default=True, help="Comma-separated surrogate RNG seeds.")
+@click.option(
+    "--surrogate-seeds",
+    type=str,
+    default="0,7,13,17,42",
+    show_default=True,
+    help="Comma-separated surrogate RNG seeds.",
+)
 def main(samples: Path, output_dir: Path, surrogate_seeds: str) -> None:
     """Run the multi-seed Uhlmann variance test and write aggregate JSON + plots."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -206,8 +212,20 @@ def main(samples: Path, output_dir: Path, surrogate_seeds: str) -> None:
     gain = np.array([r.spice_dc_gain_v_per_v for r in records])
     slew = np.array([r.spice_slew_v_per_us for r in records])
     power = np.array([r.spice_power_uw for r in records])
-    logger.info("L_mirror across runs: min=%.3f, mean=%.3f, max=%.3f, std=%.3f", l_mirror.min(), l_mirror.mean(), l_mirror.max(), l_mirror.std())
-    logger.info("DC gain across runs:   min=%.2f, mean=%.2f, max=%.2f, std=%.2f", gain.min(), gain.mean(), gain.max(), gain.std())
+    logger.info(
+        "L_mirror across runs: min=%.3f, mean=%.3f, max=%.3f, std=%.3f",
+        l_mirror.min(),
+        l_mirror.mean(),
+        l_mirror.max(),
+        l_mirror.std(),
+    )
+    logger.info(
+        "DC gain across runs:   min=%.2f, mean=%.2f, max=%.2f, std=%.2f",
+        gain.min(),
+        gain.mean(),
+        gain.max(),
+        gain.std(),
+    )
     logger.info("Slew across runs:      min=%.2f, mean=%.2f, max=%.2f", slew.min(), slew.mean(), slew.max())
     logger.info("Power across runs:     min=%.2f, mean=%.2f, max=%.2f", power.min(), power.mean(), power.max())
 

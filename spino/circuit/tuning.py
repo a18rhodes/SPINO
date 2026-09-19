@@ -341,7 +341,11 @@ def _step_response(  # pylint: disable=too-many-arguments
     :param t_step: Maximum SPICE timestep in seconds.
     :return: Transient result, or ``None`` on simulator failure.
     """
-    pwl = f"PWL(0 {vin_dc} {t_step_start * 0.5} {vin_dc} " f"{t_step_start} {vin_dc + vin_step_amplitude} " f"{t_end} {vin_dc + vin_step_amplitude})"
+    pwl = (
+        f"PWL(0 {vin_dc} {t_step_start * 0.5} {vin_dc} "
+        f"{t_step_start} {vin_dc + vin_step_amplitude} "
+        f"{t_end} {vin_dc + vin_step_amplitude})"
+    )
     circuit = _build(
         point,
         vdd=vdd,
@@ -387,11 +391,17 @@ def simulate_design_point(  # pylint: disable=too-many-arguments,too-many-locals
     :param pdk_root: Optional override for the PDK root path.
     :return: Metrics for this design point; converged flag indicates validity.
     """
-    if (vtc := _vtc(point, vdd=vdd, nfet_l_um=nfet_l_um, pfet_l_um=pfet_l_um, pdk_root=pdk_root, step_v=vtc_step_v)) is None:
+    if (
+        vtc := _vtc(point, vdd=vdd, nfet_l_um=nfet_l_um, pfet_l_um=pfet_l_um, pdk_root=pdk_root, step_v=vtc_step_v)
+    ) is None:
         logger.warning("VTC sweep failed for %s", point)
         return Metrics.failed()
     peak_gain, vin_peak, vout_peak = extract_peak_gain(vtc)
-    if (op := _operating_point(point, vdd=vdd, vin_dc=vin_peak, nfet_l_um=nfet_l_um, pfet_l_um=pfet_l_um, pdk_root=pdk_root)) is None:
+    if (
+        op := _operating_point(
+            point, vdd=vdd, vin_dc=vin_peak, nfet_l_um=nfet_l_um, pfet_l_um=pfet_l_um, pdk_root=pdk_root
+        )
+    ) is None:
         logger.warning("Operating point failed for %s at vin=%.4f V", point, vin_peak)
         return Metrics.failed()
     static_current = abs(float(op.variables[_SUPPLY_CURRENT]))
@@ -727,8 +737,12 @@ def _ota_differential_step_pwl_strings(
     :return: ``(vinp_pwl, vinn_pwl)`` SPICE PWL strings.
     """
     t_rise_end = t_step_start + rise_time_s
-    vinp_pwl = f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v + step_amp_v} {t_end} {vcm_v + step_amp_v})"
-    vinn_pwl = f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v - step_amp_v} {t_end} {vcm_v - step_amp_v})"
+    vinp_pwl = (
+        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v + step_amp_v} {t_end} {vcm_v + step_amp_v})"
+    )
+    vinn_pwl = (
+        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v - step_amp_v} {t_end} {vcm_v - step_amp_v})"
+    )
     return vinp_pwl, vinn_pwl
 
 

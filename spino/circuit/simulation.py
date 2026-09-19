@@ -165,7 +165,9 @@ def run_operating_point(
         success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_op.spice", timeout=timeout)
         iter_count = _parse_iter_count(stdout)
     else:
-        success, parsed = run_ngspice(deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_op.spice", timeout=timeout)
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_op.spice", timeout=timeout
+        )
         iter_count = None
     if not success or parsed is None:
         logger.error("Operating point analysis failed for circuit: %s", circuit.name)
@@ -203,7 +205,9 @@ def run_transient(  # pylint: disable=too-many-arguments,too-many-positional-arg
         success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_tran.spice", timeout=timeout)
         iter_count = _parse_iter_count(stdout)
     else:
-        success, parsed = run_ngspice(deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_tran.spice", timeout=timeout)
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_tran.spice", timeout=timeout
+        )
         iter_count = None
     if not success or parsed is None:
         logger.error("Transient analysis failed for circuit: %s", circuit.name)
@@ -245,7 +249,9 @@ def run_dc_sweep(
         success, parsed, stdout = run_ngspice_capture_log(deck, spice_filename="circuit_dc.spice", timeout=timeout)
         iter_count = _parse_iter_count(stdout)
     else:
-        success, parsed = run_ngspice(deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_dc.spice", timeout=timeout)
+        success, parsed = run_ngspice(
+            deck, output_mode=OutputMode.RAW_FILE, spice_filename="circuit_dc.spice", timeout=timeout
+        )
         iter_count = None
     if not success or parsed is None:
         logger.error("DC sweep analysis failed for circuit: %s", circuit.name)
@@ -255,7 +261,9 @@ def run_dc_sweep(
         sweep_values = nodes.pop(sweep_key)
         return DCSweepResult(sweep_param=sweep_key, sweep_values=sweep_values, variables=nodes, iter_count=iter_count)
     if parsed["time"] is not None:
-        return DCSweepResult(sweep_param=source_name.lower(), sweep_values=parsed["time"], variables=nodes, iter_count=iter_count)
+        return DCSweepResult(
+            sweep_param=source_name.lower(), sweep_values=parsed["time"], variables=nodes, iter_count=iter_count
+        )
     logger.error("Could not identify sweep variable in DC results for circuit: %s", circuit.name)
     return None
 

@@ -88,8 +88,18 @@ def _spice_at_corner(  # pylint: disable=too-many-locals
     rise_time_s = 5e-9
     step_amp_v = problem.step_amp
     t_end = problem.t_end
-    vinp_pwl = f"PWL(0 {vcm_v} " f"{t_step_start} {vcm_v} " f"{t_step_start + rise_time_s} {vcm_v + step_amp_v} " f"{t_end} {vcm_v + step_amp_v})"
-    vinn_pwl = f"PWL(0 {vcm_v} " f"{t_step_start} {vcm_v} " f"{t_step_start + rise_time_s} {vcm_v - step_amp_v} " f"{t_end} {vcm_v - step_amp_v})"
+    vinp_pwl = (
+        f"PWL(0 {vcm_v} "
+        f"{t_step_start} {vcm_v} "
+        f"{t_step_start + rise_time_s} {vcm_v + step_amp_v} "
+        f"{t_end} {vcm_v + step_amp_v})"
+    )
+    vinn_pwl = (
+        f"PWL(0 {vcm_v} "
+        f"{t_step_start} {vcm_v} "
+        f"{t_step_start + rise_time_s} {vcm_v - step_amp_v} "
+        f"{t_end} {vcm_v - step_amp_v})"
+    )
     circuit = build_ota_5t(
         diff_w_um=_W_DIFF,
         diff_l_um=_L_UM,

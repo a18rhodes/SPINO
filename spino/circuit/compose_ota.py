@@ -478,7 +478,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     )
 
     time_np = np.arange(0.0, t_end, t_step, dtype=np.float32)
-    vinp_np, vinn_np = _build_input_trajectories(time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp)
+    vinp_np, vinn_np = _build_input_trajectories(
+        time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp
+    )
 
     logger.info("Running FNO transient solver (T=%d timesteps)…", len(time_np))
     tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)

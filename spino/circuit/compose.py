@@ -112,7 +112,12 @@ def _format_pwl_step(vin_dc: float, t_step_start: float, vin_step_amp: float, t_
     :param t_end: Final time of the analysis window in seconds.
     :return: SPICE-compatible PWL specifier.
     """
-    return f"PWL(0 {vin_dc} " f"{t_step_start * 0.5} {vin_dc} " f"{t_step_start} {vin_dc + vin_step_amp} " f"{t_end} {vin_dc + vin_step_amp})"
+    return (
+        f"PWL(0 {vin_dc} "
+        f"{t_step_start * 0.5} {vin_dc} "
+        f"{t_step_start} {vin_dc + vin_step_amp} "
+        f"{t_end} {vin_dc + vin_step_amp})"
+    )
 
 
 def _build_vin_trajectory(time_s: np.ndarray, vin_dc: float, t_step_start: float, vin_step_amp: float) -> np.ndarray:
@@ -150,7 +155,9 @@ def _spice_op(circuit_kwargs: dict, vin: float) -> tuple[OperatingPoint, float]:
     return op, wall_ms
 
 
-def _spice_transient(circuit_kwargs: dict, vin_dc: float, vin_step_amp: float, t_step: float, t_end: float) -> tuple[TransientResult, float]:
+def _spice_transient(
+    circuit_kwargs: dict, vin_dc: float, vin_step_amp: float, t_step: float, t_end: float
+) -> tuple[TransientResult, float]:
     """
     Runs a SPICE transient using the figure step stimulus.
 
@@ -162,7 +169,9 @@ def _spice_transient(circuit_kwargs: dict, vin_dc: float, vin_step_amp: float, t
     :return: Tuple ``(transient_result, wall_ms)``.
     """
     pwl = _format_pwl_step(vin_dc, _DEFAULT_T_STEP_START, vin_step_amp, t_end)
-    circuit = build_cs_amp_active_load(**{**circuit_kwargs, "vin_dc": vin_dc, "vin_tran": pwl, "c_load_f": _DEFAULT_FIGURE_C_LOAD})
+    circuit = build_cs_amp_active_load(
+        **{**circuit_kwargs, "vin_dc": vin_dc, "vin_tran": pwl, "c_load_f": _DEFAULT_FIGURE_C_LOAD}
+    )
     start = time_module.perf_counter()
     tran = run_transient(circuit, t_step=t_step, t_end=t_end, capture_iters=True)
     wall_ms = 1000.0 * (time_module.perf_counter() - start)
@@ -293,7 +302,8 @@ def _summarize_dc(
             "iter_count": spice_op.iter_count,
             "wall_ms": spice_wall_ms,
         },
-        "rel_v_out_error_vdd": abs(fno_solution.v_out_v - spice_vout) / max(spice_op.variables.get("v(vdd)", 1.8), 1e-9),
+        "rel_v_out_error_vdd": abs(fno_solution.v_out_v - spice_vout)
+        / max(spice_op.variables.get("v(vdd)", 1.8), 1e-9),
     }
     return metrics, report
 
@@ -608,7 +618,9 @@ def _render_figures(
     :param spice_tran: SPICE transient reference.
     :param vtc_block: Dictionary with ``vin_grid``, ``fno_vout``, ``spice_vout``.
     """
-    _plot_vtc_overlay(vtc_block["vin_grid"], vtc_block["fno_vout"], vtc_block["spice_vout"], output_dir / "vtc_overlay.png")
+    _plot_vtc_overlay(
+        vtc_block["vin_grid"], vtc_block["fno_vout"], vtc_block["spice_vout"], output_dir / "vtc_overlay.png"
+    )
     _plot_step_response(transient_solution, spice_tran, output_dir / "step_response_overlay.png")
     _plot_diagnostic_parity(vtc_block, transient_solution, spice_tran, output_dir / "diagnostic_parity.png")
     _plot_convergence(
@@ -726,7 +738,9 @@ def _build_transient(
     time_tensor = torch.from_numpy(time_grid)
     vin_tensor = torch.from_numpy(vin_t)
     fno_solution = solver.solve(time_tensor, vin_tensor, v_out_dc=ic)
-    spice_tran, spice_wall_ms = _spice_transient(spice_kwargs, _DEFAULT_VIN_BIAS, _DEFAULT_VIN_STEP_AMP, _DEFAULT_T_STEP, _DEFAULT_T_END)
+    spice_tran, spice_wall_ms = _spice_transient(
+        spice_kwargs, _DEFAULT_VIN_BIAS, _DEFAULT_VIN_STEP_AMP, _DEFAULT_T_STEP, _DEFAULT_T_END
+    )
     spice_vout_resampled, fno_time = _resample_transient(spice_tran, fno_solution)
     fno_vout = fno_solution.v_out_v.cpu().numpy()
     fno_settling = extract_settling_time(
@@ -803,7 +817,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals
         pfet_dataset=pfet_dataset,
         map_location=device,
     )
-    nominal_metrics, nominal_report, nominal_solution = _run_dc_op(nfet_device, pfet_device, spice_kwargs, "nominal", vin_bias, vdd)
+    nominal_metrics, nominal_report, nominal_solution = _run_dc_op(
+        nfet_device, pfet_device, spice_kwargs, "nominal", vin_bias, vdd
+    )
     off_metrics, off_report, _ = _run_dc_op(nfet_device, pfet_device, spice_kwargs, "off_bias", vin_off_bias, vdd)
     spice_vout_ref = float(nominal_report["spice"]["v_out_v"])
     transient_solution, spice_tran, transient_report = _build_transient(
@@ -823,7 +839,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals
         t_end=_DEFAULT_T_END,
     )
     vin_grid = np.arange(0.0, vdd + 0.5 * vtc_step, vtc_step)
-    fno_vtc, spice_vtc, fno_vtc_wall, spice_vtc_wall = _vtc_sweep(DcOperatingPointSolver(nfet_device, pfet_device, vdd=vdd), vin_grid, spice_kwargs)
+    fno_vtc, spice_vtc, fno_vtc_wall, spice_vtc_wall = _vtc_sweep(
+        DcOperatingPointSolver(nfet_device, pfet_device, vdd=vdd), vin_grid, spice_kwargs
+    )
     vtc_block = {
         "vin_grid": vin_grid,
         "fno_vout": fno_vtc,

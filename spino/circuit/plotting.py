@@ -123,7 +123,10 @@ def plot_vtc(vtc: DCSweepResult, output_path: str | Path, *, design: DesignPoint
     ax.axhline(metrics.vout_at_peak_gain_v, color="#cc0000", linestyle=":", alpha=0.5)
     ax.set_xlabel(r"$V_{in}$ (V)")
     ax.set_ylabel(r"$V_{out}$ (V)")
-    ax.set_title(f"VTC: $W_n = {design.nfet_w_um:g}$ µm, $W_p = {design.pfet_w_um:g}$ µm " f"(peak |gain| = {metrics.peak_gain_v_per_v:.2f} V/V)")
+    ax.set_title(
+        f"VTC: $W_n = {design.nfet_w_um:g}$ µm, $W_p = {design.pfet_w_um:g}$ µm "
+        f"(peak |gain| = {metrics.peak_gain_v_per_v:.2f} V/V)"
+    )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="best")
     fig.tight_layout()
@@ -268,7 +271,9 @@ def plot_step_response_ota(  # pylint: disable=too-many-arguments
         ax.set_xlim(0.0, (t_step_start + t_window_s) * 1e6)
     ax.set_xlabel(r"$t$ ($\mu$s)")
     ax.set_ylabel(r"$V_{out}$ (V)")
-    ax.set_title(f"OTA step response: $W_{{diff}} = {design.diff_w_um:g}$ µm," f" $W_{{mirror}} = {design.mirror_w_um:g}$ µm")
+    ax.set_title(
+        f"OTA step response: $W_{{diff}} = {design.diff_w_um:g}$ µm," f" $W_{{mirror}} = {design.mirror_w_um:g}$ µm"
+    )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper left")
     fig.tight_layout()

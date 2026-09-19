@@ -67,7 +67,9 @@ def _load_surrogate(path: Path, device: torch.device) -> tuple[UhlmannSurrogate,
     return model, stats
 
 
-def _surrogate_forward(model: UhlmannSurrogate, stats: dict, theta: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def _surrogate_forward(
+    model: UhlmannSurrogate, stats: dict, theta: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Return (slew, power, swing) with autograd link to ``theta``."""
     theta_norm = (theta - stats["theta_mean"]) / stats["theta_std"]
     out_norm = model(theta_norm.unsqueeze(0))
@@ -145,7 +147,11 @@ def main(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positio
         trajectory.append(row)
         logger.info(
             "Step %3d | loss=%.4f | slew=%.1f V/µs | power=%.0f µW | swing=%.3f V | θ=%s",
-            step, row["loss"], row["slew_rate_v_per_us"], row["power_uw"], row["swing_v"],
+            step,
+            row["loss"],
+            row["slew_rate_v_per_us"],
+            row["power_uw"],
+            row["swing_v"],
             [f"{v:.3f}" for v in row["theta"]],
         )
 
@@ -155,7 +161,15 @@ def main(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positio
         json.dumps(
             {
                 "theta": final_theta.cpu().tolist(),
-                "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_diff_um", "L_mirror_um", "L_tail_um", "V_bias_v"],
+                "layout": [
+                    "W_diff_um",
+                    "W_mirror_um",
+                    "W_tail_um",
+                    "L_diff_um",
+                    "L_mirror_um",
+                    "L_tail_um",
+                    "V_bias_v",
+                ],
             },
             indent=2,
         ),
