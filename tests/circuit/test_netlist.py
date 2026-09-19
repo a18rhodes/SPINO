@@ -77,9 +77,7 @@ class TestVoltageSource:
         assert src.to_spice_dc() == "Vin in 0 DC 0.9 AC 0.01"
 
     def test_tran_with_pwl(self):
-        src = VoltageSource(
-            name="Vin", positive_node="in", negative_node="0", dc_value=0.9, tran_value="PWL(0 0.9 1n 1.0)"
-        )
+        src = VoltageSource(name="Vin", positive_node="in", negative_node="0", dc_value=0.9, tran_value="PWL(0 0.9 1n 1.0)")
         assert src.to_spice_tran() == "Vin in 0 PWL(0 0.9 1n 1.0)"
 
     def test_tran_falls_back_to_dc_when_no_stimulus(self):
@@ -117,9 +115,7 @@ def _make_two_device_circuit() -> Circuit:
         nets={"drain": "out", "gate": "out", "source": "vdd", "bulk": "vdd"},
     )
     v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=1.8)
-    v_input = VoltageSource(
-        name="Vin", positive_node="in", negative_node="0", dc_value=0.9, tran_value="PWL(0 0.9 1n 1.0)"
-    )
+    v_input = VoltageSource(name="Vin", positive_node="in", negative_node="0", dc_value=0.9, tran_value="PWL(0 0.9 1n 1.0)")
     return Circuit(
         name="Test Circuit",
         devices=(nfet, pfet),

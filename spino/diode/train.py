@@ -206,6 +206,7 @@ def run_dimensionless_training(
     with PreGeneratedDiodeDataset(dataset_path) as dataset:
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
         from spino.diode.model import DiodeFNO
+
         model = DiodeFNO(in_channels=6, n_modes=(modes,), hidden_channels=width).cuda()
         if checkpoint_path:
             logger.info("Loading checkpoint: %s", checkpoint_path)
@@ -213,9 +214,7 @@ def run_dimensionless_training(
             state = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
             model.load_state_dict(state)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6
-        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6)
         loss_fn = _build_loss_fn(target_sobolev_weight)
         loss_history = deque(maxlen=early_stop_patience + 1)
         patience_counter = 0
@@ -234,7 +233,12 @@ def run_dimensionless_training(
             if epoch % 10 == 0 or epoch == n_epochs - 1:
                 logger.info(
                     "Epoch %03d/%d | Total: %.6f | Data: %.6f | Sobolev: %.6f | alpha: %.2f",
-                    epoch, n_epochs, avg_loss, avg_data, avg_sob, alpha,
+                    epoch,
+                    n_epochs,
+                    avg_loss,
+                    avg_data,
+                    avg_sob,
+                    alpha,
                 )
             loss_history.append(avg_loss)
             if len(loss_history) > early_stop_patience:
@@ -268,12 +272,18 @@ def run_dimensionless_training(
             plt.close(fig_adv_final)
         logger.info(
             "Final Eval | Rectifier: R2=%.4f, MSE=%.2e, RMSE=%.4f, MAE=%.2fmV",
-            m_rect["r2"], m_rect["mse"], m_rect["rmse"], m_rect["mae_mv"],
+            m_rect["r2"],
+            m_rect["mse"],
+            m_rect["rmse"],
+            m_rect["mae_mv"],
         )
         if m_adv:
             logger.info(
                 "Final Eval | Adversarial: R2=%.4f, MSE=%.2e, RMSE=%.4f, MAE=%.2fmV",
-                m_adv["r2"], m_adv["mse"], m_adv["rmse"], m_adv["mae_mv"],
+                m_adv["r2"],
+                m_adv["mse"],
+                m_adv["rmse"],
+                m_adv["mae_mv"],
             )
     logger.info("Training complete. Saving checkpoint: %s", run_name)
     torch.save(

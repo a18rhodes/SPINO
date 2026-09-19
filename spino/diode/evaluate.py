@@ -240,7 +240,12 @@ def evaluate_rectifier(
     metrics = compute_metrics(v_true, v_pred)
     logger.info(
         "SPICE: %.0fms | FNO: %.2fms | Speedup: %.0fx | R2=%.4f, MSE=%.2e, MAE=%.2fmV",
-        spice_ms, fno_ms, spice_ms / max(fno_ms, 1e-9), metrics["r2"], metrics["mse"], metrics["mae_mv"],
+        spice_ms,
+        fno_ms,
+        spice_ms / max(fno_ms, 1e-9),
+        metrics["r2"],
+        metrics["mse"],
+        metrics["mae_mv"],
     )
     fig, ax = plt.subplots(1, 2, figsize=(14, 6))
     i_mA = i_amps / 1e-3
@@ -442,7 +447,11 @@ def evaluate_variable_t_end(
         t_end_label = f"{t_end * 1e6:.0f}us" if t_end < 1e-3 else f"{t_end * 1e3:.0f}ms"
         logger.info(
             "T_end=%s (lambda=%.4f): R2=%.4f, MSE=%.2e, MAE=%.2fmV",
-            t_end_label, lambda_val, metrics["r2"], metrics["mse"], metrics["mae_mv"],
+            t_end_label,
+            lambda_val,
+            metrics["r2"],
+            metrics["mse"],
+            metrics["mae_mv"],
         )
         _style_plot(
             ax,

@@ -47,9 +47,7 @@ def drain_current_key_from_op(op: OperatingPoint) -> str:
     for name in op.variables:
         if _DRAIN_CURRENT_KEY_RE.match(name):
             return name
-    raise KeyError(
-        f"No drain current key matching {_DRAIN_CURRENT_KEY_RE.pattern} in {list(op.variables)[:12]}..."
-    )
+    raise KeyError(f"No drain current key matching {_DRAIN_CURRENT_KEY_RE.pattern} in {list(op.variables)[:12]}...")
 
 
 def build_isolated_mosfet_circuit(

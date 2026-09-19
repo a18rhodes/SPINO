@@ -68,7 +68,9 @@ def _to_probe(vg: np.ndarray, vd: np.ndarray, vs: np.ndarray, vb: np.ndarray) ->
             torch.from_numpy(vb).float(),
         ],
         dim=0,
-    ).unsqueeze(0)  # (1, 4, T)
+    ).unsqueeze(
+        0
+    )  # (1, 4, T)
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +108,7 @@ def run_probe1(
         # Fall back to run_dir itself (e.g. if --trace-dir was set explicitly).
         traces_path = run_dir / "spice_traces.npz"
     if not traces_path.exists():
-        raise FileNotFoundError(
-            f"SPICE traces not found in scratch/{run_dir.name}/ or {run_dir}.  "
-            "Re-run compose_ota to generate them."
-        )
+        raise FileNotFoundError(f"SPICE traces not found in scratch/{run_dir.name}/ or {run_dir}.  " "Re-run compose_ota to generate them.")
 
     t = np.load(traces_path)
     time_s: np.ndarray = t["time_s"]

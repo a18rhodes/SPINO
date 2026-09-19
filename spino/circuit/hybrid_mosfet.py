@@ -99,8 +99,7 @@ class HybridMosfetDevice(nn.Module):
                 dtype=v_terminals.dtype,
                 device=v_terminals.device,
             ).reshape(1, 1, -1)
-            mask_t = torch.ones(1, 1, v_terminals.shape[2],
-                                dtype=torch.bool, device=v_terminals.device)
+            mask_t = torch.ones(1, 1, v_terminals.shape[2], dtype=torch.bool, device=v_terminals.device)
             return torch.where(mask_t, ids_spice_full, ids_fno)
         ids_fno = self.fno.drain_current(v_terminals)
         tsteps = int(v_terminals.shape[2])

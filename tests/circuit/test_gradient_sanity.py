@@ -128,9 +128,7 @@ def test_fno_autograd_di_dw_sign_matches_spice_fd() -> None:
     spice_grad = (id_plus - id_minus) / (2.0 * _EPS_UM)
 
     assert fno_grad * spice_grad > 0, (
-        f"Sign mismatch: FNO dI/dw={fno_grad:.3e} A/µm, "
-        f"SPICE FD={spice_grad:.3e} A/µm  "
-        f"(id_plus={id_plus:.3e} A, id_minus={id_minus:.3e} A)"
+        f"Sign mismatch: FNO dI/dw={fno_grad:.3e} A/µm, " f"SPICE FD={spice_grad:.3e} A/µm  " f"(id_plus={id_plus:.3e} A, id_minus={id_minus:.3e} A)"
     )
 
 
@@ -153,6 +151,5 @@ def test_fno_autograd_di_dw_relative_error_below_threshold() -> None:
 
     rel_err = abs(fno_grad - spice_grad) / (abs(spice_grad) + 1e-30)
     assert rel_err < _REL_ERR_TOL, (
-        f"Relative error {rel_err:.1%} exceeds {_REL_ERR_TOL:.0%} gate  "
-        f"(FNO={fno_grad:.3e} A/µm, SPICE FD={spice_grad:.3e} A/µm)"
+        f"Relative error {rel_err:.1%} exceeds {_REL_ERR_TOL:.0%} gate  " f"(FNO={fno_grad:.3e} A/µm, SPICE FD={spice_grad:.3e} A/µm)"
     )
