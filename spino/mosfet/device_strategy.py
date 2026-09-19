@@ -7,9 +7,10 @@ corrections, and evaluation sweep configurations for different transistor types
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable
+from typing import ClassVar
 
 import numpy as np
 
@@ -92,9 +93,9 @@ class DeviceStrategy(ABC):
     can be instantiated by name using the create() factory method.
     """
 
-    _registry: dict[str, type["DeviceStrategy"]] = {}
+    _registry: ClassVar[dict[str, type["DeviceStrategy"]]] = {}
 
-    def __init_subclass__(cls, strategy_name: str = None, **kwargs):
+    def __init_subclass__(cls, strategy_name: str | None = None, **kwargs):
         """
         Registers concrete strategy classes by name during class definition.
 
@@ -147,7 +148,9 @@ class DeviceStrategy(ABC):
         """
 
     @abstractmethod
-    def sample_terminal_voltages(self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    def sample_terminal_voltages(
+        self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """
         Generates device-appropriate voltage waveforms for all terminals.
 
@@ -229,7 +232,9 @@ class Sky130NMOSStrategy(DeviceStrategy, strategy_name="sky130_nmos"):
         """
         return "/app/sky130_volare"
 
-    def sample_terminal_voltages(self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    def sample_terminal_voltages(
+        self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """
         Generates NMOS-specific voltage waveforms.
 
@@ -351,7 +356,9 @@ class Sky130PMOSStrategy(DeviceStrategy, strategy_name="sky130_pmos"):
         """
         return "/app/sky130_volare"
 
-    def sample_terminal_voltages(self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    def sample_terminal_voltages(
+        self, pwl_generator: Callable[[float, float], tuple[np.ndarray, np.ndarray]]
+    ) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """
         Generates PMOS-specific voltage waveforms.
 

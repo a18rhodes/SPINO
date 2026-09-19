@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 """Gradient-based 5T OTA sizing via the Implicit Function Theorem (IFT).
 
 Design vector θ = (W_diff, W_mirror, W_tail, L_common, V_bias).
@@ -14,9 +13,6 @@ BSIM4 queries and evaluates the KCL residual at the fixed converged state.
 
 Power is tracked but not connected to the IFT gradient (see ``extract_metrics``).
 """
-
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-# pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
 
@@ -38,8 +34,8 @@ from spino.circuit.composition_io import (
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
     DEFAULT_PFET_DATASET,
-    load_ota_5t_devices,
     _read_curated_physics,  # internal — used for BSIM re-query in FD loop
+    load_ota_5t_devices,
 )
 from spino.circuit.devices import FnoMosfetDevice
 from spino.circuit.ota_composition import (
@@ -307,7 +303,7 @@ def _eval_tran_residual(
     m1, m2, m3, m4, m5 = devices
     solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
     dt_vec = tg[1:] - tg[:-1]
-    return solver._full_residual_flat(v_flat, vinp_t, vinn_t, v_dc, dt_vec)  # pylint: disable=protected-access
+    return solver._full_residual_flat(v_flat, vinp_t, vinn_t, v_dc, dt_vec)
 
 
 def _jtheta_fd(
@@ -427,11 +423,11 @@ def _make_ift_function(
     The returned class implements the IFT backward pass for the OTA transient solve.
     """
 
-    class _OtaTransientIFT(torch.autograd.Function):  # pylint: disable=abstract-method
+    class _OtaTransientIFT(torch.autograd.Function):
         """IFT-based custom autograd for the OTA transient Newton solve."""
 
         @staticmethod
-        def forward(  # type: ignore[override]  # pylint: disable=arguments-differ
+        def forward(  # type: ignore[override]
             ctx: torch.autograd.function.FunctionCtx,
             theta: Tensor,
             v_dc: Tensor,
@@ -470,7 +466,7 @@ def _make_ift_function(
             return result.v_out_v.detach()
 
         @staticmethod
-        def backward(  # type: ignore[override]  # pylint: disable=arguments-differ
+        def backward(  # type: ignore[override]
             ctx: torch.autograd.function.FunctionCtx,
             grad_v_out: Tensor,
         ) -> tuple[Tensor | None, Tensor | None]:
@@ -496,7 +492,7 @@ def _make_ift_function(
             eye = torch.eye(j_v.shape[0], dtype=j_v.dtype, device=j_v.device)
             j_v_reg = j_v + _TIKHONOV_LAMBDA * eye
             try:
-                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)  # pylint: disable=not-callable  # (3T, n_theta)
+                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)
             except torch.linalg.LinAlgError:
                 logger.warning("IFT solve failed (singular J_v); returning zero gradient.")
                 return torch.zeros(n_theta, device=theta.device), None
@@ -677,10 +673,7 @@ def extract_metrics(
         slew_rate = torch.tensor(0.0)
 
     # Differentiable output swing: max - min in post-step window.
-    if v_post.numel() > 1:
-        swing = torch.max(v_post) - torch.min(v_post)
-    else:
-        swing = torch.tensor(0.0)
+    swing = torch.max(v_post) - torch.min(v_post) if v_post.numel() > 1 else torch.tensor(0.0)
 
     if i_tail_tensor is not None:
         power_uw: Tensor | float = i_tail_tensor.abs() * problem.vdd * 1e6
@@ -861,7 +854,9 @@ def run_adam(
     (output_dir / "trajectory.json").write_text(json.dumps(trajectory, indent=2), encoding="utf-8")
     final_theta = theta.detach()
     (output_dir / "theta_final.json").write_text(
-        json.dumps({"theta": final_theta.tolist(), "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_um", "V_bias_v"]}),
+        json.dumps(
+            {"theta": final_theta.tolist(), "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_um", "V_bias_v"]}
+        ),
         encoding="utf-8",
     )
     logger.info("Adam complete. Final θ: %s", final_theta.tolist())
@@ -898,7 +893,9 @@ def _spice_metrics_at(theta_vals: tuple[float, ...], problem: OtaSizingProblem) 
 
 def _scalar_loss(slew: float, power_uw: float, problem: OtaSizingProblem) -> float:
     """Same hinge loss as :func:`loss_fn` but on float metrics (no autograd)."""
-    return problem.slew_weight * max(0.0, problem.slew_rate_min_v_per_us - slew) + problem.power_weight * max(0.0, power_uw - problem.power_max_uw)
+    return problem.slew_weight * max(0.0, problem.slew_rate_min_v_per_us - slew) + problem.power_weight * max(
+        0.0, power_uw - problem.power_max_uw
+    )
 
 
 def fd_spice_gradient(
@@ -970,7 +967,7 @@ def fd_spice_gradient(
     return grad, slew_base, power_base, loss_base, sims
 
 
-def run_fd_spice_adam(  # pylint: disable=too-many-locals
+def run_fd_spice_adam(
     problem: OtaSizingProblem,
     *,
     theta_init: Tensor,
@@ -1083,7 +1080,8 @@ def spice_validate(
 
     point = OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror)
     logger.info(
-        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, " "L_diff=%.3f, L_mirror=%.3f, L_tail=%.3f, Vbias=%.3f)",
+        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, "
+        "L_diff=%.3f, L_mirror=%.3f, L_tail=%.3f, Vbias=%.3f)",
         w_diff,
         w_mirror,
         w_tail,
@@ -1178,7 +1176,7 @@ def spice_validate(
     help="FD discretisation order for --mode fd-spice. Forward = n_theta + 1 sims/iter (production). "
     "Central = 2*n_theta + 1 sims/iter (matches the IFT internal FD; used for the control study).",
 )
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def main(
     mode: str,
     theta_init: str,
     n_iters: int,
@@ -1198,7 +1196,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
     theta_vals = [float(v) for v in theta_init.split(",")]
     if len(theta_vals) != 7:
-        raise click.BadParameter("theta-init must have exactly 7 comma-separated values: " "W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias.")
+        raise click.BadParameter(
+            "theta-init must have exactly 7 comma-separated values: "
+            "W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias."
+        )
 
     torch_dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
     problem = OtaSizingProblem(
@@ -1229,4 +1230,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

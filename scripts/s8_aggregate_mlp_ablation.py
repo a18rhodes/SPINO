@@ -138,9 +138,21 @@ def main(logs_dir: Path, output_dir: Path) -> None:
         summary[cap] = {
             "n_seeds": len(run_list),
             "seeds": [r.seed for r in run_list],
-            "fast_r2": {"mean": float(arr_fast.mean()), "std": float(arr_fast.std(ddof=0)), "values": arr_fast.tolist()},
-            "transfer_r2": {"mean": float(arr_trans.mean()), "std": float(arr_trans.std(ddof=0)), "values": arr_trans.tolist()},
-            "transfer_subth_r2": {"mean": float(arr_subth.mean()), "std": float(arr_subth.std(ddof=0)), "values": arr_subth.tolist()},
+            "fast_r2": {
+                "mean": float(arr_fast.mean()),
+                "std": float(arr_fast.std(ddof=0)),
+                "values": arr_fast.tolist(),
+            },
+            "transfer_r2": {
+                "mean": float(arr_trans.mean()),
+                "std": float(arr_trans.std(ddof=0)),
+                "values": arr_trans.tolist(),
+            },
+            "transfer_subth_r2": {
+                "mean": float(arr_subth.mean()),
+                "std": float(arr_subth.std(ddof=0)),
+                "values": arr_subth.tolist(),
+            },
             "output_r2": {"mean": float(arr_out.mean()), "std": float(arr_out.std(ddof=0)), "values": arr_out.tolist()},
         }
     aggregate["summary"] = summary
@@ -165,11 +177,17 @@ def main(logs_dir: Path, output_dir: Path) -> None:
     for cap, s in summary.items():
         logger.info(
             "%s (n=%d, seeds=%s): Fast %.3f ± %.3f  Transfer %.4f ± %.4f  SubTh %.4f ± %.4f  Output %.4f ± %.4f",
-            cap, s["n_seeds"], s["seeds"],
-            s["fast_r2"]["mean"], s["fast_r2"]["std"],
-            s["transfer_r2"]["mean"], s["transfer_r2"]["std"],
-            s["transfer_subth_r2"]["mean"], s["transfer_subth_r2"]["std"],
-            s["output_r2"]["mean"], s["output_r2"]["std"],
+            cap,
+            s["n_seeds"],
+            s["seeds"],
+            s["fast_r2"]["mean"],
+            s["fast_r2"]["std"],
+            s["transfer_r2"]["mean"],
+            s["transfer_r2"]["std"],
+            s["transfer_subth_r2"]["mean"],
+            s["transfer_subth_r2"]["std"],
+            s["output_r2"]["mean"],
+            s["output_r2"]["std"],
         )
 
 

@@ -22,10 +22,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from spino.config import PathConfig
-from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
-from spino.mosfet.train import run_final_evaluations
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
+from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
+from spino.mosfet.model import MosfetFiLMFNO, MosfetFNO, MosfetMLP, MosfetVCFiLMFNO
+from spino.mosfet.train import run_final_evaluations
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,7 +62,9 @@ logger = logging.getLogger(__name__)
     default="",
     help="Suffix to append to tensorboard log dir (e.g. for hyperparameter variants).",
 )
-@click.option("--trim-eval", default=DEFAULT_TRIM_EVAL, help="Timesteps to discard from eval start (SPICE .op artifact).")
+@click.option(
+    "--trim-eval", default=DEFAULT_TRIM_EVAL, help="Timesteps to discard from eval start (SPICE .op artifact)."
+)
 @click.option(
     "--model-type",
     default="vcfilm",
@@ -156,5 +158,4 @@ def run_evaluation(
 
 
 if __name__ == "__main__":
-    # pylint: disable=no-value-for-parameter
     run_evaluation()

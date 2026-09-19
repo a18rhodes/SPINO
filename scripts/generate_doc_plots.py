@@ -9,6 +9,7 @@ Usage:
     python -m scripts.generate_doc_plots --device-type pfet
     python -m scripts.generate_doc_plots --device-type nfet
 """
+
 import argparse
 import logging
 import sys
@@ -45,7 +46,9 @@ from spino.mosfet.model import MosfetVCFiLMFNO
 
 __all__ = ["DEVICE_CONFIGS", "generate_comprehensive", "generate_core_sweeps", "generate_sample_iv"]
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S", stream=sys.stdout)
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%H:%M:%S", stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 SPICE_COLOR = "#333333"
@@ -112,7 +115,12 @@ def _plot_error(ax, x, y_true, y_pred, xlabel, title_prefix):
     valid_mask = np.abs(y_true) > 0.001
     mape = np.mean(np.abs(rel_error_pct[valid_mask])) if valid_mask.any() else 0.0
     male_ua = calculate_male(y_true, y_pred)
-    ax.set_title(f"{title_prefix}\nMAE={mae_ua:.2f}uA, MAPE={mape:.1f}%, MALE={male_ua:.2f}uA", fontsize=10, fontweight="bold", color="black")
+    ax.set_title(
+        f"{title_prefix}\nMAE={mae_ua:.2f}uA, MAPE={mape:.1f}%, MALE={male_ua:.2f}uA",
+        fontsize=10,
+        fontweight="bold",
+        color="black",
+    )
     ax.legend(loc="upper left", fontsize=8)
     ax_rel.legend(loc="upper right", fontsize=8)
 
@@ -163,14 +171,21 @@ def generate_sample_iv(
     logger.info("Generating sample I-V plot...")
     np.random.seed(42)
     sample_idx = np.random.randint(0, len(dataset))
-    current_true_ma, current_pred_ma, vg, vd, vs, physics_raw = _infer_and_denormalize_sample(model, dataset, sample_idx, device)
+    current_true_ma, current_pred_ma, vg, vd, vs, physics_raw = _infer_and_denormalize_sample(
+        model, dataset, sample_idx, device
+    )
     w_um, l_um, vth0 = _extract_geometry_label(physics_raw)
     mse = np.mean((current_true_ma - current_pred_ma) ** 2)
     r2 = calculate_r2(current_true_ma, current_pred_ma)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     time_us = np.linspace(0, 1, len(current_true_ma))
     ax = axes[0, 0]
-    _style(ax, f"MOSFET Transient Response\nW={w_um:.2f}\u00b5m, L={l_um:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}", "Normalized Time", "Current (mA)")
+    _style(
+        ax,
+        f"MOSFET Transient Response\nW={w_um:.2f}\u00b5m, L={l_um:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}",
+        "Normalized Time",
+        "Current (mA)",
+    )
     ax.plot(time_us, current_true_ma, color=SPICE_COLOR, linewidth=2, alpha=0.7, label="Ground Truth")
     ax.plot(time_us, current_pred_ma, color=FNO_TRANSFER_COLOR, linestyle=":", linewidth=2, label="FNO Prediction")
     ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
@@ -184,8 +199,18 @@ def generate_sample_iv(
     ax = axes[1, 0]
     _style(ax, f"Parity Plot: Current Prediction | R\u00b2={r2:.4f}", "True Id (mA)", "Predicted Id (mA)")
     ax.scatter(current_true_ma, current_pred_ma, c=PARITY_COLOR, s=15, alpha=0.6, edgecolors="gray", linewidth=0.5)
-    lim_min, lim_max = min(current_true_ma.min(), current_pred_ma.min()), max(current_true_ma.max(), current_pred_ma.max())
-    ax.plot([lim_min, lim_max], [lim_min, lim_max], color=PERFECT_LINE_COLOR, linestyle="--", linewidth=1.5, alpha=0.7, label="Perfect (y=x)")
+    lim_min, lim_max = min(current_true_ma.min(), current_pred_ma.min()), max(
+        current_true_ma.max(), current_pred_ma.max()
+    )
+    ax.plot(
+        [lim_min, lim_max],
+        [lim_min, lim_max],
+        color=PERFECT_LINE_COLOR,
+        linestyle="--",
+        linewidth=1.5,
+        alpha=0.7,
+        label="Perfect (y=x)",
+    )
     ax.set_xlim(lim_min, lim_max)
     ax.set_ylim(lim_min, lim_max)
     ax.legend(loc="upper left", fontsize=9)
@@ -230,7 +255,9 @@ def generate_core_sweeps(
     trim_eval = DEFAULT_TRIM_EVAL
     raw_steps = t_steps + trim_eval
     ec = DeviceStrategy.create(strategy_name).eval_config
-    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9)
+    spice_dataset = InfiniteSpiceMosfetDataset(
+        strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9
+    )
     time_grid = np.linspace(0, spice_dataset.t_end, raw_steps)
     vs_bias = np.full(raw_steps, ec.vs_bias)
     vb_bias = np.full(raw_steps, ec.vb_bias)
@@ -239,35 +266,55 @@ def generate_core_sweeps(
     vg_sweep = np.linspace(ec.transfer_vg_start, ec.transfer_vg_stop, raw_steps)
     vd_sat = np.full(raw_steps, ec.transfer_vd_bias)
     logger.info("  Running transfer sweep (Vd=%.1fV)...", ec.transfer_vd_bias)
-    id_spice_t, id_pred_t, spice_ms, fno_ms = _run_timed_sweep(model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device)
+    id_spice_t, id_pred_t, spice_ms, fno_ms = _run_timed_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device
+    )
     if id_spice_t is None:
         logger.error("  SPICE failed for transfer sweep.")
         plt.close(fig)
         return
     vg_plot, id_spice_t, id_pred_t = _apply_eval_trim(vg_sweep, id_spice_t, id_pred_t, trim=trim_eval)
     r2_transfer = calculate_r2(id_spice_t, id_pred_t)
-    r2_subth = calculate_subthreshold_r2(vg_plot, id_spice_t, id_pred_t, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below)
+    r2_subth = calculate_subthreshold_r2(
+        vg_plot, id_spice_t, id_pred_t, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below
+    )
     l2_transfer = _l2_relative_error(id_spice_t, id_pred_t)
     subth_str = f", SubTh-R\u00b2={r2_subth:.4f}" if r2_subth is not None else ""
-    _style(axes[0, 0], f"Id-Vg Transfer (Saturation)\nW={w_um}\u00b5m, L={l_um}\u00b5m | R\u00b2={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V", "Vg (V)", "|Id| (mA)")
+    _style(
+        axes[0, 0],
+        f"Id-Vg Transfer (Saturation)\nW={w_um}\u00b5m, L={l_um}\u00b5m | R\u00b2={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
+        "Vg (V)",
+        "|Id| (mA)",
+    )
     axes[0, 0].plot(vg_plot, np.abs(id_spice_t), color=SPICE_COLOR, linewidth=2.5, alpha=0.7, label="SPICE")
     axes[0, 0].plot(vg_plot, np.abs(id_pred_t), color=FNO_TRANSFER_COLOR, linestyle=":", linewidth=2, label="FNO")
     axes[0, 0].set_yscale("log")
-    subth_label = f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
-    axes[0, 0].axvline(ec.subth_vg_threshold, color=SUBTH_LINE_COLOR, linewidth=1, linestyle=":", alpha=0.5, label=subth_label)
+    subth_label = (
+        f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
+    )
+    axes[0, 0].axvline(
+        ec.subth_vg_threshold, color=SUBTH_LINE_COLOR, linewidth=1, linestyle=":", alpha=0.5, label=subth_label
+    )
     axes[0, 0].legend(loc="upper left", fontsize=9)
     _plot_error(axes[0, 1], vg_plot, id_spice_t, id_pred_t, "Vg (V)", "Transfer Error")
     vd_sweep = np.linspace(ec.output_vd_start, ec.output_vd_stop, raw_steps)
     vg_drive = np.full(raw_steps, ec.output_vg_drive)
     logger.info("  Running output sweep (Vg=%.1fV)...", ec.output_vg_drive)
-    id_spice_o, id_pred_o, _, _ = _run_timed_sweep(model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device)
+    id_spice_o, id_pred_o, _, _ = _run_timed_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device
+    )
     if id_spice_o is None:
         logger.error("  SPICE failed for output sweep.")
     else:
         vd_plot, id_spice_o, id_pred_o = _apply_eval_trim(vd_sweep, id_spice_o, id_pred_o, trim=trim_eval)
         r2_output = calculate_r2(id_spice_o, id_pred_o)
         l2_output = _l2_relative_error(id_spice_o, id_pred_o)
-        _style(axes[1, 0], f"Id-Vd Output (Linear/Sat)\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V | R\u00b2={r2_output:.4f}, L2={l2_output:.4f}", "Vd (V)", "Id (mA)")
+        _style(
+            axes[1, 0],
+            f"Id-Vd Output (Linear/Sat)\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V | R\u00b2={r2_output:.4f}, L2={l2_output:.4f}",
+            "Vd (V)",
+            "Id (mA)",
+        )
         axes[1, 0].plot(vd_plot, id_spice_o, color=SPICE_COLOR, linewidth=2.5, alpha=0.7, label="SPICE")
         axes[1, 0].plot(vd_plot, id_pred_o, color=FNO_SWEEP_COLOR, linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
@@ -276,8 +323,15 @@ def generate_core_sweeps(
     out_path = output_dir / "core_iv_sweeps.png"
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    logger.info("  Saved: %s (Transfer R2=%.4f, Output R2=%.4f)", out_path, r2_transfer, r2_output if id_spice_o is not None else 0.0)
-    logger.info("  SPICE: %.1f ms | FNO: %.2f ms | Speedup: %.0fx", spice_ms, fno_ms, spice_ms / fno_ms if fno_ms > 0 else 0)
+    logger.info(
+        "  Saved: %s (Transfer R2=%.4f, Output R2=%.4f)",
+        out_path,
+        r2_transfer,
+        r2_output if id_spice_o is not None else 0.0,
+    )
+    logger.info(
+        "  SPICE: %.1f ms | FNO: %.2f ms | Speedup: %.0fx", spice_ms, fno_ms, spice_ms / fno_ms if fno_ms > 0 else 0
+    )
 
 
 def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output_dir, device, strategy_name):
@@ -286,7 +340,9 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
     trim_eval = DEFAULT_TRIM_EVAL
     raw_steps = t_steps + trim_eval
     ec = DeviceStrategy.create(strategy_name).eval_config
-    spice_dataset = InfiniteSpiceMosfetDataset(strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9)
+    spice_dataset = InfiniteSpiceMosfetDataset(
+        strategy_name=ec.strategy_name, t_steps=raw_steps, t_end=raw_steps * 1e-9
+    )
     time_grid = np.linspace(0, spice_dataset.t_end, raw_steps)
     vs_bias = np.full(raw_steps, ec.vs_bias)
     vb_bias = np.full(raw_steps, ec.vb_bias)
@@ -295,19 +351,32 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
     metrics = {}
     vg_sweep = np.linspace(ec.transfer_vg_start, ec.transfer_vg_stop, raw_steps)
     vd_sat = np.full(raw_steps, ec.transfer_vd_bias)
-    id_spice_ramp, id_pred_ramp = _run_single_sweep(model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device)
+    id_spice_ramp, id_pred_ramp = _run_single_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_sweep, vd_sat, vs_bias, vb_bias, w_um, l_um, device
+    )
     if id_spice_ramp is not None:
         vg_t, id_spice_ramp, id_pred_ramp = _apply_eval_trim(vg_sweep, id_spice_ramp, id_pred_ramp, trim=trim_eval)
         r2_ramp = calculate_r2(id_spice_ramp, id_pred_ramp)
-        r2_ramp_subth = calculate_subthreshold_r2(vg_t, id_spice_ramp, id_pred_ramp, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below)
+        r2_ramp_subth = calculate_subthreshold_r2(
+            vg_t, id_spice_ramp, id_pred_ramp, vg_threshold=ec.subth_vg_threshold, below=ec.subth_below
+        )
         metrics["ramp_r2"] = r2_ramp
         metrics["ramp_r2_subth"] = r2_ramp_subth if r2_ramp_subth is not None else 0.0
         subth_str = f", SubTh={r2_ramp_subth:.4f}" if r2_ramp_subth is not None else ""
-        _style(axes[0, 0], f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd={ec.transfer_vd_bias:.1f}V", "Vg (V)", "|Id| (mA)")
+        _style(
+            axes[0, 0],
+            f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd={ec.transfer_vd_bias:.1f}V",
+            "Vg (V)",
+            "|Id| (mA)",
+        )
         axes[0, 0].plot(vg_t, np.abs(id_spice_ramp), color=SPICE_COLOR, linewidth=2.5, alpha=0.7, label="SPICE")
         axes[0, 0].plot(vg_t, np.abs(id_pred_ramp), color=FNO_TRANSFER_COLOR, linestyle=":", linewidth=2, label="FNO")
-        subth_label = f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
-        axes[0, 0].axvline(ec.subth_vg_threshold, color=SUBTH_LINE_COLOR, linewidth=1, linestyle=":", alpha=0.5, label=subth_label)
+        subth_label = (
+            f"SubTh (Vg<{ec.subth_vg_threshold:.1f}V)" if ec.subth_below else f"SubTh (Vg>{ec.subth_vg_threshold:.1f}V)"
+        )
+        axes[0, 0].axvline(
+            ec.subth_vg_threshold, color=SUBTH_LINE_COLOR, linewidth=1, linestyle=":", alpha=0.5, label=subth_label
+        )
         axes[0, 0].set_yscale("log")
         axes[0, 0].legend(loc="upper left", fontsize=9)
         _plot_error(axes[0, 1], vg_t, id_spice_ramp, id_pred_ramp, "Vg (V)", "Ramp Error")
@@ -317,7 +386,9 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
         _style(axes[0, 2], f"Ramp Parity | R2={r2_ramp:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
     vd_sweep = np.linspace(ec.output_vd_start, ec.output_vd_stop, raw_steps)
     vg_drive = np.full(raw_steps, ec.output_vg_drive)
-    id_spice_sweep, id_pred_sweep = _run_single_sweep(model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device)
+    id_spice_sweep, id_pred_sweep = _run_single_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_drive, vd_sweep, vs_bias, vb_bias, w_um, l_um, device
+    )
     if id_spice_sweep is not None:
         vd_t, id_spice_sweep, id_pred_sweep = _apply_eval_trim(vd_sweep, id_spice_sweep, id_pred_sweep, trim=trim_eval)
         r2_sweep = calculate_r2(id_spice_sweep, id_pred_sweep)
@@ -339,14 +410,21 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
     vd_pwl_raw = np.random.uniform(*ec.random_vd_range, len(pwl_times))
     vg_pwl = np.interp(time_grid, pwl_times, vg_pwl_raw)
     vd_pwl = np.interp(time_grid, pwl_times, vd_pwl_raw)
-    id_spice_pwl, id_pred_pwl = _run_single_sweep(model, dataset, spice_dataset, p_tensor, time_grid, vg_pwl, vd_pwl, vs_bias, vb_bias, w_um, l_um, device)
+    id_spice_pwl, id_pred_pwl = _run_single_sweep(
+        model, dataset, spice_dataset, p_tensor, time_grid, vg_pwl, vd_pwl, vs_bias, vb_bias, w_um, l_um, device
+    )
     if id_spice_pwl is not None:
         time_t, id_spice_pwl, id_pred_pwl = _apply_eval_trim(time_grid, id_spice_pwl, id_pred_pwl, trim=trim_eval)
         vg_pwl, vd_pwl = _apply_eval_trim(vg_pwl, vd_pwl, trim=trim_eval)
         r2_pwl = calculate_r2(id_spice_pwl, id_pred_pwl)
         metrics["random_r2"] = r2_pwl
         time_us = time_t * 1e6
-        _style(axes[2, 0], f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs={ec.vs_bias:.1f}V", "Time (us)", "Id (mA)")
+        _style(
+            axes[2, 0],
+            f"Random: PWL Transient | R2={r2_pwl:.4f}\nVg/Vd=PWL, Vs={ec.vs_bias:.1f}V",
+            "Time (us)",
+            "Id (mA)",
+        )
         axes[2, 0].plot(time_us, id_spice_pwl, color=SPICE_COLOR, linewidth=2, alpha=0.7, label="SPICE")
         axes[2, 0].plot(time_us, id_pred_pwl, color=FNO_RANDOM_COLOR, linestyle=":", linewidth=1.5, label="FNO")
         axes[2, 0].legend(loc="upper right", fontsize=9)
@@ -361,7 +439,12 @@ def _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output
         lims = [min(id_spice_pwl.min(), id_pred_pwl.min()), max(id_spice_pwl.max(), id_pred_pwl.max())]
         axes[2, 2].plot(lims, lims, color=PERFECT_LINE_COLOR, linestyle="--", linewidth=1, alpha=0.7)
         _style(axes[2, 2], f"Random Parity | R2={r2_pwl:.4f}", "SPICE Id (mA)", "FNO Id (mA)")
-    fig.suptitle(f"Comprehensive: {geom_name.upper()} (W={w_um:.2f}um, L={l_um:.2f}um)", fontsize=14, fontweight="bold", color="black")
+    fig.suptitle(
+        f"Comprehensive: {geom_name.upper()} (W={w_um:.2f}um, L={l_um:.2f}um)",
+        fontsize=14,
+        fontweight="bold",
+        color="black",
+    )
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     comp_dir = output_dir / "comprehensive"
     comp_dir.mkdir(parents=True, exist_ok=True)
@@ -399,9 +482,17 @@ def generate_comprehensive(
         "xlarge": (8.0, 1.75),
     }
     for geom_name, (w_um, l_um) in test_geometries.items():
-        metrics = _generate_comprehensive_single(model, dataset, w_um, l_um, geom_name, output_dir, device, strategy_name)
+        metrics = _generate_comprehensive_single(
+            model, dataset, w_um, l_um, geom_name, output_dir, device, strategy_name
+        )
         if metrics:
-            logger.info("    %s: Ramp=%.4f, Sweep=%.4f, Random=%.4f", geom_name, metrics.get("ramp_r2", 0), metrics.get("sweep_r2", 0), metrics.get("random_r2", 0))
+            logger.info(
+                "    %s: Ramp=%.4f, Sweep=%.4f, Random=%.4f",
+                geom_name,
+                metrics.get("ramp_r2", 0),
+                metrics.get("sweep_r2", 0),
+                metrics.get("random_r2", 0),
+            )
 
 
 def main() -> None:
@@ -413,7 +504,9 @@ def main() -> None:
     runs all three plot generators in sequence.
     """
     parser = argparse.ArgumentParser(description="Generate light-mode MOSFET doc plots.")
-    parser.add_argument("--device-type", choices=list(DEVICE_CONFIGS.keys()), required=True, help="MOSFET type to generate plots for.")
+    parser.add_argument(
+        "--device-type", choices=list(DEVICE_CONFIGS.keys()), required=True, help="MOSFET type to generate plots for."
+    )
     parser.add_argument(
         "--compute-device",
         default="cuda" if torch.cuda.is_available() else "cpu",

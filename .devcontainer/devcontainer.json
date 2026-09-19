@@ -17,14 +17,19 @@
     "vscode": {
       "settings": {
         "python.defaultInterpreterPath": "/opt/venv/bin/python",
-        "editor.formatOnSave": true
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
+        }
       },
       "extensions": [
         "ms-python.python",
         "ms-toolsai.jupyter",
         "ms-python.vscode-pylance",
-        "ms-python.black-formatter",
-        "ms-python.pylint",
+        "charliermarsh.ruff",
         "quarto.quarto",
         "ms-toolsai.tensorboard",
         "tamasfe.even-better-toml"

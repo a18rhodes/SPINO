@@ -125,7 +125,9 @@ def _train(
     target_std = torch.tensor(target_train.std(axis=0) + 1e-6, dtype=torch.float32, device=device)
     stats = _NormStats(theta_mean, theta_std, target_mean, target_std)
 
-    model = UhlmannSurrogate(in_dim=theta_train.shape[1], out_dim=target_train.shape[1], hidden_dim=hidden_dim, n_hidden=n_hidden).to(device)
+    model = UhlmannSurrogate(
+        in_dim=theta_train.shape[1], out_dim=target_train.shape[1], hidden_dim=hidden_dim, n_hidden=n_hidden
+    ).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs)
 
@@ -186,22 +188,34 @@ def _gradient_r2(
             try:
                 m_p = simulate_ota_design_point(
                     OtaDesignPoint(diff_w_um=float(plus[0]), mirror_w_um=float(plus[1])),
-                    vdd=problem.vdd, vcm_v=problem.vcm, step_amp_v=problem.step_amp,
-                    diff_l_um=float(plus[3]), mirror_l_um=float(plus[4]),
-                    tail_w_um=float(plus[2]), tail_l_um=float(plus[5]),
+                    vdd=problem.vdd,
+                    vcm_v=problem.vcm,
+                    step_amp_v=problem.step_amp,
+                    diff_l_um=float(plus[3]),
+                    mirror_l_um=float(plus[4]),
+                    tail_w_um=float(plus[2]),
+                    tail_l_um=float(plus[5]),
                     vbias_v=float(plus[6]),
-                    t_step_start=problem.t_step_start, t_end=problem.t_end,
-                    t_step=problem.t_step, c_load_f=problem.c_load_f,
+                    t_step_start=problem.t_step_start,
+                    t_end=problem.t_end,
+                    t_step=problem.t_step,
+                    c_load_f=problem.c_load_f,
                     pdk_root=problem.pdk_root,
                 )
                 m_m = simulate_ota_design_point(
                     OtaDesignPoint(diff_w_um=float(minus[0]), mirror_w_um=float(minus[1])),
-                    vdd=problem.vdd, vcm_v=problem.vcm, step_amp_v=problem.step_amp,
-                    diff_l_um=float(minus[3]), mirror_l_um=float(minus[4]),
-                    tail_w_um=float(minus[2]), tail_l_um=float(minus[5]),
+                    vdd=problem.vdd,
+                    vcm_v=problem.vcm,
+                    step_amp_v=problem.step_amp,
+                    diff_l_um=float(minus[3]),
+                    mirror_l_um=float(minus[4]),
+                    tail_w_um=float(minus[2]),
+                    tail_l_um=float(minus[5]),
                     vbias_v=float(minus[6]),
-                    t_step_start=problem.t_step_start, t_end=problem.t_end,
-                    t_step=problem.t_step, c_load_f=problem.c_load_f,
+                    t_step_start=problem.t_step_start,
+                    t_end=problem.t_end,
+                    t_step=problem.t_step,
+                    c_load_f=problem.c_load_f,
                     pdk_root=problem.pdk_root,
                 )
                 if m_p.converged and m_m.converged:
@@ -240,7 +254,12 @@ def _gradient_r2(
 @click.option("--n-hidden", type=int, default=3, show_default=True)
 @click.option("--test-frac", type=float, default=0.15, show_default=True)
 @click.option("--n-grad-eval", type=int, default=15, show_default=True, help="Held-out points for gradient R² check.")
-@click.option("--skip-gradient-check", is_flag=True, default=False, help="Skip the slow SPICE gradient-R² check (only the MLP fit + test R² are reported).")
+@click.option(
+    "--skip-gradient-check",
+    is_flag=True,
+    default=False,
+    help="Skip the slow SPICE gradient-R² check (only the MLP fit + test R² are reported).",
+)
 @click.option("--seed", type=int, default=0, show_default=True, help="RNG seed for train/test split + MLP init.")
 @click.option("--device", type=str, default=None)
 def main(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
@@ -278,8 +297,15 @@ def main(  # pylint: disable=too-many-locals,too-many-arguments,too-many-positio
     logger.info("Split: %d train / %d test", theta_train.shape[0], theta_test.shape[0])
 
     model, stats, history = _train(
-        theta_train, target_train, theta_test, target_test,
-        hidden_dim=hidden_dim, n_hidden=n_hidden, epochs=epochs, lr=lr, device=torch_device,
+        theta_train,
+        target_train,
+        theta_test,
+        target_test,
+        hidden_dim=hidden_dim,
+        n_hidden=n_hidden,
+        epochs=epochs,
+        lr=lr,
+        device=torch_device,
     )
 
     model.eval()

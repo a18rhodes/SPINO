@@ -24,9 +24,7 @@ click = "^8.3.1"
 [tool.poetry.group.dev.dependencies]
 pytest = ">=7,<10"
 pytest-cov = "^4.0"
-black = { extras = ["jupyter"], version = "^26.3.1" }
-pylint = "^4.0.4"
-isort = "^7.0.0"
+ruff = "^0.16.8"
 mypy = "^1.19.1"
 jupyterlab = "^4.5.10"
 
@@ -34,14 +32,33 @@ jupyterlab = "^4.5.10"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.black]
+[tool.ruff]
 line-length = 120
+target-version = "py311"
+exclude = ["sky130_volare", ".venv", "*.ipynb"]
 
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    "N803",   # Argument name should be lowercase — physics variable convention
+    "N806",   # Variable in function should be lowercase — physics variable convention
+    "N812",   # Lowercase imported as non-lowercase — torch.nn.functional as F/AF is standard
+    "RUF001", # Ambiguous character in string — intentional math notation
+    "RUF002", # Ambiguous character in docstring — intentional math notation
+    "B905",   # zip() without explicit strict= — not enforced project-wide
+    "E741",   # Ambiguous variable name — single-letter physics variables (I, l) are standard
+]
 
-[tool.pylint.format]
-max-line-length = 120
+[tool.ruff.lint.per-file-ignores]
+"spino/spice_benchmark.py" = ["F403", "F405"]
+"spino/benchmarking/*.py" = ["F403", "F405"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["spino"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

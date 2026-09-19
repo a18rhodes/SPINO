@@ -98,7 +98,9 @@ def cache_nfet(
             corner=corner,
             thresholds=RelAbsThresholds(),
         )
-        (out.parent / (out.stem + "_validation.json")).write_text(json.dumps({"pass": ok, "records": records}, indent=2))
+        (out.parent / (out.stem + "_validation.json")).write_text(
+            json.dumps({"pass": ok, "records": records}, indent=2)
+        )
         if not ok:
             raise SystemExit("IV cache validation failed; see validation JSON")
     logger.info("Wrote %s", out.resolve())
@@ -170,7 +172,9 @@ def cache_pfet(
             corner=corner,
             thresholds=RelAbsThresholds(),
         )
-        (out.parent / (out.stem + "_validation.json")).write_text(json.dumps({"pass": ok, "records": records}, indent=2))
+        (out.parent / (out.stem + "_validation.json")).write_text(
+            json.dumps({"pass": ok, "records": records}, indent=2)
+        )
         if not ok:
             raise SystemExit("IV cache validation failed; see validation JSON")
     logger.info("Wrote %s", out.resolve())

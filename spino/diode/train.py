@@ -32,7 +32,10 @@ from torch.utils.tensorboard import SummaryWriter
 from spino.archive import backup_artifacts
 from spino.config import PathConfig
 from spino.diode.evaluate import evaluate_adversarial, evaluate_rectifier
-from spino.diode.gen_data import DimensionlessDiodeDataset, InfiniteSpiceDiodeDataset, PreGeneratedDiodeDataset
+from spino.diode.gen_data import (
+    InfiniteSpiceDiodeDataset,
+    PreGeneratedDiodeDataset,
+)
 from spino.diode.model import get_model
 from spino.loss import GenericDimensionlessPhysicsLoss
 from spino.utils import generate_unique_id
@@ -214,7 +217,9 @@ def run_dimensionless_training(
             state = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
             model.load_state_dict(state)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6
+        )
         loss_fn = _build_loss_fn(target_sobolev_weight)
         loss_history = deque(maxlen=early_stop_patience + 1)
         patience_counter = 0
@@ -254,7 +259,7 @@ def run_dimensionless_training(
                 fig_rect, m_val = evaluate_rectifier(model, dimensionless=True)
                 training_fig_dir = path_config.figure_dir / "training" / run_name
                 training_fig_dir.mkdir(parents=True, exist_ok=True)
-                fig_rect.savefig(training_fig_dir / f"rectifier_epoch_{epoch+1}.png")
+                fig_rect.savefig(training_fig_dir / f"rectifier_epoch_{epoch + 1}.png")
                 writer.add_figure("Validation/Rectifier", fig_rect, epoch)
                 writer.add_scalar("Validation/R2_Rectifier", m_val["r2"], epoch)
                 writer.add_scalar("Validation/MSE_Rectifier", m_val["mse"], epoch)
@@ -344,7 +349,9 @@ def run_legacy_training(
     loader_iter = iter(train_loader)
     avg_loss = float("nan")
     for epoch in range(n_epochs):
-        avg_loss, loader_iter = _train_epoch_online(model, loader_iter, optimizer, mse_loss, steps_per_epoch, train_loader)
+        avg_loss, loader_iter = _train_epoch_online(
+            model, loader_iter, optimizer, mse_loss, steps_per_epoch, train_loader
+        )
         scheduler.step()
         writer.add_scalar("Loss/train", avg_loss, epoch)
         writer.add_scalar("Params/lr", optimizer.param_groups[0]["lr"], epoch)
@@ -352,7 +359,7 @@ def run_legacy_training(
             logger.info("Epoch %03d/%d | Loss (MSE): %.6f", epoch, n_epochs, avg_loss)
         if (epoch + 1) % 10 == 0:
             fig_rect, _ = evaluate_rectifier(model, dimensionless=False)
-            fig_rect.savefig(path_config.figure_dir / f"{run_name}_rectifier_epoch_{epoch+1}.png")
+            fig_rect.savefig(path_config.figure_dir / f"{run_name}_rectifier_epoch_{epoch + 1}.png")
             writer.add_figure("Validation/Rectifier", fig_rect, epoch)
             plt.close(fig_rect)
     logger.info("Training Complete.")
@@ -377,7 +384,9 @@ def run_legacy_training(
 
 
 @click.command()
-@click.option("--dataset-path", default=None, type=click.Path(exists=True), help="HDF5 dataset for dimensionless training.")
+@click.option(
+    "--dataset-path", default=None, type=click.Path(exists=True), help="HDF5 dataset for dimensionless training."
+)
 @click.option("--experiment-name", default="diode_dimensionless", help="Base name for run identification.")
 @click.option("--n-epochs", default=250, show_default=True, help="Number of training epochs.")
 @click.option("--batch-size", default=64, show_default=True, help="Training batch size.")
@@ -424,7 +433,9 @@ def main(
         )
     else:
         if not dataset_path:
-            raise click.UsageError("--dataset-path is required for dimensionless training. Use --legacy for on-the-fly mode.")
+            raise click.UsageError(
+                "--dataset-path is required for dimensionless training. Use --legacy for on-the-fly mode."
+            )
         run_dimensionless_training(
             dataset_path=dataset_path,
             experiment_name=experiment_name,
@@ -445,4 +456,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

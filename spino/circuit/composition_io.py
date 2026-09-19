@@ -203,7 +203,7 @@ def load_fno_device(
     return device_wrapper.to(map_location)
 
 
-def load_cs_amp_devices(  # pylint: disable=too-many-arguments
+def load_cs_amp_devices(
     *,
     nfet_w_um: float,
     nfet_l_um: float,
@@ -310,7 +310,7 @@ def load_inverter_chain_devices(
     return tuple(nfets_list), tuple(pfets_list)
 
 
-def load_ota_5t_devices(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def load_ota_5t_devices(
     *,
     diff_w_um: float,
     diff_l_um: float,

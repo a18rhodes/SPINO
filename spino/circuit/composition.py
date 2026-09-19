@@ -22,15 +22,13 @@ diagnostics are returned via :class:`ConvergenceReport`.
 """
 
 # Solver classes are configuration-heavy by design; keep NR parameters explicit.
-# pylint: disable=too-many-arguments,too-many-instance-attributes,too-few-public-methods
-# pylint: disable=too-many-locals,too-many-positional-arguments
 
 from __future__ import annotations
 
 import logging
 import time as time_module
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 import torch
 from torch import Tensor
@@ -42,8 +40,8 @@ __all__ = [
     "ConvergenceReport",
     "DcOperatingPointSolver",
     "DcSolution",
-    "TransientSolver",
     "TransientSolution",
+    "TransientSolver",
     "transient_kcl_residual_waveform",
 ]
 
@@ -575,7 +573,7 @@ class TransientSolver:
         with torch.no_grad():
             residual = residual_fn(v_out)
         jacobian = torch.autograd.functional.jacobian(residual_fn, v_out, vectorize=True)
-        direction = torch.linalg.solve(jacobian, -residual)  # pylint: disable=not-callable
+        direction = torch.linalg.solve(jacobian, -residual)
         alpha, _ = _backtrack(
             residual_fn,
             v_out,

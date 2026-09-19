@@ -28,21 +28,21 @@ from torch.utils.tensorboard import SummaryWriter
 from spino.config import PathConfig
 from spino.loss import (
     ArcSinhMSELoss,
+    Log10Loss,
     LpLoss,
     LpLossWithFloor,
-    Log10Loss,
     RegionAdaptiveLoss,
     SubthresholdWeightedLoss,
 )
 from spino.mosfet.evaluate import (
+    DEFAULT_TRIM_EVAL,
     evaluate_comprehensive,
     evaluate_sample_iv_curves,
     evaluate_spice_iv_sweeps,
     log_evaluation_summary,
-    DEFAULT_TRIM_EVAL,
 )
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
+from spino.mosfet.model import MosfetFiLMFNO, MosfetFNO, MosfetMLP, MosfetVCFiLMFNO
 from spino.utils import generate_unique_id, timeit
 
 # Configure Logging
@@ -93,10 +93,14 @@ def _initialize_training_components(
     :return: Tuple of (model, optimizer, scheduler, loss_fn).
     """
     if model_type == "vcfilm":
-        model = MosfetVCFiLMFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
+        model = MosfetVCFiLMFNO(
+            input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
+        ).cuda()
         logger.info("Initialized MosfetVCFiLMFNO (Voltage-Conditioned FiLM architecture)")
     elif model_type == "film":
-        model = MosfetFiLMFNO(input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width).cuda()
+        model = MosfetFiLMFNO(
+            input_param_dim=input_param_dim, embedding_dim=embedding_dim, modes=modes, width=width
+        ).cuda()
         logger.info("Initialized MosfetFiLMFNO (FiLM architecture)")
     elif model_type == "mlp":
         model = MosfetMLP(input_param_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=width).cuda()
@@ -106,7 +110,9 @@ def _initialize_training_components(
         logger.info("Initialized MosfetFNO (Concat architecture)")
 
     optimizer = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6)
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6
+    )
     if loss_type == "mse":
         loss_fn = ArcSinhMSELoss().cuda()
         logger.info("Using ArcSinhMSELoss (plain MSE in arcsinh space, no denominator)")
@@ -123,7 +129,9 @@ def _initialize_training_components(
         if vg_mean is None or vg_std is None:
             logger.warning("vg_mean/vg_std not provided, using defaults from 40K dataset")
             vg_mean, vg_std = 0.755, 0.476
-        loss_fn = RegionAdaptiveLoss(subth_weight=loss_scale_ma, sat_weight=loss_exponent, vg_mean=vg_mean, vg_std=vg_std).cuda()
+        loss_fn = RegionAdaptiveLoss(
+            subth_weight=loss_scale_ma, sat_weight=loss_exponent, vg_mean=vg_mean, vg_std=vg_std
+        ).cuda()
         logger.info(
             "Using RegionAdaptiveLoss: subth_weight=%.2f, sat_weight=%.2f, vg_norm_threshold=%.3f",
             loss_scale_ma,
@@ -210,10 +218,7 @@ def _train_epoch(model, loader, optimizer, scheduler, loss_fn):
         target = current_target.cuda()
         optimizer.zero_grad()
         pred = model(voltages, physics)
-        if isinstance(loss_fn, RegionAdaptiveLoss):
-            loss = loss_fn(pred, target, voltages)
-        else:
-            loss = loss_fn(pred, target)
+        loss = loss_fn(pred, target, voltages) if isinstance(loss_fn, RegionAdaptiveLoss) else loss_fn(pred, target)
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -224,7 +229,9 @@ def _train_epoch(model, loader, optimizer, scheduler, loss_fn):
     return total_loss / batch_count
 
 
-def _check_early_stopping(loss_history, patience_counter, avg_loss, early_stop_patience, early_stop_threshold, writer, epoch):
+def _check_early_stopping(
+    loss_history, patience_counter, avg_loss, early_stop_patience, early_stop_threshold, writer, epoch
+):
     """
     Checks if early stopping should be triggered.
 
@@ -272,13 +279,15 @@ def _run_periodic_evaluation(model, dataset, path_config, run_name, writer, epoc
     fig_iv, r2_iv = evaluate_sample_iv_curves(model, dataset, device="cuda")
     training_fig_dir = path_config.figure_dir / "training" / run_name
     training_fig_dir.mkdir(parents=True, exist_ok=True)
-    fig_iv.savefig(training_fig_dir / f"iv_epoch_{epoch+1}.png")
+    fig_iv.savefig(training_fig_dir / f"iv_epoch_{epoch + 1}.png")
     writer.add_figure("Validation/IV_Curves", fig_iv, epoch)
     writer.add_scalar("Validation/R2", r2_iv, epoch)
     plt.close(fig_iv)
 
 
-def run_final_evaluations(model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"):
+def run_final_evaluations(
+    model, dataset, path_config, run_name, writer, n_epochs, trim_eval=DEFAULT_TRIM_EVAL, strategy_name="sky130_nmos"
+):
     """
     Executes all final evaluation procedures after training.
 
@@ -476,9 +485,13 @@ def run_mosfet_training(
             _freeze_backbone(model)
             trainable_params = [p for p in model.parameters() if p.requires_grad]
             optimizer = optim.AdamW(trainable_params, lr=learning_rate, weight_decay=weight_decay)
-            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6)
+            scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                optimizer, T_0=max(1, n_epochs // warm_restart_count), eta_min=1e-6
+            )
             logger.info("Optimizer rebuilt with %d trainable parameter groups", len(trainable_params))
-        early_stopping_enabled, loss_history, patience_counter = _initialize_early_stopping(warm_restart_count, early_stop_patience, early_stop_threshold)
+        early_stopping_enabled, loss_history, patience_counter = _initialize_early_stopping(
+            warm_restart_count, early_stop_patience, early_stop_threshold
+        )
         logger.info("Starting Training Loop...")
         avg_loss = float("nan")
         final_epoch = n_epochs - 1
@@ -500,7 +513,8 @@ def run_mosfet_training(
                         )
                         if should_stop:
                             logger.info(
-                                "EARLY STOPPING TRIGGERED at epoch %d/%d. Loss flatlined (change rate: %.2e < threshold: %.2e).",
+                                "EARLY STOPPING TRIGGERED at epoch %d/%d."
+                                " Loss flatlined (change rate: %.2e < threshold: %.2e).",
                                 epoch + 1,
                                 n_epochs,
                                 loss_change_rate,
@@ -517,7 +531,7 @@ def run_mosfet_training(
                     logger.warning("Training interrupted by user at epoch %d. Saving checkpoint...", epoch)
                     final_epoch = epoch
                     break
-                lap_epoch(alt_msg=f"Epoch {epoch+1} completed")
+                lap_epoch(alt_msg=f"Epoch {epoch + 1} completed")
         logger.info("Training Complete.")
         torch.save(model.state_dict(), path_config.model_dir / f"{run_name}.pt")
         final_r2_fast, final_metrics_spice, comprehensive_metrics = run_final_evaluations(
@@ -540,7 +554,10 @@ def run_mosfet_training(
     "--loss-type",
     default="lp",
     type=click.Choice(["lp", "mse", "lp_floor", "weighted", "log10", "region_adaptive"]),
-    help="Loss function type. 'mse': plain MSE in arcsinh space (no denominator). 'lp_floor': relative L2 with clamped denominator.",
+    help=(
+        "Loss function type. 'mse': plain MSE in arcsinh space (no denominator). "
+        "'lp_floor': relative L2 with clamped denominator."
+    ),
 )
 @click.option("--denom-floor", default=10.0, help="For 'lp_floor': minimum denominator value in arcsinh units.")
 @click.option("--modes", default=128, help="Number of Fourier modes for FNO.")
@@ -550,7 +567,9 @@ def run_mosfet_training(
 @click.option("--early-stop-threshold", default=1e-5, help="Minimum loss change rate to consider as improvement.")
 @click.option("--loss-scale-ma", default=0.01, help="For 'weighted': scale_mA. For 'region_adaptive': subth_weight.")
 @click.option("--loss-exponent", default=2.0, help="For 'weighted': exponent. For 'region_adaptive': sat_weight.")
-@click.option("--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training.")
+@click.option(
+    "--checkpoint-path", default=None, help="Optional model checkpoint path for initialization before training."
+)
 @click.option(
     "--model-type",
     default="concat",
@@ -642,5 +661,4 @@ def main(
 
 
 if __name__ == "__main__":
-    # pylint: disable=no-value-for-parameter  # click mutates.
     main()

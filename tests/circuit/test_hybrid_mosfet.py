@@ -28,7 +28,7 @@ def test_hybrid_mixed_branch_grad_through_fno_only_where_good() -> None:
     ``torch.where`` only at timesteps where the bad-region mask is False.
     """
 
-    class FakeFno(nn.Module):  # pylint: disable=abstract-method
+    class FakeFno(nn.Module):
         """Linear sensitivity to gate voltage for a deterministic nonzero grad."""
 
         def __init__(self) -> None:

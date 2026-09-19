@@ -20,13 +20,21 @@ from spino.constants import MODELS_ROOT
 from spino.diode.evaluate import evaluate_adversarial, evaluate_rectifier
 from spino.diode.gen_data import InfiniteSpiceDiodeDataset
 from spino.diode.model import get_model as _get_diode_model
-from spino.mosfet.evaluate import evaluate_comprehensive, evaluate_sample_iv_curves, evaluate_spice_iv_sweeps
+from spino.mosfet.evaluate import (
+    evaluate_comprehensive,
+    evaluate_sample_iv_curves,
+    evaluate_spice_iv_sweeps,
+)
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
 from spino.mosfet.model import MosfetVCFiLMFNO
-from spino.rc.evaluate import evaluate_adversarial_spectrum, evaluate_ic_spectrum, evaluate_ood_physics
+from spino.rc.evaluate import (
+    evaluate_adversarial_spectrum,
+    evaluate_ic_spectrum,
+    evaluate_ood_physics,
+)
 from spino.rc.model import get_model as _get_rc_model
 
-__all__ = ["export_mosfet_figures", "export_rc_figures", "export_diode_figures"]
+__all__ = ["export_diode_figures", "export_mosfet_figures", "export_rc_figures"]
 
 # Production MOSFET checkpoint.
 # Run ID: wtmjf8yn (W&B). Exp 19b full fine-tune on sky130_nmos_61k_plus_shortch_supp8k.h5.
@@ -108,7 +116,9 @@ def export_mosfet_figures(output_dir: Path, device: str, dataset_path: Path | No
         logger.info("Saved: %s/core_iv_sweeps.png", output_dir)
         comprehensive_dir = output_dir / "comprehensive"
         comprehensive_dir.mkdir(exist_ok=True)
-        evaluate_comprehensive(model, dataset, output_dir=comprehensive_dir, device=device, dark=False, save_summary=False)
+        evaluate_comprehensive(
+            model, dataset, output_dir=comprehensive_dir, device=device, dark=False, save_summary=False
+        )
     logger.info("MOSFET figures complete.")
 
 
@@ -129,7 +139,9 @@ def export_rc_figures(output_dir: Path, device: str) -> None:
     logger.info("Loading RC checkpoint: %s", ckpt)
     model = _get_rc_model()
     raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
-    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
+    model.load_state_dict(
+        raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt
+    )
     model.to(device).eval()
     logger.info("RC model loaded. Generating documentation figures...")
     fig_ic, _ = evaluate_ic_spectrum(model, device=device, dark=False)
@@ -162,7 +174,9 @@ def export_diode_figures(output_dir: Path, device: str) -> None:
     logger.info("Loading diode checkpoint: %s", ckpt)
     model = _get_diode_model()
     raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
-    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
+    model.load_state_dict(
+        raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt
+    )
     model.to(device).eval()
     logger.info("Diode model loaded. Generating documentation figures...")
     fig_rect, _ = evaluate_rectifier(model, device=device, dark=False)
@@ -218,5 +232,4 @@ def main(docs_assets: str, device: str, mosfet: bool, rc: bool, diode: bool, dat
 
 
 if __name__ == "__main__":
-    # pylint: disable=no-value-for-parameter
     main()

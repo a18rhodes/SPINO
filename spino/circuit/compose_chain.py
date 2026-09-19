@@ -9,35 +9,45 @@ Invocation::
 
 from __future__ import annotations
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
-
 import json
-import math
 import logging
+import math
 import time as time_module
 from pathlib import Path
 
 import click
 import matplotlib
 
-matplotlib.use("Agg")  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-from spino.circuit.chain_composition import ChainDcSolver, ChainTransientSolver  # noqa: E402
-from spino.circuit.chain_metrics import crossing_time_s, max_abs_delta_v, pearson_r  # noqa: E402
-from spino.circuit.composition_io import (  # noqa: E402
+from spino.circuit.chain_composition import (
+    ChainDcSolver,
+    ChainTransientSolver,
+)
+from spino.circuit.chain_metrics import (
+    crossing_time_s,
+    max_abs_delta_v,
+    pearson_r,
+)
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_PFET_CHECKPOINT,
     load_inverter_chain_devices,
 )
-from spino.circuit.partition_caps import load_torch_partition_caps  # noqa: E402
-from spino.circuit.simulation import TransientResult, run_operating_point, run_transient  # noqa: E402
-from spino.circuit.topologies import build_inverter_chain  # noqa: E402
+from spino.circuit.partition_caps import load_torch_partition_caps
+from spino.circuit.simulation import (
+    TransientResult,
+    run_operating_point,
+    run_transient,
+)
+from spino.circuit.topologies import build_inverter_chain
 
 _SPEEDUP_NOTES = (
-    "cold_solver_ms is the first timed DC+transient pair after model load; " "warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
+    "cold_solver_ms is the first timed DC+transient pair after model load; "
+    "warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
 )
 
 logger = logging.getLogger(__name__)
@@ -179,7 +189,7 @@ def _plot_final_overlay(
     show_default=True,
     help="MosfetMLP hidden_dim when --device-class mlp. Production checkpoints: 64 (h64), 128 (h128).",
 )
-def main(  # pylint: disable=too-many-statements
+def main(
     *,
     output_dir: Path,
     device: str,
@@ -242,7 +252,7 @@ def main(  # pylint: disable=too-many-statements
         "warm_tran_iters": _spice_tran_b.iter_count,
     }
     if device_class == "mlp":
-        from spino.circuit.composition_mlp_adapter import (  # pylint: disable=import-outside-toplevel
+        from spino.circuit.composition_mlp_adapter import (
             MlpArchitecture,
             load_inverter_chain_mlp_devices,
         )
@@ -340,4 +350,4 @@ def main(  # pylint: disable=too-many-statements
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=missing-kwoa,no-value-for-parameter
+    main()

@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 
-from spino.constants import MODELS_ROOT, FIGURES_ROOT, RUNS_ROOT
+from spino.constants import FIGURES_ROOT, MODELS_ROOT, RUNS_ROOT
 
 
 @dataclass
 class PathConfig:
-
     experiment_type_name: str
 
     def __post_init__(self):

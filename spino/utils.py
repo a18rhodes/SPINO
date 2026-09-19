@@ -45,7 +45,7 @@ def timeit(name: str):
     logger = logging.getLogger(__name__)
     start_time = time.time()
 
-    def _lapper(alt_msg: str = None):
+    def _lapper(alt_msg: str | None = None):
         elapsed = time.time() - start_time
         if alt_msg:
             logger.info("%s %s", alt_msg, _convert_seconds_to_hms(elapsed))

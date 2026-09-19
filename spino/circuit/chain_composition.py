@@ -15,7 +15,12 @@ import torch
 from torch import Tensor
 from torch.autograd.functional import jacobian
 
-from spino.circuit.composition import _backtrack, _cap_alpha, _inf_norm, ConvergenceReport
+from spino.circuit.composition import (
+    ConvergenceReport,
+    _backtrack,
+    _cap_alpha,
+    _inf_norm,
+)
 from spino.circuit.devices import FnoMosfetDevice
 from spino.circuit.partition_caps import TorchPartitionCapGrid
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
@@ -176,7 +181,7 @@ class ChainDcSolver:
     ``V_in`` (stage 1) or ``V_{k-1}`` (internal feedback from previous output).
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         nfet_devices: tuple[FnoMosfetDevice, ...],
         pfet_devices: tuple[FnoMosfetDevice, ...],
@@ -315,7 +320,7 @@ class ChainTransientSolver:
     Whole-window implicit NR on stacked stage-output voltages ``(N, T)``.
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         nfet_devices: tuple[FnoMosfetDevice, ...],
         pfet_devices: tuple[FnoMosfetDevice, ...],

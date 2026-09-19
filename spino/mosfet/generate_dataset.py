@@ -8,7 +8,11 @@ from pathlib import Path
 import click
 
 from spino.mosfet.device_strategy import DeviceStrategy
-from spino.mosfet.gen_data import GEOMETRY_BINS, generate_offline_dataset, merge_geometry_bins
+from spino.mosfet.gen_data import (
+    GEOMETRY_BINS,
+    generate_offline_dataset,
+    merge_geometry_bins,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,8 +36,12 @@ def main():
     parser.add_argument("--workers", "-j", type=int, default=16, help="Number of parallel workers (16 recommended)")
     parser.add_argument("--gate-max", type=float, default=1.8, help="Maximum gate voltage")
     parser.add_argument("--drain-max", type=float, default=1.8, help="Maximum drain voltage")
-    parser.add_argument("--source-min", type=float, default=None, help="Minimum source voltage (overrides strategy default)")
-    parser.add_argument("--source-max", type=float, default=None, help="Maximum source voltage (overrides strategy default)")
+    parser.add_argument(
+        "--source-min", type=float, default=None, help="Minimum source voltage (overrides strategy default)"
+    )
+    parser.add_argument(
+        "--source-max", type=float, default=None, help="Maximum source voltage (overrides strategy default)"
+    )
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing file (default: append)")
     parser.add_argument(
         "--waveform-mode",
@@ -48,7 +56,10 @@ def main():
             "transfer_sweep",
         ],
         default="pwl",
-        help="Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth), output_sweep (gate constant, drain ramps), transfer_sweep (drain constant, gate ramps)",
+        help=(
+            "Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth), "
+            "output_sweep (gate constant, drain ramps), transfer_sweep (drain constant, gate ramps)"
+        ),
     )
     parser.add_argument(
         "--geometry-bin",
@@ -104,7 +115,9 @@ def main():
     logger.info("Samples: %d", args.samples)
     logger.info("Strategy: %s", args.strategy)
     logger.info("Waveform mode: %s", args.waveform_mode)
-    logger.info("Geometry: %s%s", args.geometry_bin or (f"{args.w_bin}x{args.l_bin}" if args.w_bin else "uniform"), bin_info)
+    logger.info(
+        "Geometry: %s%s", args.geometry_bin or (f"{args.w_bin}x{args.l_bin}" if args.w_bin else "uniform"), bin_info
+    )
     if args.geometry_bin:
         gbin = GEOMETRY_BINS[args.geometry_bin]
         logger.info("  W range: [%.2f, %.2f] um", *gbin.w_range)

@@ -49,11 +49,11 @@ from spino.mosfet.gen_data import ParameterSchema
 from spino.mosfet.model import MosfetMLP
 
 __all__ = [
-    "MlpArchitecture",
     "DEFAULT_NFET_MLP_H64_CHECKPOINT",
     "DEFAULT_NFET_MLP_H128_CHECKPOINT",
-    "load_mlp_device",
+    "MlpArchitecture",
     "load_inverter_chain_mlp_devices",
+    "load_mlp_device",
 ]
 
 
@@ -130,7 +130,7 @@ def load_mlp_device(
     return wrapper.to(map_location)
 
 
-def load_inverter_chain_mlp_devices(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def load_inverter_chain_mlp_devices(
     *,
     n_stages: int,
     nfet_w_um: float,

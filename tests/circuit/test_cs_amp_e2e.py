@@ -21,6 +21,9 @@ import shutil
 import numpy as np
 import pytest
 
+from spino.circuit import build_cs_amp_active_load
+from spino.circuit.simulation import run_dc_sweep, run_operating_point, run_transient
+
 _NGSPICE_AVAILABLE = shutil.which("ngspice") is not None
 _PDK_AVAILABLE = os.path.exists("/app/sky130_volare/sky130A/libs.tech/ngspice/sky130.lib.spice")
 pytestmark = [
@@ -30,9 +33,6 @@ pytestmark = [
         reason="ngspice or Sky130 PDK not available",
     ),
 ]
-
-from spino.circuit import build_cs_amp_active_load
-from spino.circuit.simulation import run_dc_sweep, run_operating_point, run_transient
 
 _PDK_LIB = "/app/sky130_volare/sky130A/libs.tech/ngspice/sky130.lib.spice"
 _NMOS_MODEL = "sky130_fd_pr__nfet_01v8"

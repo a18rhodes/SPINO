@@ -24,9 +24,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 import click
 import matplotlib.pyplot as plt
@@ -84,7 +84,7 @@ def _load_cache(path: Path, label: str) -> _CacheEntry:
     )
 
 
-def _evaluate_fno_grid(  # pylint: disable=too-many-locals
+def _evaluate_fno_grid(
     device: FnoMosfetDevice,
     entry: _CacheEntry,
     *,
@@ -161,7 +161,7 @@ def _safe_region_summary(
     return out
 
 
-def _plot_safe_region(  # pylint: disable=too-many-locals
+def _plot_safe_region(
     entry: _CacheEntry,
     err_ratio: np.ndarray,
     out_path: Path,
@@ -228,7 +228,7 @@ def _plot_safe_region(  # pylint: disable=too-many-locals
     default=None,
     help="Override PFET checkpoint path.",
 )
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def main(
     iv_cache_dir: Path,
     output_dir: Path,
     device: str | None,
@@ -309,4 +309,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

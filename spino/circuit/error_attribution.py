@@ -14,7 +14,11 @@ from typing import Any
 import numpy as np
 import torch
 
-from spino.circuit.composition import TransientSolution, TransientSolver, transient_kcl_residual_waveform
+from spino.circuit.composition import (
+    TransientSolution,
+    TransientSolver,
+    transient_kcl_residual_waveform,
+)
 from spino.circuit.devices import FnoMosfetDevice
 from spino.circuit.simulation import TransientResult
 

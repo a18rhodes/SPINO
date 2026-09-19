@@ -242,8 +242,17 @@ def main(output_dir: Path, w_mirror_grid: str, l_grid: str) -> None:
             m4_ft[i, j] = runs["triode_finetune"].get(key, {}).get("M4_pfet_mirror_out", float("nan")) * 1e6
     delta = m4_ft - m4_prod
 
-    _heat_map(w_grid_tup, l_grid_tup, m4_prod, "M4 max |ΔI| (production PFET)", "viridis", output_dir / "m4_dI_production.png")
-    _heat_map(w_grid_tup, l_grid_tup, m4_ft, "M4 max |ΔI| (triode fine-tune)", "viridis", output_dir / "m4_dI_triode_finetune.png")
+    _heat_map(
+        w_grid_tup, l_grid_tup, m4_prod, "M4 max |ΔI| (production PFET)", "viridis", output_dir / "m4_dI_production.png"
+    )
+    _heat_map(
+        w_grid_tup,
+        l_grid_tup,
+        m4_ft,
+        "M4 max |ΔI| (triode fine-tune)",
+        "viridis",
+        output_dir / "m4_dI_triode_finetune.png",
+    )
     _heat_map(
         w_grid_tup,
         l_grid_tup,

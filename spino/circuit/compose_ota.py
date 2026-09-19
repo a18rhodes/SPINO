@@ -20,8 +20,6 @@ Invocation::
 
 from __future__ import annotations
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
-
 import json
 import logging
 import time as time_module
@@ -31,23 +29,27 @@ from pathlib import Path
 import click
 import matplotlib
 
-matplotlib.use("Agg")  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-from spino.circuit.composition import ConvergenceReport  # noqa: E402
-from spino.circuit.composition_io import (  # noqa: E402
+from spino.circuit.composition import ConvergenceReport
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
     DEFAULT_PFET_DATASET,
     load_ota_5t_devices,
 )
-from spino.circuit.ota_composition import OtaDcSolution, OtaDcSolver, OtaTransientSolver  # noqa: E402
-from spino.circuit.simulation import TransientResult, run_transient  # noqa: E402
-from spino.circuit.topologies import build_ota_5t  # noqa: E402
-from spino.circuit.tuning import (  # noqa: E402
+from spino.circuit.ota_composition import (
+    OtaDcSolution,
+    OtaDcSolver,
+    OtaTransientSolver,
+)
+from spino.circuit.simulation import TransientResult, run_transient
+from spino.circuit.topologies import build_ota_5t
+from spino.circuit.tuning import (
     _ota_differential_step_pwl_strings,
     extract_slew_rate,
     extract_slew_time,
@@ -414,7 +416,7 @@ def _plot_convergence(
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_PFET_CHECKPOINT, show_default=True)
 @click.option("--nfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_NFET_DATASET, show_default=True)
 @click.option("--pfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_PFET_DATASET, show_default=True)
-def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+def main(
     output_dir: Path,
     trace_dir: Path | None,
     diff_w: float,
@@ -478,7 +480,9 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     )
 
     time_np = np.arange(0.0, t_end, t_step, dtype=np.float32)
-    vinp_np, vinn_np = _build_input_trajectories(time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp)
+    vinp_np, vinn_np = _build_input_trajectories(
+        time_np, vcm_v=vcm, t_step_start=t_step_start, rise_time_s=_DEFAULT_RISE_TIME, step_amp_v=step_amp
+    )
 
     logger.info("Running FNO transient solver (T=%d timesteps)…", len(time_np))
     tran_solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
@@ -599,7 +603,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
     # Save raw traces for offline attribution analysis.
     _trace_root = trace_dir if trace_dir is not None else Path("scratch") / output_dir.name
     _trace_root.mkdir(parents=True, exist_ok=True)
-    _id = lambda inst, dev: f"i(@m.{inst}.{dev}[id])"
+
+    def _id(inst: str, dev: str) -> str:
+        return f"i(@m.{inst}.{dev}[id])"
+
     np.savez_compressed(
         _trace_root / "spice_traces.npz",
         time_s=spice_tran.time,
@@ -627,4 +634,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positio
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()

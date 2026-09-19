@@ -27,13 +27,12 @@ current *from* n_tail.
 """
 
 # Solver classes carry many NR tuning knobs by design.
-# pylint: disable=too-many-arguments,too-many-instance-attributes,too-few-public-methods
-# pylint: disable=too-many-locals,too-many-positional-arguments
 
 from __future__ import annotations
 
 import logging
 import time as time_module
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -44,7 +43,12 @@ from torch import Tensor
 from torch.autograd.functional import jacobian
 from torch.autograd.functional import jvp as torch_jvp
 
-from spino.circuit.composition import ConvergenceReport, _backtrack, _cap_alpha, _inf_norm
+from spino.circuit.composition import (
+    ConvergenceReport,
+    _backtrack,
+    _cap_alpha,
+    _inf_norm,
+)
 from spino.circuit.devices import FnoMosfetDevice
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
 
@@ -303,7 +307,7 @@ class OtaDcSolver:
             iters += 1
             jac = jacobian(self._residual, v, vectorize=True, create_graph=False)
             res = self._residual(v)
-            direction = torch.linalg.solve(jac, -res.detach())  # pylint: disable=not-callable
+            direction = torch.linalg.solve(jac, -res.detach())
 
             alpha, _ = _backtrack(
                 self._residual,
@@ -468,7 +472,7 @@ class OtaTransientSolver:
 
     def _gmres_direction(
         self,
-        rfn: "Callable[[Tensor], Tensor]",  # type: ignore[name-defined]
+        rfn: Callable[[Tensor], Tensor],
         v_flat: Tensor,
         res_vec: Tensor,
         rn: float,
@@ -493,7 +497,7 @@ class OtaTransientSolver:
             # Fall back to one Jacobian+direct solve if GMRES failed.
             logger.debug("GMRES did not converge (info=%d); falling back to direct solve", info)
             jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
-            return torch.linalg.solve(jac, -res_vec.detach())  # pylint: disable=not-callable
+            return torch.linalg.solve(jac, -res_vec.detach())
         return torch.from_numpy(direction_np.astype(np.float32)).to(device=dev, dtype=dtype)
 
     def solve(
@@ -557,7 +561,7 @@ class OtaTransientSolver:
                 direction = self._gmres_direction(rfn, v_flat, res_vec, rn)
             else:
                 jac = jacobian(rfn, v_flat, vectorize=True, create_graph=False)
-                direction = torch.linalg.solve(jac, -res_vec.detach())  # pylint: disable=not-callable
+                direction = torch.linalg.solve(jac, -res_vec.detach())
             alpha, _ = _backtrack(
                 rfn,
                 v_flat.detach(),

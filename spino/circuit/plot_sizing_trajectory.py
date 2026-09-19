@@ -140,7 +140,7 @@ def _plot_theta_trajectory(traj: _Trajectory, problem: OtaSizingProblem, out_pat
     logger.info("Wrote %s", out_path)
 
 
-def _plot_fno_vs_spice(traj: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:  # pylint: disable=too-many-locals
+def _plot_fno_vs_spice(traj: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:
     """Bar chart of FNO-predicted vs SPICE-validated metrics at θ_final."""
     if traj.spice_summary is None:
         logger.warning("No spice_validation summary; skipping FNO-vs-SPICE plot.")
@@ -163,7 +163,9 @@ def _plot_fno_vs_spice(traj: _Trajectory, problem: OtaSizingProblem, out_path: P
 
     fig, ax = plt.subplots(figsize=(7.0, 4.0), constrained_layout=True)
     bars_fno = ax.bar(x - width / 2, fno_vals, width, label="FNO predicted", color=palette["pred"])
-    bars_spice = ax.bar(x + width / 2, spice_vals, width, label="SPICE validated", color=palette["gt"], edgecolor="black")
+    bars_spice = ax.bar(
+        x + width / 2, spice_vals, width, label="SPICE validated", color=palette["gt"], edgecolor="black"
+    )
 
     for rect, val in zip(bars_fno, fno_vals):
         ax.text(rect.get_x() + rect.get_width() / 2, val, f"{val:.2f}", ha="center", va="bottom", fontsize=9)
@@ -203,4 +205,4 @@ def main(run_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

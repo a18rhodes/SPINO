@@ -25,16 +25,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from torch import Tensor, nn
-
 import torch.autograd.functional as AF
+from torch import Tensor, nn
 
 from spino.circuit.composition import (
     ConvergenceReport,
     DcOperatingPointSolver,
     DcSolution,
-    TransientSolver,
     TransientSolution,
+    TransientSolver,
     _backtrack,
     _build_nfet_probe,
     _build_nfet_trajectory,
@@ -43,7 +42,11 @@ from spino.circuit.composition import (
     _cap_alpha,
 )
 from spino.circuit.devices import FnoMosfetDevice
-from spino.circuit.simulation import TransientResult, _maybe_with_acct, _parse_iter_count
+from spino.circuit.simulation import (
+    TransientResult,
+    _maybe_with_acct,
+    _parse_iter_count,
+)
 from spino.circuit.tuning import extract_settling_time
 from spino.constants import ARCSINH_SCALE_MA
 
@@ -202,12 +205,12 @@ class TestDcOperatingPointSolver:
         solver = _make_dc_solver(dc_devices)
         v_out = torch.tensor(0.7, dtype=torch.float32, requires_grad=True)
         vin = torch.tensor(0.85, dtype=torch.float32)
-        residual = solver._residual(v_out, vin)  # pylint: disable=protected-access
+        residual = solver._residual(v_out, vin)
         (autograd_jac,) = torch.autograd.grad(residual, v_out)
         eps = 1e-3
         with torch.no_grad():
-            r_plus = solver._residual(torch.tensor(0.7 + eps, dtype=torch.float32), vin)  # pylint: disable=protected-access
-            r_minus = solver._residual(torch.tensor(0.7 - eps, dtype=torch.float32), vin)  # pylint: disable=protected-access
+            r_plus = solver._residual(torch.tensor(0.7 + eps, dtype=torch.float32), vin)
+            r_minus = solver._residual(torch.tensor(0.7 - eps, dtype=torch.float32), vin)
         finite_diff = (r_plus - r_minus) / (2 * eps)
         torch.testing.assert_close(autograd_jac, finite_diff, rtol=1e-3, atol=1e-12)
 
@@ -298,7 +301,7 @@ class TestTransientSolver:
         v0.requires_grad_(True)
 
         def residual_fn(v: Tensor) -> Tensor:
-            return solver._residual_fn(v, vin_t, v_out_dc, dt)  # pylint: disable=protected-access
+            return solver._residual_fn(v, vin_t, v_out_dc, dt)
 
         jac_auto = AF.jacobian(residual_fn, v0, vectorize=True)
         jac_fd = torch.zeros_like(jac_auto)

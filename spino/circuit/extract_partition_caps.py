@@ -29,7 +29,7 @@ def _partition_cap_save_directive() -> str:
     return ".save @m.xiv[cgs] @m.xiv[cgd] @m.xiv[cgb]"
 
 
-def extract_nfet_grid(  # pylint: disable=too-many-arguments
+def extract_nfet_grid(
     *,
     width_um: float,
     length_um: float,

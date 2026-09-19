@@ -89,7 +89,7 @@ def _serialise_sweep(sweep: SweepResult) -> list[dict]:
     return [{"point": asdict(point), "metrics": asdict(metrics)} for point, metrics in zip(sweep.points, sweep.metrics)]
 
 
-def _write_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _write_summary(
     summary_path: Path,
     sweep: SweepResult,
     selected_point: DesignPoint,
@@ -225,7 +225,7 @@ def _generate_design_plots(
     show_default=True,
     help="PFET L (um); the (W_n, W_p) search uses this length.",
 )
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def main(
     output_dir: Path, vout_min: float, vout_max: float, vdd: float, pdk_root: str | None, nfet_l: float, pfet_l: float
 ) -> None:
     """Runs the CS amplifier characterization sweep and writes artefacts."""
@@ -293,4 +293,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()

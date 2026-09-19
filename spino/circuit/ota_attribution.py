@@ -34,11 +34,11 @@ import click
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-from spino.circuit.composition_io import (  # noqa: E402
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
@@ -68,9 +68,7 @@ def _to_probe(vg: np.ndarray, vd: np.ndarray, vs: np.ndarray, vb: np.ndarray) ->
             torch.from_numpy(vb).float(),
         ],
         dim=0,
-    ).unsqueeze(
-        0
-    )  # (1, 4, T)
+    ).unsqueeze(0)  # (1, 4, T)
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +106,9 @@ def run_probe1(
         # Fall back to run_dir itself (e.g. if --trace-dir was set explicitly).
         traces_path = run_dir / "spice_traces.npz"
     if not traces_path.exists():
-        raise FileNotFoundError(f"SPICE traces not found in scratch/{run_dir.name}/ or {run_dir}.  " "Re-run compose_ota to generate them.")
+        raise FileNotFoundError(
+            f"SPICE traces not found in scratch/{run_dir.name}/ or {run_dir}.  Re-run compose_ota to generate them."
+        )
 
     t = np.load(traces_path)
     time_s: np.ndarray = t["time_s"]
@@ -264,7 +264,7 @@ def _plot_probe1(
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_PFET_CHECKPOINT)
 @click.option("--nfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_NFET_DATASET)
 @click.option("--pfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_PFET_DATASET)
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def main(
     run_dir: Path,
     diff_w: float,
     mirror_w: float,
@@ -298,4 +298,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()
