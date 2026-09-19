@@ -13,13 +13,13 @@ from neuralop.layers.spectral_convolution import SpectralConv
 from neuralop.models import FNO
 
 __all__ = [
+    "BatchedFiLM",
     "DeviceEmbedding",
     "MosfetFNO",
-    "BatchedFiLM",
     "MosfetFiLMFNO",
-    "VoltageConditionedFiLM",
-    "MosfetVCFiLMFNO",
     "MosfetMLP",
+    "MosfetVCFiLMFNO",
+    "VoltageConditionedFiLM",
 ]
 
 
@@ -331,7 +331,7 @@ class MosfetFiLMFNO(nn.Module):
 
     def _pad(self, x: torch.Tensor) -> tuple[torch.Tensor, int]:
         """Pad the input tensor along the time dimension."""
-        pad_len = int(round(x.shape[-1] * self.domain_padding))
+        pad_len = round(x.shape[-1] * self.domain_padding)
         x = nn.functional.pad(x, (0, pad_len), mode="replicate")
         return x, pad_len
 
@@ -481,7 +481,7 @@ class MosfetVCFiLMFNO(nn.Module):
 
     def _pad(self, x: torch.Tensor) -> tuple[torch.Tensor, int]:
         """Pad the input tensor along the time dimension."""
-        pad_len = int(round(x.shape[-1] * self.domain_padding))
+        pad_len = round(x.shape[-1] * self.domain_padding)
         x = nn.functional.pad(x, (0, pad_len), mode="replicate")
         return x, pad_len
 

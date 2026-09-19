@@ -70,7 +70,7 @@ def _load(run_dir: Path, label: str) -> _Trajectory:
 
 def _plot_loss_slew(
     traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:  # pylint: disable=too-many-locals
+) -> None:
     """Side-by-side overlay of loss (log) and slew vs Adam step."""
     palette = get_palette(dark=False)
     fig, (ax_loss, ax_slew) = plt.subplots(1, 2, figsize=(13, 4.0), constrained_layout=True)
@@ -111,7 +111,7 @@ def _plot_loss_slew(
 
 def _plot_theta(
     traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:  # pylint: disable=too-many-locals
+) -> None:
     """Overlay 7-panel θ trajectory."""
     bounds = [
         problem.w_diff_bounds,
@@ -176,4 +176,4 @@ def main(fno_dir: Path, fd_dir: Path, out_dir: Path | None) -> None:
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

@@ -250,13 +250,11 @@ def evaluate_rectifier(
     fig, ax = plt.subplots(1, 2, figsize=(14, 6))
     i_mA = i_amps / 1e-3
     mode_str = f"Dimensionless (lambda={lambda_val:.4f})" if dimensionless else "Legacy (fixed 1ms)"
-    _style_plot(
-        ax[0],
-        f"Standard Rectifier Check [{mode_str}]\nR2={metrics['r2']:.4f} | MSE={metrics['mse']:.2e} | MAE={metrics['mae_mv']:.2f}mV",
-        "Time (ms)",
-        "Voltage (V)",
-        palette=p,
+    title = (
+        f"Standard Rectifier Check [{mode_str}]"
+        f"\nR2={metrics['r2']:.4f} | MSE={metrics['mse']:.2e} | MAE={metrics['mae_mv']:.2f}mV"
     )
+    _style_plot(ax[0], title, "Time (ms)", "Voltage (V)", palette=p)
     ax[0].plot(t * 1000, i_mA, color=p["vg"], linestyle="--", alpha=0.4, label="Input Current (mA)")
     ax[0].plot(t * 1000, v_true, color=p["gt"], linewidth=2.5, alpha=0.6, label="Ground Truth (SPICE)")
     ax[0].plot(t * 1000, v_pred, color=p["pred"], linestyle=":", linewidth=2, label="Prediction (FNO)")
@@ -321,7 +319,10 @@ def evaluate_adversarial(
     metrics = compute_metrics(y_true_phys, y_pred_phys)
     fig, ax = plt.subplots(1, 2, figsize=(14, 6))
     t_axis = np.linspace(0, 1, len(y_true_phys))
-    title_str = f"Adversarial Sample (Random Params)\nR={R:.0f}Ohm, C={C:.1e}F, Is={Is:.1e}A\nR2={metrics['r2']:.4f} | MSE={metrics['mse']:.2e} | MAE={metrics['mae_mv']:.2f}mV"
+    title_str = (
+        f"Adversarial Sample (Random Params)\nR={R:.0f}Ohm, C={C:.1e}F, Is={Is:.1e}A"
+        f"\nR2={metrics['r2']:.4f} | MSE={metrics['mse']:.2e} | MAE={metrics['mae_mv']:.2f}mV"
+    )
     _style_plot(ax[0], title_str, "Normalized Time", "Voltage (V)", palette=p)
     ax[0].plot(t_axis, i_hat, color=p["vg"], linestyle="--", alpha=0.3, label=i_label)
     ax[0].plot(t_axis, y_true_phys, color=p["gt"], linewidth=2.5, alpha=0.6, label="Ground Truth")
@@ -373,7 +374,7 @@ def evaluate_resolution_invariance(
             r2_map[t_steps] = 0.0
             continue
         if dimensionless:
-            x_in, lam = _prepare_dimensionless_input(i_amps, R_val, C_val, Is_val, N_val, t_end, device)
+            x_in, _lam = _prepare_dimensionless_input(i_amps, R_val, C_val, Is_val, N_val, t_end, device)
         else:
             x_in = _prepare_legacy_input(i_amps, R_val, C_val, Is_val, N_val, device)
         with torch.no_grad():
@@ -383,7 +384,6 @@ def evaluate_resolution_invariance(
         mse = np.mean((v_true - v_pred) ** 2)
         r2_map[t_steps] = r2
         logger.info("Resolution %d: MSE=%.2e, R2=%.4f", t_steps, mse, r2)
-        i_mA = i_amps / 1e-3
         _style_plot(ax, f"T={t_steps} | R2={r2:.4f} | MSE={mse:.2e}", "Time (ms)", "Voltage (V)", palette=p)
         ax.plot(t * 1000, v_true, color=p["gt"], linewidth=2.5, alpha=0.6, label="SPICE")
         ax.plot(t * 1000, v_pred, color=p["pred"], linestyle=":", linewidth=2, label="FNO")

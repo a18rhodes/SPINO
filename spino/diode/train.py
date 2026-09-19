@@ -33,7 +33,6 @@ from spino.archive import backup_artifacts
 from spino.config import PathConfig
 from spino.diode.evaluate import evaluate_adversarial, evaluate_rectifier
 from spino.diode.gen_data import (
-    DimensionlessDiodeDataset,
     InfiniteSpiceDiodeDataset,
     PreGeneratedDiodeDataset,
 )
@@ -457,4 +456,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

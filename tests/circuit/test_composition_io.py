@@ -64,9 +64,11 @@ def test_read_curated_physics_empty_raises() -> None:
         length_um=0.18,
         label="Y",
     )
-    with patch.object(BSIMParser, "inspect_model", lambda self, name, w, l: {}):
-        with pytest.raises(RuntimeError, match="BSIMParser returned no parameters"):
-            load_fno_device(spec)
+    with (
+        patch.object(BSIMParser, "inspect_model", lambda self, name, w, l: {}),
+        pytest.raises(RuntimeError, match="BSIMParser returned no parameters"),
+    ):
+        load_fno_device(spec)
 
 
 def test_load_fno_device_maps_to_cpu() -> None:

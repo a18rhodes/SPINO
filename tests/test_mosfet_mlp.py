@@ -1,8 +1,5 @@
 """Unit tests for MosfetMLP — per-timestep quasi-static MOSFET baseline."""
 
-# pytest fixtures shadow outer names by design; suppress the pylint warning globally.
-# pylint: disable=redefined-outer-name
-
 import pytest
 import torch
 

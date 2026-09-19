@@ -20,7 +20,7 @@ Logging.setup_logging(logging_level="ERROR")
 # ==============================================================================
 # 1. MODEL DEFINITION (Must match training exactly)
 # ==============================================================================
-class FNO_Wrapper(nn.Module):
+class FNOWrapper(nn.Module):
     def __init__(self):
         super().__init__()
         # Dimensionless Config
@@ -41,7 +41,7 @@ class FNO_Wrapper(nn.Module):
 
 def load_model(path, device="cuda"):
     print(f"Loading model from {path}...")
-    model = FNO_Wrapper().to(device)
+    model = FNOWrapper().to(device)
     # Load state dict (handling potential DataParallel wrappers if they existed)
     state_dict = torch.load(path, map_location=device, weights_only=False)
 
@@ -53,7 +53,7 @@ def load_model(path, device="cuda"):
         # Dictionary might match inner FNO structure, try loading into model.model
         try:
             model.model.load_state_dict(state_dict)
-        except:
+        except Exception:
             # Fallback: Maybe it was saved as the wrapper itself
             model.load_state_dict(state_dict)
 
@@ -223,25 +223,21 @@ def benchmark(model_path, n_trials=5):
 
         # --- METRICS ---
         # Compare against SPICE (Engineering Reality)
-        mse_spice = np.mean((v_spice - v_fno) ** 2)
         r2_spice = 1 - (np.sum((v_spice - v_fno) ** 2) / (np.sum((v_spice - np.mean(v_spice)) ** 2) + 1e-9))
 
         # Compare against Math (Physics Ideal)
         r2_math = 1 - (np.sum((v_math - v_fno) ** 2) / (np.sum((v_math - np.mean(v_math)) ** 2) + 1e-9))
 
-        r2_spice_vs_math = 1 - (np.sum((v_math - v_spice) ** 2) / (np.sum((v_math - np.mean(v_math)) ** 2) + 1e-9))
-
         speedup = time_spice / time_fno
 
         print(f"  > R2 vs SPICE:         {r2_spice:.5f}")
         print(f"  > R2 vs MATH:          {r2_math:.5f}")
-        print(f"  > R2 SPICE vs MATH:    {r2_math:.5f}")
         print(f"  > SPICE Time:          {time_spice*1000:.2f} ms")
         print(f"  > FNO Time:            {time_fno*1000:.2f} ms")
         print(f"  > SPEEDUP:             {speedup:.1f}x")
 
         # Plotting
-        fig, ax1 = plt.subplots(figsize=(10, 5))
+        _, ax1 = plt.subplots(figsize=(10, 5))
 
         # Voltage Axis
         ax1.set_xlabel("Time (s)")

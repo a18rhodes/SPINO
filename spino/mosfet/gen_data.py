@@ -8,6 +8,7 @@ import shutil
 import sys
 import uuid
 from pathlib import Path
+from typing import ClassVar
 
 import h5py
 import numpy as np
@@ -22,13 +23,13 @@ from spino.mosfet.physics_cache import PhysicsCache
 from spino.spice import OutputMode, run_ngspice
 
 __all__ = [
-    "ParameterSchema",
+    "GEOMETRY_BINS",
+    "GeometryBin",
     "InfiniteSpiceMosfetDataset",
+    "ParameterSchema",
     "PreGeneratedMosfetDataset",
     "generate_offline_dataset",
     "merge_geometry_bins",
-    "GeometryBin",
-    "GEOMETRY_BINS",
 ]
 
 
@@ -206,7 +207,7 @@ class ParameterSchema:
     """
 
     SUPPORTED_KEYS = _SUPPORTED_KEYS
-    TRAINING_KEYS = [
+    TRAINING_KEYS: ClassVar[list[str]] = [
         "w",
         "l",
         "vth0",
@@ -237,7 +238,7 @@ class ParameterSchema:
         "at",
         "rdsw",
     ]
-    TRAINING_INDICES = [
+    TRAINING_INDICES: ClassVar[list[int]] = [
         0,
         1,
         4,
@@ -371,7 +372,8 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         :param t_steps: Number of time points in output grid.
         :param t_end: Simulation end time in seconds (fixed mode) or fallback (variable mode).
         :param cache_dir: Directory for persistent physics parameter cache.
-        :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused", "deep_subthreshold", "output_sweep", "transfer_sweep").
+        :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused",
+            "deep_subthreshold", "output_sweep", "transfer_sweep").
         :param geometry_bin: Optional geometry bin name for stratified sampling (tiny/small/medium/large/xlarge).
         :param w_bin: Optional width bin for cross-bin sampling (requires l_bin).
         :param l_bin: Optional length bin for cross-bin sampling (requires w_bin).
@@ -493,10 +495,7 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         v_low = max(min_v, vth_center - vth_window)
         v_high = min(max_v, vth_center + vth_window)
         times = np.array([0.0, self.t_end])
-        if np.random.random() < 0.5:
-            volts = np.array([v_low, v_high])
-        else:
-            volts = np.array([v_high, v_low])
+        volts = np.array([v_low, v_high]) if np.random.random() < 0.5 else np.array([v_high, v_low])
         return times, volts
 
     def _generate_subthreshold_focused_voltage(self) -> tuple[np.ndarray, np.ndarray]:
@@ -518,10 +517,7 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
             v_high = max(wc.deep_subth_vg_range)
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
-        if np.random.random() < 0.5:
-            volts = np.array([v_low, v_high, v_high])
-        else:
-            volts = np.array([v_high, v_low, v_low])
+        volts = np.array([v_low, v_high, v_high]) if np.random.random() < 0.5 else np.array([v_high, v_low, v_low])
         return times, volts
 
     def _generate_deep_subthreshold_voltage(self) -> tuple[np.ndarray, np.ndarray]:
@@ -541,10 +537,7 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         )
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
-        if np.random.random() < 0.5:
-            volts = np.array([v_low, v_high, v_high])
-        else:
-            volts = np.array([v_high, v_low, v_low])
+        volts = np.array([v_low, v_high, v_high]) if np.random.random() < 0.5 else np.array([v_high, v_low, v_low])
         return times, volts
 
     def _generate_transitional_subthreshold_voltage(self) -> tuple[np.ndarray, np.ndarray]:
@@ -567,10 +560,7 @@ class InfiniteSpiceMosfetDataset(IterableDataset):
         v_high = np.random.uniform(range_lo + 0.6 * range_span, range_lo + range_span)
         end_time = np.random.uniform(0.5 * self.t_end, self.t_end)
         times = np.array([0.0, end_time, self.t_end])
-        if np.random.random() < 0.5:
-            volts = np.array([v_low, v_high, v_high])
-        else:
-            volts = np.array([v_high, v_low, v_low])
+        volts = np.array([v_low, v_high, v_high]) if np.random.random() < 0.5 else np.array([v_high, v_low, v_low])
         return times, volts
 
     def _get_voltage_generator(self, terminal: str):
@@ -1202,7 +1192,8 @@ def generate_offline_dataset(
     :param num_workers: Number of parallel workers (16 recommended for 22GB RAM).
     :param progress_callback: Optional callback(completed_count) for progress tracking.
     :param overwrite: If True, overwrite existing file. If False (default), append to existing file.
-    :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused", "deep_subthreshold").
+    :param waveform_mode: Waveform generation mode ("pwl", "monotonic", "vth_focused", "subthreshold_focused",
+        "deep_subthreshold").
     :param geometry_bin: Optional geometry bin for stratified sampling (tiny/small/medium/large/xlarge).
     :param w_bin: Optional width bin for cross-bin sampling (requires l_bin).
     :param l_bin: Optional length bin for cross-bin sampling (requires w_bin).

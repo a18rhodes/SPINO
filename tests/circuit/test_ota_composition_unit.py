@@ -16,7 +16,6 @@ NFET, slope=-1.0 for PFET, VDD=1.8 V, Vinp=Vinn=Vcm):
 confirmed numerically by the solver convergence test).
 """
 
-# pylint: disable=too-few-public-methods
 
 from __future__ import annotations
 

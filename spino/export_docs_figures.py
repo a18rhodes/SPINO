@@ -34,7 +34,7 @@ from spino.rc.evaluate import (
 )
 from spino.rc.model import get_model as _get_rc_model
 
-__all__ = ["export_mosfet_figures", "export_rc_figures", "export_diode_figures"]
+__all__ = ["export_diode_figures", "export_mosfet_figures", "export_rc_figures"]
 
 # Production MOSFET checkpoint.
 # Run ID: wtmjf8yn (W&B). Exp 19b full fine-tune on sky130_nmos_61k_plus_shortch_supp8k.h5.
@@ -232,5 +232,4 @@ def main(docs_assets: str, device: str, mosfet: bool, rc: bool, diode: bool, dat
 
 
 if __name__ == "__main__":
-    # pylint: disable=no-value-for-parameter
     main()

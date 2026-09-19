@@ -5,6 +5,7 @@ Handles subprocess management, temp file lifecycle, and format-specific
 parsing for both binary raw files and stdout-based marker extraction.
 """
 
+import contextlib
 import logging
 import os
 import signal
@@ -18,11 +19,11 @@ import numpy as np
 from numpy.typing import NDArray
 
 __all__ = [
+    "OutputMode",
     "parse_ngspice_raw",
     "run_ngspice",
     "run_ngspice_capture_log",
     "spice_temp_workspace",
-    "OutputMode",
 ]
 
 logger = logging.getLogger(__name__)
@@ -91,10 +92,8 @@ def _kill_process_group(process: subprocess.Popen) -> None:
         os.killpg(os.getpgid(process.pid), signal.SIGKILL)
     except (ProcessLookupError, PermissionError):
         process.kill()
-    try:
+    with contextlib.suppress(subprocess.TimeoutExpired):
         process.wait(timeout=1.0)
-    except subprocess.TimeoutExpired:
-        pass
 
 
 def _execute_ngspice(cmd: list[str], timeout: float) -> subprocess.CompletedProcess | None:

@@ -1,4 +1,3 @@
-# pylint: disable=too-many-lines
 """Gradient-based 5T OTA sizing via the Implicit Function Theorem (IFT).
 
 Design vector θ = (W_diff, W_mirror, W_tail, L_common, V_bias).
@@ -15,8 +14,6 @@ BSIM4 queries and evaluates the KCL residual at the fixed converged state.
 Power is tracked but not connected to the IFT gradient (see ``extract_metrics``).
 """
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
-# pylint: disable=too-many-instance-attributes
 
 from __future__ import annotations
 
@@ -34,13 +31,11 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from spino.circuit.composition_io import (
-    _read_curated_physics,  # internal — used for BSIM re-query in FD loop
-)
-from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
     DEFAULT_PFET_DATASET,
+    _read_curated_physics,  # internal — used for BSIM re-query in FD loop
     load_ota_5t_devices,
 )
 from spino.circuit.devices import FnoMosfetDevice
@@ -309,7 +304,7 @@ def _eval_tran_residual(
     m1, m2, m3, m4, m5 = devices
     solver = OtaTransientSolver(m1, m2, m3, m4, m5, vdd=vdd, vbias_v=vbias, c_load_f=c_load)
     dt_vec = tg[1:] - tg[:-1]
-    return solver._full_residual_flat(v_flat, vinp_t, vinn_t, v_dc, dt_vec)  # pylint: disable=protected-access
+    return solver._full_residual_flat(v_flat, vinp_t, vinn_t, v_dc, dt_vec)
 
 
 def _jtheta_fd(
@@ -429,11 +424,11 @@ def _make_ift_function(
     The returned class implements the IFT backward pass for the OTA transient solve.
     """
 
-    class _OtaTransientIFT(torch.autograd.Function):  # pylint: disable=abstract-method
+    class _OtaTransientIFT(torch.autograd.Function):
         """IFT-based custom autograd for the OTA transient Newton solve."""
 
         @staticmethod
-        def forward(  # type: ignore[override]  # pylint: disable=arguments-differ
+        def forward(  # type: ignore[override]
             ctx: torch.autograd.function.FunctionCtx,
             theta: Tensor,
             v_dc: Tensor,
@@ -472,7 +467,7 @@ def _make_ift_function(
             return result.v_out_v.detach()
 
         @staticmethod
-        def backward(  # type: ignore[override]  # pylint: disable=arguments-differ
+        def backward(  # type: ignore[override]
             ctx: torch.autograd.function.FunctionCtx,
             grad_v_out: Tensor,
         ) -> tuple[Tensor | None, Tensor | None]:
@@ -498,7 +493,7 @@ def _make_ift_function(
             eye = torch.eye(j_v.shape[0], dtype=j_v.dtype, device=j_v.device)
             j_v_reg = j_v + _TIKHONOV_LAMBDA * eye
             try:
-                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)  # pylint: disable=not-callable  # (3T, n_theta)
+                dv_dtheta = -torch.linalg.solve(j_v_reg, j_theta)
             except torch.linalg.LinAlgError:
                 logger.warning("IFT solve failed (singular J_v); returning zero gradient.")
                 return torch.zeros(n_theta, device=theta.device), None
@@ -679,10 +674,7 @@ def extract_metrics(
         slew_rate = torch.tensor(0.0)
 
     # Differentiable output swing: max - min in post-step window.
-    if v_post.numel() > 1:
-        swing = torch.max(v_post) - torch.min(v_post)
-    else:
-        swing = torch.tensor(0.0)
+    swing = torch.max(v_post) - torch.min(v_post) if v_post.numel() > 1 else torch.tensor(0.0)
 
     if i_tail_tensor is not None:
         power_uw: Tensor | float = i_tail_tensor.abs() * problem.vdd * 1e6
@@ -976,7 +968,7 @@ def fd_spice_gradient(
     return grad, slew_base, power_base, loss_base, sims
 
 
-def run_fd_spice_adam(  # pylint: disable=too-many-locals
+def run_fd_spice_adam(
     problem: OtaSizingProblem,
     *,
     theta_init: Tensor,
@@ -1185,7 +1177,7 @@ def spice_validate(
     help="FD discretisation order for --mode fd-spice. Forward = n_theta + 1 sims/iter (production). "
     "Central = 2*n_theta + 1 sims/iter (matches the IFT internal FD; used for the control study).",
 )
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def main(
     mode: str,
     theta_init: str,
     n_iters: int,
@@ -1239,4 +1231,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

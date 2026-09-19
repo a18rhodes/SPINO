@@ -14,7 +14,6 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -45,14 +44,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "evaluate_sample_iv_curves",
-    "evaluate_spice_iv_sweeps",
-    "evaluate_comprehensive",
+    "DEFAULT_TRIM_EVAL",
+    "calculate_male",
     "calculate_r2",
     "calculate_subthreshold_r2",
-    "calculate_male",
+    "evaluate_comprehensive",
+    "evaluate_sample_iv_curves",
+    "evaluate_spice_iv_sweeps",
     "log_evaluation_summary",
-    "DEFAULT_TRIM_EVAL",
 ]
 
 
@@ -244,13 +243,11 @@ def _extract_geometry_label(physics_raw: np.ndarray) -> tuple[float, float, floa
 def _draw_transient_panel(ax, time_us, current_true_ma, current_pred_ma, w, l, vth0, mse, r2, palette=None):
     """Draws the time-domain transient response panel."""
     pal = palette if palette is not None else DARK_PALETTE
-    _style_plot(
-        ax,
-        f"MOSFET Transient Response\nW={w:.2f}\u00b5m, L={l:.2f}\u00b5m, Vth0={vth0:.3f}V | MSE={mse:.2e}, R\u00b2={r2:.4f}",
-        "Normalized Time",
-        "Current (mA)",
-        palette=pal,
+    title = (
+        f"MOSFET Transient Response\nW={w:.2f}\u00b5m, L={l:.2f}\u00b5m, Vth0={vth0:.3f}V"
+        f" | MSE={mse:.2e}, R\u00b2={r2:.4f}"
     )
+    _style_plot(ax, title, "Normalized Time", "Current (mA)", palette=pal)
     ax.plot(time_us, current_true_ma, color=pal["gt"], linewidth=2, alpha=0.7, label="Ground Truth")
     ax.plot(time_us, current_pred_ma, color=pal["pred"], linestyle=":", linewidth=2, label="FNO Prediction")
     ax.axhline(0, color="gray", linewidth=0.5, alpha=0.5)
@@ -443,13 +440,11 @@ def evaluate_spice_iv_sweeps(
     metrics["l2_transfer"] = l2_transfer
     metrics["male_transfer"] = calculate_male(id_spice_plot, id_pred_plot)
     subth_str = f", SubTh-R²={r2_subth:.4f}" if r2_subth is not None else ""
-    _style_plot(
-        axes[0, 0],
-        f"Id-Vg Transfer (Saturation)\nW={w_um}µm, L={l_um}µm | R²={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
-        "Vg (V)",
-        "|Id| (mA)",
-        palette=palette,
+    title_transfer = (
+        f"Id-Vg Transfer (Saturation)\nW={w_um}µm, L={l_um}µm | R²={r2_transfer:.4f}{subth_str}, L2={l2_transfer:.4f}"
+        f"\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V"
     )
+    _style_plot(axes[0, 0], title_transfer, "Vg (V)", "|Id| (mA)", palette=palette)
     axes[0, 0].plot(vg_plot, np.abs(id_spice_plot), color=palette["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
     axes[0, 0].plot(vg_plot, np.abs(id_pred_plot), color=palette["pred"], linestyle=":", linewidth=2, label="FNO")
     axes[0, 0].set_yscale("log")
@@ -485,13 +480,11 @@ def evaluate_spice_iv_sweeps(
         metrics["r2_output"] = r2_output
         metrics["l2_output"] = l2_output
         metrics["male_output"] = calculate_male(id_spice_plot2, id_pred_plot2)
-        _style_plot(
-            axes[1, 0],
-            f"Id-Vd Output (Linear/Sat)\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V | R²={r2_output:.4f}, L2={l2_output:.4f}",
-            "Vd (V)",
-            "Id (mA)",
-            palette=palette,
+        title_output = (
+            f"Id-Vd Output (Linear/Sat)\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V"
+            f" | R²={r2_output:.4f}, L2={l2_output:.4f}"
         )
+        _style_plot(axes[1, 0], title_output, "Vd (V)", "Id (mA)", palette=palette)
         axes[1, 0].plot(vd_plot, id_spice_plot2, color=palette["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
         axes[1, 0].plot(vd_plot, id_pred_plot2, color=palette["pred_sweep"], linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
@@ -512,7 +505,7 @@ def evaluate_multi_geometry(
     model,
     dataset,
     output_dir: Path,
-    geometries: Optional[list[tuple[float, float]]] = None,
+    geometries: list[tuple[float, float]] | None = None,
     device: str = "cuda",
     t_steps: int = 512,
     trim_eval: int = DEFAULT_TRIM_EVAL,
@@ -686,13 +679,11 @@ def _evaluate_single_geometry_ramp(
         metrics["ramp_mae_ua"] = np.mean(np.abs(id_pred_ramp - id_spice_ramp)) * 1000.0
         metrics["ramp_male_ua"] = calculate_male(id_spice_ramp, id_pred_ramp)
         subth_str = f", SubTh={r2_ramp_subth:.4f}" if r2_ramp_subth is not None else ""
-        _style_plot(
-            axes[0, 0],
-            f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
-            "Vg (V)",
-            "|Id| (mA)",
-            palette=pal,
+        ramp_title = (
+            f"Ramp: Id-Vg | R2={r2_ramp:.4f}{subth_str}"
+            f"\nVd={ec.transfer_vd_bias:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V"
         )
+        _style_plot(axes[0, 0], ramp_title, "Vg (V)", "|Id| (mA)", palette=pal)
         axes[0, 0].plot(vg_sweep, np.abs(id_spice_ramp), color=pal["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
         axes[0, 0].plot(
             vg_sweep, np.abs(id_pred_ramp), color=pal["ramp_parity"], linestyle=":", linewidth=2, label="FNO"
@@ -746,13 +737,11 @@ def _evaluate_single_geometry_sweep(
         metrics["sweep_r2"] = r2_sweep
         metrics["sweep_mae_ua"] = np.mean(np.abs(id_pred_sweep - id_spice_sweep)) * 1000.0
         metrics["sweep_male_ua"] = calculate_male(id_spice_sweep, id_pred_sweep)
-        _style_plot(
-            axes[1, 0],
-            f"Sweep: Id-Vd | R2={r2_sweep:.4f}\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V",
-            "Vd (V)",
-            "Id (mA)",
-            palette=pal,
+        sweep_title = (
+            f"Sweep: Id-Vd | R2={r2_sweep:.4f}"
+            f"\nVg={ec.output_vg_drive:.1f}V, Vs={ec.vs_bias:.1f}V, Vb={ec.vb_bias:.1f}V"
         )
+        _style_plot(axes[1, 0], sweep_title, "Vd (V)", "Id (mA)", palette=pal)
         axes[1, 0].plot(vd_sweep, id_spice_sweep, color=pal["gt"], linewidth=2.5, alpha=0.7, label="SPICE")
         axes[1, 0].plot(vd_sweep, id_pred_sweep, color=pal["sweep_parity"], linestyle=":", linewidth=2, label="FNO")
         axes[1, 0].legend(loc="upper left", fontsize=9)
@@ -1026,7 +1015,8 @@ def _generate_summary_table(all_metrics: dict, output_dir: Path):
         f.write("=" * 130 + "\n\n")
         f.write(
             f"{'Geometry':<10} | {'Ramp R2':<10} | {'Ramp SubTh-R2':<14} | {'Sweep R2':<10} | {'Random R2':<10} | "
-            f"{'Ramp MAE':<12} | {'Ramp MALE':<12} | {'Sweep MAE':<12} | {'Sweep MALE':<12} | {'Random MAE':<12} | {'Random MALE':<12}\n"
+            f"{'Ramp MAE':<12} | {'Ramp MALE':<12} | {'Sweep MAE':<12} | {'Sweep MALE':<12} | "
+            f"{'Random MAE':<12} | {'Random MALE':<12}\n"
         )
         f.write("-" * 160 + "\n")
         for geom_name, metrics in all_metrics.items():

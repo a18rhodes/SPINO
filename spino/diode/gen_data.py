@@ -41,8 +41,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "DiodeParameters",
     "DimensionlessDiodeDataset",
+    "DiodeParameters",
     "InfiniteSpiceDiodeDataset",
     "PreGeneratedDiodeDataset",
     "generate_offline_dataset",
@@ -665,7 +665,7 @@ def visualize_generated_sample(filename: str = "Diode_Sample_Debug.png"):
     V_out = y[0].numpy()
     t_axis = np.linspace(0, dataset.t_end, dataset.t_steps) * 1000
     plt.style.use("dark_background")
-    fig, ax = plt.subplots(1, 2, figsize=(14, 6))
+    _, ax = plt.subplots(1, 2, figsize=(14, 6))
     ax[0].plot(t_axis, I_mA, "c", label="Input Current (mA)", alpha=0.7)
     ax[0].set_ylabel("Current (mA)", color="c")
     ax[0].tick_params(axis="y", labelcolor="c")

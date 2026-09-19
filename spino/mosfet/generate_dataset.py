@@ -56,7 +56,10 @@ def main():
             "transfer_sweep",
         ],
         default="pwl",
-        help="Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth), output_sweep (gate constant, drain ramps), transfer_sweep (drain constant, gate ramps)",
+        help=(
+            "Waveform generation mode: pwl (chaotic), monotonic (DC-sweep-like), vth_focused (gate near Vth), "
+            "output_sweep (gate constant, drain ramps), transfer_sweep (drain constant, gate ramps)"
+        ),
     )
     parser.add_argument(
         "--geometry-bin",

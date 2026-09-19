@@ -88,7 +88,7 @@ def _serialise_sweep(sweep: OtaSweepResult) -> list[dict]:
     return [{"point": asdict(point), "metrics": asdict(metrics)} for point, metrics in zip(sweep.points, sweep.metrics)]
 
 
-def _write_summary(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def _write_summary(
     summary_path: Path,
     sweep: OtaSweepResult,
     selected_point: OtaDesignPoint,
@@ -245,7 +245,7 @@ def _generate_figure(
     ),
 )
 @click.option("--pdk-root", type=str, default=None, help="Override Sky130 PDK root.")
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def main(
     output_dir: Path,
     vdd: float,
     nfet_l: float,
@@ -343,4 +343,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments,to
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()

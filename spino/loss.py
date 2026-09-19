@@ -7,7 +7,7 @@ arcsinh ∈ [0, 7] and saturation currents to [7, 17], providing implicit
 multi-scale balance without explicit weighting.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 import torch.nn.functional as F
@@ -18,9 +18,9 @@ from spino.constants import ARCSINH_SCALE_MA
 __all__ = [
     "ArcSinhMSELoss",
     "GenericDimensionlessPhysicsLoss",
+    "Log10Loss",
     "LpLoss",
     "LpLossWithFloor",
-    "Log10Loss",
     "RegionAdaptiveLoss",
     "SubthresholdWeightedLoss",
     "rc_physics_residual",
@@ -153,7 +153,7 @@ class LpLoss(nn.Module):
         :param p: Lp norm (p=2 is Euclidean/L2 norm).
         :param reduction: 'mean', 'sum', or 'none'.
         """
-        super(LpLoss, self).__init__()
+        super().__init__()
         self.d = d
         self.p = p
         self.reduction = reduction
@@ -320,16 +320,10 @@ class RegionAdaptiveLoss(nn.Module):
         subth_y_norm = torch.sqrt((target_sq * subth_mask).sum(dim=(1, 2)) + self.lp_loss.epsilon)
         subth_lp = subth_diff_norm / (subth_y_norm + self.lp_loss.epsilon)
         subth_valid = subth_mask.sum(dim=(1, 2)) > 0
-        if subth_valid.any():
-            loss_subth = subth_lp[subth_valid].mean()
-        else:
-            loss_subth = torch.tensor(0.0, device=pred.device)
+        loss_subth = subth_lp[subth_valid].mean() if subth_valid.any() else torch.tensor(0.0, device=pred.device)
         sat_diff_norm = torch.sqrt((diff_sq * sat_mask).sum(dim=(1, 2)) + self.lp_loss.epsilon)
         sat_y_norm = torch.sqrt((target_sq * sat_mask).sum(dim=(1, 2)) + self.lp_loss.epsilon)
         sat_lp = sat_diff_norm / (sat_y_norm + self.lp_loss.epsilon)
         sat_valid = sat_mask.sum(dim=(1, 2)) > 0
-        if sat_valid.any():
-            loss_sat = sat_lp[sat_valid].mean()
-        else:
-            loss_sat = torch.tensor(0.0, device=pred.device)
+        loss_sat = sat_lp[sat_valid].mean() if sat_valid.any() else torch.tensor(0.0, device=pred.device)
         return self.subth_weight * loss_subth + self.sat_weight * loss_sat

@@ -104,7 +104,7 @@ def _maybe_with_acct(options: tuple[str, ...], capture_iters: bool) -> tuple[str
     """
     if not capture_iters or _ACCT_OPTION in options:
         return options
-    return options + (_ACCT_OPTION,)
+    return (*options, _ACCT_OPTION)
 
 
 def _maybe_with_temp(options: tuple[str, ...], temperature: float | None) -> tuple[str, ...]:
@@ -121,7 +121,7 @@ def _maybe_with_temp(options: tuple[str, ...], temperature: float | None) -> tup
     """
     if temperature is None:
         return options
-    return options + (f"temp={temperature}",)
+    return (*options, f"temp={temperature}")
 
 
 def _parse_iter_count(stdout: str) -> int | None:
@@ -178,7 +178,7 @@ def run_operating_point(
     )
 
 
-def run_transient(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def run_transient(
     circuit: Circuit,
     t_step: float,
     t_end: float,

@@ -71,7 +71,7 @@ class _CornerResult:
     wall_ms: float
 
 
-def _spice_at_corner(  # pylint: disable=too-many-locals
+def _spice_at_corner(
     *,
     problem: OtaSizingProblem,
     time_np: np.ndarray,
@@ -142,7 +142,7 @@ def _slew_rate_v_per_us(time_s: np.ndarray, v_out: np.ndarray, t_step_start: flo
     return float(np.max(np.abs(dv_dt)) * 1e-6)
 
 
-def _run_fno_at_design_point(  # pylint: disable=too-many-locals
+def _run_fno_at_design_point(
     problem: OtaSizingProblem,
 ) -> tuple[np.ndarray, np.ndarray, float]:
     """Build FNO devices, run composition, return ``(time, v_out, wall_ms)``."""
@@ -185,7 +185,7 @@ def _run_fno_at_design_point(  # pylint: disable=too-many-locals
     return time_np.astype(np.float64), v_out_t.detach().cpu().numpy().astype(np.float64), wall_ms
 
 
-def _plot(  # pylint: disable=too-many-locals
+def _plot(
     time_s: np.ndarray,
     v_fno: np.ndarray,
     spice_tt: _CornerResult,
@@ -287,4 +287,4 @@ def main(output_dir: Path, device: str | None) -> None:
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

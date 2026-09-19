@@ -15,8 +15,8 @@ available).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -31,9 +31,6 @@ from spino.circuit.simulation import (
     run_transient,
 )
 from spino.circuit.topologies import build_cs_amp_active_load, build_ota_5t
-
-# pylint: disable=too-many-lines
-
 
 __all__ = [
     "DesignPoint",
@@ -102,7 +99,7 @@ class Metrics:
     settling_time_s: float
 
     @classmethod
-    def failed(cls) -> "Metrics":
+    def failed(cls) -> Metrics:
         """
         Returns a sentinel ``Metrics`` for designs that did not converge.
 
@@ -235,7 +232,7 @@ def extract_settling_time(tran: TransientResult, *, t_step_start: float, settle_
     return max(float(time[last_outside + 1]) - t_step_start, 0.0)
 
 
-def _build(  # pylint: disable=too-many-arguments
+def _build(
     point: DesignPoint,
     *,
     vdd: float,
@@ -271,7 +268,7 @@ def _build(  # pylint: disable=too-many-arguments
     return build_cs_amp_active_load(**kwargs)
 
 
-def _vtc(  # pylint: disable=too-many-arguments
+def _vtc(
     point: DesignPoint, *, vdd: float, nfet_l_um: float, pfet_l_um: float, pdk_root: str | None, step_v: float
 ) -> DCSweepResult | None:
     """
@@ -289,7 +286,7 @@ def _vtc(  # pylint: disable=too-many-arguments
     return run_dc_sweep(circuit, source_name="Vin", start=0.0, stop=vdd, step=step_v)
 
 
-def _operating_point(  # pylint: disable=too-many-arguments
+def _operating_point(
     point: DesignPoint,
     *,
     vdd: float,
@@ -313,7 +310,7 @@ def _operating_point(  # pylint: disable=too-many-arguments
     return run_operating_point(circuit)
 
 
-def _step_response(  # pylint: disable=too-many-arguments
+def _step_response(
     point: DesignPoint,
     *,
     vdd: float,
@@ -358,7 +355,7 @@ def _step_response(  # pylint: disable=too-many-arguments
     return run_transient(circuit, t_step=t_step, t_end=t_end)
 
 
-def simulate_design_point(  # pylint: disable=too-many-arguments,too-many-locals
+def simulate_design_point(
     point: DesignPoint,
     *,
     vdd: float = 1.8,
@@ -432,7 +429,7 @@ def simulate_design_point(  # pylint: disable=too-many-arguments,too-many-locals
     )
 
 
-def sweep_design_space(  # pylint: disable=too-many-arguments
+def sweep_design_space(
     nfet_widths_um: tuple[float, ...],
     pfet_widths_um: tuple[float, ...],
     *,
@@ -532,7 +529,7 @@ class OtaMetrics:
     quiescent_n_out_v: float
 
     @classmethod
-    def failed(cls) -> "OtaMetrics":
+    def failed(cls) -> OtaMetrics:
         """Returns a sentinel instance for designs that did not converge."""
         nan = float("nan")
         return cls(False, nan, nan, nan, nan, nan, nan)
@@ -648,7 +645,7 @@ def extract_slew_rate(
     return float(np.max(np.abs(dv_dt))) * 1e-6  # V/µs
 
 
-def extract_slew_time(  # pylint: disable=too-many-locals
+def extract_slew_time(
     tran: TransientResult,
     *,
     t_step_start: float,
@@ -746,7 +743,7 @@ def _ota_differential_step_pwl_strings(
     return vinp_pwl, vinn_pwl
 
 
-def _ota_op(  # pylint: disable=too-many-arguments
+def _ota_op(
     point: OtaDesignPoint,
     *,
     vdd: float,
@@ -775,7 +772,7 @@ def _ota_op(  # pylint: disable=too-many-arguments
     return run_operating_point(build_ota_5t(**kwargs))
 
 
-def _ota_tran(  # pylint: disable=too-many-arguments,too-many-locals
+def _ota_tran(
     point: OtaDesignPoint,
     *,
     vdd: float,
@@ -820,7 +817,7 @@ def _ota_tran(  # pylint: disable=too-many-arguments,too-many-locals
     return run_transient(build_ota_5t(**kwargs), t_step=t_step, t_end=t_end)
 
 
-def _ota_dc_gain_sweep(  # pylint: disable=too-many-arguments
+def _ota_dc_gain_sweep(
     point: OtaDesignPoint,
     *,
     vdd: float,
@@ -858,7 +855,7 @@ def _ota_dc_gain_sweep(  # pylint: disable=too-many-arguments
     )
 
 
-def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+def simulate_ota_design_point(
     point: OtaDesignPoint,
     *,
     vdd: float = 1.8,
@@ -973,7 +970,7 @@ def simulate_ota_design_point(  # pylint: disable=too-many-arguments,too-many-lo
     )
 
 
-def sweep_ota_design_space(  # pylint: disable=too-many-arguments,too-many-locals,too-many-positional-arguments
+def sweep_ota_design_space(
     diff_widths_um: tuple[float, ...],
     mirror_widths_um: tuple[float, ...],
     *,

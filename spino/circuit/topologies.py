@@ -37,7 +37,7 @@ def _resolve_lib_path(pdk_root: str = _DEFAULT_PDK_ROOT) -> str:
     return str(lib_path.absolute())
 
 
-def build_cs_amp_active_load(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def build_cs_amp_active_load(
     nfet_w: float = 1.6,
     nfet_l: float = 0.4,
     pfet_w: float = 2.5,
@@ -101,7 +101,7 @@ def build_cs_amp_active_load(  # pylint: disable=too-many-arguments,too-many-pos
     v_input = VoltageSource(name="Vin", positive_node="in", negative_node="0", dc_value=vin_dc, tran_value=vin_tran)
     devices: tuple[SpiceDevice, ...] = (nfet, pfet)
     if c_load_f > 0.0:
-        devices = devices + (Capacitor(name="CL", positive_node="out", negative_node="0", capacitance_f=c_load_f),)
+        devices = (*devices, Capacitor(name="CL", positive_node="out", negative_node="0", capacitance_f=c_load_f))
     return Circuit(
         name=f"CS Amp Active Load (NFET {nfet_w}/{nfet_l}, PFET {pfet_w}/{pfet_l})",
         devices=devices,
@@ -111,7 +111,7 @@ def build_cs_amp_active_load(  # pylint: disable=too-many-arguments,too-many-pos
     )
 
 
-def build_cmos_inverter(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def build_cmos_inverter(
     nfet_w: float = 0.82,
     nfet_l: float = 0.18,
     pfet_w: float = 2.05,
@@ -153,7 +153,7 @@ def build_cmos_inverter(  # pylint: disable=too-many-arguments,too-many-position
     )
 
 
-def build_inverter_chain(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def build_inverter_chain(
     n_stages: int,
     nfet_w: float = 0.82,
     nfet_l: float = 0.18,
@@ -225,7 +225,7 @@ def build_inverter_chain(  # pylint: disable=too-many-arguments,too-many-positio
     )
 
 
-def build_ota_5t(  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+def build_ota_5t(
     *,
     diff_w_um: float,
     diff_l_um: float,
@@ -323,7 +323,7 @@ def build_ota_5t(  # pylint: disable=too-many-arguments,too-many-positional-argu
     v_inn = VoltageSource(name="Vinn", positive_node="vinn", negative_node="0", dc_value=vcm_v, tran_value=vinn_tran)
     devices: tuple[SpiceDevice, ...] = (m1, m2, m3, m4, m5)
     if c_load_f > 0.0:
-        devices = devices + (Capacitor(name="CL", positive_node="n_out", negative_node="0", capacitance_f=c_load_f),)
+        devices = (*devices, Capacitor(name="CL", positive_node="n_out", negative_node="0", capacitance_f=c_load_f))
     return Circuit(
         name=(
             f"5T OTA (Wdiff={diff_w_um}/{diff_l_um} µm, Wmirror={mirror_w_um}/{mirror_l_um} µm,"

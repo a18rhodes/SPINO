@@ -57,4 +57,4 @@ def main(output: str, samples: int, t_steps: int, workers: int, overwrite: bool)
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

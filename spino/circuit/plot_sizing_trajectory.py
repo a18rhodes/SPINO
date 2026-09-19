@@ -142,7 +142,7 @@ def _plot_theta_trajectory(traj: _Trajectory, problem: OtaSizingProblem, out_pat
 
 def _plot_fno_vs_spice(
     traj: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:  # pylint: disable=too-many-locals
+) -> None:
     """Bar chart of FNO-predicted vs SPICE-validated metrics at θ_final."""
     if traj.spice_summary is None:
         logger.warning("No spice_validation summary; skipping FNO-vs-SPICE plot.")
@@ -207,4 +207,4 @@ def main(run_dir: Path) -> None:
 
 
 if __name__ == "__main__":
-    main()  # pylint: disable=no-value-for-parameter
+    main()

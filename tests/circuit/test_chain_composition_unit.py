@@ -5,7 +5,6 @@ Uses linear mock FNO devices (same construction idea as ``test_composition``)
 so no checkpoint files are required.
 """
 
-# pylint: disable=too-few-public-methods
 
 from __future__ import annotations
 

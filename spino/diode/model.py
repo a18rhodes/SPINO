@@ -12,7 +12,7 @@ Two configurations are provided:
 import torch.nn as nn
 from neuralop.models import FNO
 
-__all__ = ["DiodeFNO", "get_model", "I_SCALE_A"]
+__all__ = ["I_SCALE_A", "DiodeFNO", "get_model"]
 
 # Channel contract: dimensionless formulation
 # Ch 0: I_hat(t_hat)  -- normalized current waveform (+-1)

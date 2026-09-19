@@ -12,7 +12,6 @@ The test is integration-gated: it requires NGSpice, the sky130 PDK, and both
 production FNO checkpoints/datasets to be present.
 """
 
-# pylint: disable=duplicate-code
 
 from __future__ import annotations
 

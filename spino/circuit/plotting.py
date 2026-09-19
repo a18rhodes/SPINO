@@ -11,9 +11,6 @@ from pathlib import Path
 
 import matplotlib
 
-# pylint: disable=wrong-import-position
-
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -223,7 +220,7 @@ def plot_slew_time_heatmap(
     return target
 
 
-def plot_step_response_ota(  # pylint: disable=too-many-arguments
+def plot_step_response_ota(
     tran: TransientResult,
     output_path: str | Path,
     *,
@@ -282,7 +279,7 @@ def plot_step_response_ota(  # pylint: disable=too-many-arguments
     return target
 
 
-def plot_step_response(  # pylint: disable=too-many-arguments
+def plot_step_response(
     tran: TransientResult,
     output_path: str | Path,
     *,

@@ -32,8 +32,8 @@ ABS_FLOOR_A = _ABS_FLOOR_A
 _REL_FRAC_PASS_DEFAULT = 0.01
 
 __all__ = [
-    "ABS_MODE_SWITCH_A",
     "ABS_FLOOR_A",
+    "ABS_MODE_SWITCH_A",
     "RelAbsThresholds",
     "build_iv_cache_npz",
     "load_iv_cache_npz",

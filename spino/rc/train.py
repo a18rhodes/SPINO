@@ -80,7 +80,7 @@ def run_experiment(
     )
 
     # 4. Training Loop
-    print(f"Starting Training...")
+    print("Starting Training...")
     total_warmup_epochs = dead_zone_epochs + warmup_epochs
     avg_loss = avg_data = avg_sob = avg_phys = 0.0
 

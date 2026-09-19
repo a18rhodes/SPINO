@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -40,14 +40,10 @@ jobs:
       - name: Install PyTorch (CPU)
         run: poetry run pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Format check (black)
-        run: poetry run black --check --verbose --config pyproject.toml .
-
-      - name: Import order check (isort)
-        run: poetry run isort --check-only .
-
-      - name: Lint (pylint)
-        run: poetry run pylint spino tests --fail-under=10
+      - name: Lint and format check (ruff)
+        run: |
+          poetry run ruff check spino tests
+          poetry run ruff format --check spino tests
 
       - name: Run tests
         run: poetry run pytest --cov-report=xml -v

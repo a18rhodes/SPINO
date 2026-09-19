@@ -218,10 +218,7 @@ def _train_epoch(model, loader, optimizer, scheduler, loss_fn):
         target = current_target.cuda()
         optimizer.zero_grad()
         pred = model(voltages, physics)
-        if isinstance(loss_fn, RegionAdaptiveLoss):
-            loss = loss_fn(pred, target, voltages)
-        else:
-            loss = loss_fn(pred, target)
+        loss = loss_fn(pred, target, voltages) if isinstance(loss_fn, RegionAdaptiveLoss) else loss_fn(pred, target)
         loss.backward()
         nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
@@ -516,7 +513,8 @@ def run_mosfet_training(
                         )
                         if should_stop:
                             logger.info(
-                                "EARLY STOPPING TRIGGERED at epoch %d/%d. Loss flatlined (change rate: %.2e < threshold: %.2e).",
+                                "EARLY STOPPING TRIGGERED at epoch %d/%d."
+                                " Loss flatlined (change rate: %.2e < threshold: %.2e).",
                                 epoch + 1,
                                 n_epochs,
                                 loss_change_rate,
@@ -556,7 +554,10 @@ def run_mosfet_training(
     "--loss-type",
     default="lp",
     type=click.Choice(["lp", "mse", "lp_floor", "weighted", "log10", "region_adaptive"]),
-    help="Loss function type. 'mse': plain MSE in arcsinh space (no denominator). 'lp_floor': relative L2 with clamped denominator.",
+    help=(
+        "Loss function type. 'mse': plain MSE in arcsinh space (no denominator). "
+        "'lp_floor': relative L2 with clamped denominator."
+    ),
 )
 @click.option("--denom-floor", default=10.0, help="For 'lp_floor': minimum denominator value in arcsinh units.")
 @click.option("--modes", default=128, help="Number of Fourier modes for FNO.")
@@ -660,5 +661,4 @@ def main(
 
 
 if __name__ == "__main__":
-    # pylint: disable=no-value-for-parameter  # click mutates.
     main()

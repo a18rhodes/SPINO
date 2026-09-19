@@ -28,37 +28,34 @@ from pathlib import Path
 import click
 import matplotlib
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-
-matplotlib.use("Agg")  # noqa: E402
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
-
-from spino.circuit.composition import (  # noqa: E402
+from spino.circuit.composition import (
     ConvergenceReport,
     DcOperatingPointSolver,
     DcSolution,
     TransientSolution,
     TransientSolver,
 )
-from spino.circuit.composition_io import (  # noqa: E402
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
     DEFAULT_PFET_DATASET,
     load_cs_amp_devices,
 )
-from spino.circuit.simulation import (  # noqa: E402
+from spino.circuit.simulation import (
     OperatingPoint,
     TransientResult,
     run_dc_sweep,
     run_operating_point,
     run_transient,
 )
-from spino.circuit.topologies import build_cs_amp_active_load  # noqa: E402
-from spino.circuit.tuning import extract_settling_time  # noqa: E402
+from spino.circuit.topologies import build_cs_amp_active_load
+from spino.circuit.tuning import extract_settling_time
 
 __all__ = ["main"]
 
@@ -685,7 +682,7 @@ def _build_summary(
     }
 
 
-def _run_dc_op(  # pylint: disable=too-many-arguments
+def _run_dc_op(
     nfet_device,
     pfet_device,
     spice_kwargs: dict,
@@ -787,7 +784,7 @@ def _build_transient(
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_PFET_CHECKPOINT, show_default=True)
 @click.option("--nfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_NFET_DATASET, show_default=True)
 @click.option("--pfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_PFET_DATASET, show_default=True)
-def main(  # pylint: disable=too-many-arguments,too-many-locals
+def main(
     output_dir: Path,
     nfet_w: float,
     nfet_l: float,
@@ -882,4 +879,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()

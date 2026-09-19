@@ -34,11 +34,11 @@ import click
 import matplotlib
 
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import torch  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
-from spino.circuit.composition_io import (  # noqa: E402
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
@@ -266,7 +266,7 @@ def _plot_probe1(
 @click.option("--pfet-checkpoint", type=click.Path(path_type=Path), default=DEFAULT_PFET_CHECKPOINT)
 @click.option("--nfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_NFET_DATASET)
 @click.option("--pfet-dataset", type=click.Path(path_type=Path), default=DEFAULT_PFET_DATASET)
-def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def main(
     run_dir: Path,
     diff_w: float,
     mirror_w: float,
@@ -300,4 +300,4 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()  # pylint: disable=no-value-for-parameter
+    main()
