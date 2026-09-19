@@ -35,7 +35,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-exclude = ["sky130_volare", ".venv"]
+exclude = ["sky130_volare", ".venv", "*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
