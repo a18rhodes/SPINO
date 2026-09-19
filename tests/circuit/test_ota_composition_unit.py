@@ -202,7 +202,9 @@ class TestOtaDcSolver:
         )
         sol = solver.solve()
         assert sol.report.converged
-        assert abs(sol.v_left_v - sol.v_out_v) < 1e-4, f"Arm asymmetry too large: v_left={sol.v_left_v:.6f}, v_out={sol.v_out_v:.6f}"
+        assert (
+            abs(sol.v_left_v - sol.v_out_v) < 1e-4
+        ), f"Arm asymmetry too large: v_left={sol.v_left_v:.6f}, v_out={sol.v_out_v:.6f}"
 
     def test_residual_norm_decreases(self, ota_devices) -> None:
         """Newton iterations reduce the KCL residual from a deliberately bad start."""

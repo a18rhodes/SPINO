@@ -329,7 +329,9 @@ def evaluate_adversarial(
     ax[0].legend(loc="upper right", fontsize=9)
     _style_plot(ax[1], "Dynamic I-V Hysteresis Loop", "Voltage (V)", "Current", palette=p)
     ax[1].plot(y_true_phys, i_hat, color=p["gt"], marker="o", markersize=2, linestyle="None", alpha=0.3, label="True")
-    ax[1].plot(y_pred_phys, i_hat, color=p["pred_sweep"], marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred")
+    ax[1].plot(
+        y_pred_phys, i_hat, color=p["pred_sweep"], marker="x", markersize=2, linestyle="None", alpha=0.5, label="Pred"
+    )
     ax[1].legend(loc="lower right", fontsize=9)
     plt.tight_layout()
     return fig, metrics

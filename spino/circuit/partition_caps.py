@@ -201,7 +201,9 @@ class TorchPartitionCapGrid(torch.nn.Module):
         self.register_buffer("cgb_grid", cgb.clone())
 
     @classmethod
-    def from_numpy(cls, v1: np.ndarray, v2: np.ndarray, cgs: np.ndarray, cgd: np.ndarray, cgb: np.ndarray) -> TorchPartitionCapGrid:
+    def from_numpy(
+        cls, v1: np.ndarray, v2: np.ndarray, cgs: np.ndarray, cgd: np.ndarray, cgb: np.ndarray
+    ) -> TorchPartitionCapGrid:
         """
         Builds from numpy grids on CPU float32 tensors.
 
@@ -265,7 +267,9 @@ class TorchPartitionCapGrid(torch.nn.Module):
         return cg_s, cgd, cgb
 
 
-def load_torch_partition_caps(path: Path, *, is_pfet: bool, map_location: torch.device | str = "cpu") -> TorchPartitionCapGrid:
+def load_torch_partition_caps(
+    path: Path, *, is_pfet: bool, map_location: torch.device | str = "cpu"
+) -> TorchPartitionCapGrid:
     """
     Loads ``TorchPartitionCapGrid`` from an ``.npz`` on disk.
 

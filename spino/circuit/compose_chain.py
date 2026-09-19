@@ -37,7 +37,8 @@ from spino.circuit.simulation import TransientResult, run_operating_point, run_t
 from spino.circuit.topologies import build_inverter_chain  # noqa: E402
 
 _SPEEDUP_NOTES = (
-    "cold_solver_ms is the first timed DC+transient pair after model load; " "warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
+    "cold_solver_ms is the first timed DC+transient pair after model load; "
+    "warm_solver_ms is an immediate repeat. Compare to SPICE columns the same way."
 )
 
 logger = logging.getLogger(__name__)

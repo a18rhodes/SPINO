@@ -221,7 +221,7 @@ def _parse_args() -> argparse.Namespace:
         default=[],
         help=(
             "Extra raw args forwarded to compose_chain (repeatable). Example: "
-            '--compose-extra-arg=--t-end --compose-extra-arg=2e-6'
+            "--compose-extra-arg=--t-end --compose-extra-arg=2e-6"
         ),
     )
     return p.parse_args()
@@ -243,8 +243,7 @@ def main() -> None:
         _prepare_synth_caps(args.python_bin, caps_dir)
     if not nfet_cap.exists() or not pfet_cap.exists():
         raise FileNotFoundError(
-            "Cap tables missing. Use --prepare-synthetic-caps or pass existing caps in "
-            f"{caps_dir}."
+            "Cap tables missing. Use --prepare-synthetic-caps or pass existing caps in " f"{caps_dir}."
         )
     records: list[RunRecord] = []
     for stage_count in args.stages:

@@ -268,7 +268,9 @@ def benchmark(model_path, n_trials=5):
 
 if __name__ == "__main__":
     # Update this path to your actual saved model
-    MODEL_PATH = Path(__file__).parent / Path("models", "simple_rc", "Dimensionless_With_Gaussian_Noise_And_Chirp_Log_Uniform_eyJhZGFt.pt")
+    MODEL_PATH = Path(__file__).parent / Path(
+        "models", "simple_rc", "Dimensionless_With_Gaussian_Noise_And_Chirp_Log_Uniform_eyJhZGFt.pt"
+    )
     if os.path.exists(MODEL_PATH):
         benchmark(MODEL_PATH)
     else:

@@ -108,7 +108,9 @@ def export_mosfet_figures(output_dir: Path, device: str, dataset_path: Path | No
         logger.info("Saved: %s/core_iv_sweeps.png", output_dir)
         comprehensive_dir = output_dir / "comprehensive"
         comprehensive_dir.mkdir(exist_ok=True)
-        evaluate_comprehensive(model, dataset, output_dir=comprehensive_dir, device=device, dark=False, save_summary=False)
+        evaluate_comprehensive(
+            model, dataset, output_dir=comprehensive_dir, device=device, dark=False, save_summary=False
+        )
     logger.info("MOSFET figures complete.")
 
 
@@ -129,7 +131,9 @@ def export_rc_figures(output_dir: Path, device: str) -> None:
     logger.info("Loading RC checkpoint: %s", ckpt)
     model = _get_rc_model()
     raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
-    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
+    model.load_state_dict(
+        raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt
+    )
     model.to(device).eval()
     logger.info("RC model loaded. Generating documentation figures...")
     fig_ic, _ = evaluate_ic_spectrum(model, device=device, dark=False)
@@ -162,7 +166,9 @@ def export_diode_figures(output_dir: Path, device: str) -> None:
     logger.info("Loading diode checkpoint: %s", ckpt)
     model = _get_diode_model()
     raw_ckpt = torch.load(ckpt, map_location=device, weights_only=False)
-    model.load_state_dict(raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt)
+    model.load_state_dict(
+        raw_ckpt["state_dict"] if isinstance(raw_ckpt, dict) and "state_dict" in raw_ckpt else raw_ckpt
+    )
     model.to(device).eval()
     logger.info("Diode model loaded. Generating documentation figures...")
     fig_rect, _ = evaluate_rectifier(model, device=device, dark=False)

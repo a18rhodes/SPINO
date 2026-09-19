@@ -93,7 +93,9 @@ class FnoMosfetDevice(nn.Module):
         if p_mean.ndim != 1 or p_std.shape != p_mean.shape:
             raise ValueError(f"p_mean/p_std must be 1D and same shape; got {tuple(p_mean.shape)}, {tuple(p_std.shape)}")
         if physics_raw.shape != p_mean.shape:
-            raise ValueError(f"physics_raw must match p_mean shape; got {tuple(physics_raw.shape)} vs {tuple(p_mean.shape)}")
+            raise ValueError(
+                f"physics_raw must match p_mean shape; got {tuple(physics_raw.shape)} vs {tuple(p_mean.shape)}"
+            )
 
     @property
     def physics_norm(self) -> torch.Tensor:

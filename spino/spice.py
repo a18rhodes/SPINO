@@ -313,7 +313,9 @@ def _decode_binary_data(raw_bytes: bytes, n_vars: int, n_points: int) -> NDArray
     return data.reshape((n_points, n_vars))
 
 
-def _organize_results(data: NDArray[np.float64], var_names: list[str]) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]]:
+def _organize_results(
+    data: NDArray[np.float64], var_names: list[str]
+) -> dict[str, NDArray[np.float64] | dict[str, NDArray[np.float64]]]:
     """
     Organizes simulation data into time and node dictionaries.
 

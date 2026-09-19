@@ -861,7 +861,9 @@ def run_adam(
     (output_dir / "trajectory.json").write_text(json.dumps(trajectory, indent=2), encoding="utf-8")
     final_theta = theta.detach()
     (output_dir / "theta_final.json").write_text(
-        json.dumps({"theta": final_theta.tolist(), "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_um", "V_bias_v"]}),
+        json.dumps(
+            {"theta": final_theta.tolist(), "layout": ["W_diff_um", "W_mirror_um", "W_tail_um", "L_um", "V_bias_v"]}
+        ),
         encoding="utf-8",
     )
     logger.info("Adam complete. Final θ: %s", final_theta.tolist())
@@ -898,7 +900,9 @@ def _spice_metrics_at(theta_vals: tuple[float, ...], problem: OtaSizingProblem) 
 
 def _scalar_loss(slew: float, power_uw: float, problem: OtaSizingProblem) -> float:
     """Same hinge loss as :func:`loss_fn` but on float metrics (no autograd)."""
-    return problem.slew_weight * max(0.0, problem.slew_rate_min_v_per_us - slew) + problem.power_weight * max(0.0, power_uw - problem.power_max_uw)
+    return problem.slew_weight * max(0.0, problem.slew_rate_min_v_per_us - slew) + problem.power_weight * max(
+        0.0, power_uw - problem.power_max_uw
+    )
 
 
 def fd_spice_gradient(
@@ -1083,7 +1087,8 @@ def spice_validate(
 
     point = OtaDesignPoint(diff_w_um=w_diff, mirror_w_um=w_mirror)
     logger.info(
-        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, " "L_diff=%.3f, L_mirror=%.3f, L_tail=%.3f, Vbias=%.3f)",
+        "Running SPICE validation at θ = (W_diff=%.3f, W_mirror=%.3f, W_tail=%.3f, "
+        "L_diff=%.3f, L_mirror=%.3f, L_tail=%.3f, Vbias=%.3f)",
         w_diff,
         w_mirror,
         w_tail,
@@ -1198,7 +1203,10 @@ def main(  # pylint: disable=too-many-arguments,too-many-positional-arguments
 
     theta_vals = [float(v) for v in theta_init.split(",")]
     if len(theta_vals) != 7:
-        raise click.BadParameter("theta-init must have exactly 7 comma-separated values: " "W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias.")
+        raise click.BadParameter(
+            "theta-init must have exactly 7 comma-separated values: "
+            "W_diff, W_mirror, W_tail, L_diff, L_mirror, L_tail, V_bias."
+        )
 
     torch_dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
     problem = OtaSizingProblem(

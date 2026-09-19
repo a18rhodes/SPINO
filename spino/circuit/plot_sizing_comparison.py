@@ -68,13 +68,19 @@ def _load(run_dir: Path, label: str) -> _Trajectory:
     return _Trajectory(label, steps, loss, slew, power_uw, theta, sims_total)
 
 
-def _plot_loss_slew(traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:  # pylint: disable=too-many-locals
+def _plot_loss_slew(
+    traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
+) -> None:  # pylint: disable=too-many-locals
     """Side-by-side overlay of loss (log) and slew vs Adam step."""
     palette = get_palette(dark=False)
     fig, (ax_loss, ax_slew) = plt.subplots(1, 2, figsize=(13, 4.0), constrained_layout=True)
 
-    ax_loss.semilogy(traj_fno.steps, np.maximum(traj_fno.loss, 1e-4), color=palette["pred"], lw=1.8, label=traj_fno.label)
-    ax_loss.semilogy(traj_fd.steps, np.maximum(traj_fd.loss, 1e-4), color=palette["pred_sweep"], lw=1.8, label=traj_fd.label, ls="--")
+    ax_loss.semilogy(
+        traj_fno.steps, np.maximum(traj_fno.loss, 1e-4), color=palette["pred"], lw=1.8, label=traj_fno.label
+    )
+    ax_loss.semilogy(
+        traj_fd.steps, np.maximum(traj_fd.loss, 1e-4), color=palette["pred_sweep"], lw=1.8, label=traj_fd.label, ls="--"
+    )
     ax_loss.set_xlabel("Adam step")
     ax_loss.set_ylabel("loss (log)")
     ax_loss.legend(loc="upper right", fontsize=10)
@@ -103,7 +109,9 @@ def _plot_loss_slew(traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSiz
     logger.info("Wrote %s", out_path)
 
 
-def _plot_theta(traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:  # pylint: disable=too-many-locals
+def _plot_theta(
+    traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
+) -> None:  # pylint: disable=too-many-locals
     """Overlay 7-panel θ trajectory."""
     bounds = [
         problem.w_diff_bounds,

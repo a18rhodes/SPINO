@@ -203,7 +203,9 @@ class MosfetFNO(nn.Module):
         """
         super().__init__()
 
-        self.embedding = DeviceEmbedding(input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim)
+        self.embedding = DeviceEmbedding(
+            input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim
+        )
 
         # Input Channels Strategy:
         # 4 Dynamic Channels: Vg(t), Vd(t), Vs(t), Vb(t)
@@ -279,7 +281,9 @@ class MosfetFiLMFNO(nn.Module):
         """
         super().__init__()
 
-        self.embedding = DeviceEmbedding(input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim)
+        self.embedding = DeviceEmbedding(
+            input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim
+        )
 
         # Input Channels Strategy:
         # 4 Dynamic Channels: Vg(t), Vd(t), Vs(t), Vb(t)
@@ -308,7 +312,12 @@ class MosfetFiLMFNO(nn.Module):
         # 3. Custom Batched FiLM Layers
         # FNOBlocks with channel_mlp uses 2 norm layers per block
         self.n_norms_per_block = 2
-        self.film_layers = nn.ModuleList([BatchedFiLM(embed_dim=embedding_dim, in_channels=self.width) for _ in range(self.n_layers * self.n_norms_per_block)])
+        self.film_layers = nn.ModuleList(
+            [
+                BatchedFiLM(embed_dim=embedding_dim, in_channels=self.width)
+                for _ in range(self.n_layers * self.n_norms_per_block)
+            ]
+        )
 
         # 4. Projection Layer: Project hidden width to 1 output channel
         self.projection = nn.Sequential(
@@ -432,7 +441,9 @@ class MosfetVCFiLMFNO(nn.Module):
         :param n_layers: Number of FNO blocks.
         """
         super().__init__()
-        self.embedding = DeviceEmbedding(input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim)
+        self.embedding = DeviceEmbedding(
+            input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim
+        )
         self.fno_in_channels = 4
         self.n_voltage_channels = 4
         self.width = width
@@ -548,7 +559,9 @@ class MosfetMLP(nn.Module):
         :param embedding_hidden_dim: Hidden dimension for the DeviceEmbedding encoder.
         """
         super().__init__()
-        self.embedding = DeviceEmbedding(input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim)
+        self.embedding = DeviceEmbedding(
+            input_dim=input_param_dim, embedding_dim=embedding_dim, hidden_dim=embedding_hidden_dim
+        )
         self.n_voltage_channels = 4
         input_features = self.n_voltage_channels + embedding_dim
         layers: list[nn.Module] = [nn.Linear(input_features, hidden_dim), nn.GELU()]

@@ -52,7 +52,14 @@ _NFET_CKPT = DEFAULT_NFET_CHECKPOINT
 _PFET_CKPT = DEFAULT_PFET_CHECKPOINT
 _NFET_DS = DEFAULT_NFET_DATASET
 _PFET_DS = DEFAULT_PFET_DATASET
-_INTEGRATION_READY = _NGSPICE_AVAILABLE and _PDK_AVAILABLE and _NFET_CKPT.exists() and _PFET_CKPT.exists() and _NFET_DS.exists() and _PFET_DS.exists()
+_INTEGRATION_READY = (
+    _NGSPICE_AVAILABLE
+    and _PDK_AVAILABLE
+    and _NFET_CKPT.exists()
+    and _PFET_CKPT.exists()
+    and _NFET_DS.exists()
+    and _PFET_DS.exists()
+)
 
 _SKIP = pytest.mark.skipif(
     not _INTEGRATION_READY,
@@ -384,7 +391,9 @@ _FD_THETA_CLAMP: tuple[tuple[float, float], ...] = (
 )
 
 
-def _bracket_perturbation(theta_vec: tuple[float, ...], i: int, eps_rel: float) -> tuple[list[float], list[float], float]:
+def _bracket_perturbation(
+    theta_vec: tuple[float, ...], i: int, eps_rel: float
+) -> tuple[list[float], list[float], float]:
     """Return (plus_vals, minus_vals, effective_eps) with PDK clamping.
 
     If the symmetric +/- step would leave the validity bracket on either side,
@@ -515,5 +524,9 @@ def test_slew_grad_ift_and_surrogate_fidelity(name: str, theta_vec: tuple[float,
             f"See docs/sizing.md §'Gradient-verification bounds'."
         )
 
-    assert rel_a <= _M2_TOL_TEST_A, f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
-    assert rel_b <= _M2_TOL_TEST_B, f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"
+    assert (
+        rel_a <= _M2_TOL_TEST_A
+    ), f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
+    assert (
+        rel_b <= _M2_TOL_TEST_B
+    ), f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"

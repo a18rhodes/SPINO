@@ -206,8 +206,12 @@ class TestDcOperatingPointSolver:
         (autograd_jac,) = torch.autograd.grad(residual, v_out)
         eps = 1e-3
         with torch.no_grad():
-            r_plus = solver._residual(torch.tensor(0.7 + eps, dtype=torch.float32), vin)  # pylint: disable=protected-access
-            r_minus = solver._residual(torch.tensor(0.7 - eps, dtype=torch.float32), vin)  # pylint: disable=protected-access
+            r_plus = solver._residual(
+                torch.tensor(0.7 + eps, dtype=torch.float32), vin
+            )  # pylint: disable=protected-access
+            r_minus = solver._residual(
+                torch.tensor(0.7 - eps, dtype=torch.float32), vin
+            )  # pylint: disable=protected-access
         finite_diff = (r_plus - r_minus) / (2 * eps)
         torch.testing.assert_close(autograd_jac, finite_diff, rtol=1e-3, atol=1e-12)
 

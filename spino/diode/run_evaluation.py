@@ -20,7 +20,12 @@ import torch
 from torch.utils.data import DataLoader
 
 from spino.config import PathConfig
-from spino.diode.evaluate import evaluate_adversarial, evaluate_rectifier, evaluate_resolution_invariance, evaluate_variable_t_end
+from spino.diode.evaluate import (
+    evaluate_adversarial,
+    evaluate_rectifier,
+    evaluate_resolution_invariance,
+    evaluate_variable_t_end,
+)
 from spino.diode.gen_data import PreGeneratedDiodeDataset
 from spino.diode.model import DiodeFNO
 
@@ -86,8 +91,15 @@ def _write_metrics(out_path: Path, sections: list[tuple[str, dict]]) -> None:
 @click.option("--device", default="cuda", show_default=True, help="Torch device.")
 @click.option("--dark/--light", default=True, show_default=True, help="Plot colour scheme.")
 @click.option("--out-dir", default=None, type=click.Path(path_type=Path), help="Override output directory.")
-@click.option("--dataset-path", default=None, type=click.Path(exists=True, path_type=Path), help="HDF5 dataset for adversarial eval.")
-def run_evaluation(checkpoint_path: Path, device: str, dark: bool, out_dir: Path | None, dataset_path: Path | None) -> None:
+@click.option(
+    "--dataset-path",
+    default=None,
+    type=click.Path(exists=True, path_type=Path),
+    help="HDF5 dataset for adversarial eval.",
+)
+def run_evaluation(
+    checkpoint_path: Path, device: str, dark: bool, out_dir: Path | None, dataset_path: Path | None
+) -> None:
     """
     Runs the full diode evaluation suite on CHECKPOINT_PATH.
 
@@ -139,7 +151,10 @@ def run_evaluation(checkpoint_path: Path, device: str, dark: bool, out_dir: Path
     logger.info("=== Summary ===")
     logger.info("Rectifier   : R2=%.4f, MAE=%.2fmV", metrics_rect["r2"], metrics_rect["mae_mv"])
     logger.info("Resolution  : %s", {k: f"{v:.4f}" for k, v in r2_res.items()})
-    logger.info("Variable T  : %s", {(f"{k * 1e6:.0f}us" if k < 1e-3 else f"{k * 1e3:.0f}ms"): f"R2={v['r2']:.4f}" for k, v in metrics_te.items()})
+    logger.info(
+        "Variable T  : %s",
+        {(f"{k * 1e6:.0f}us" if k < 1e-3 else f"{k * 1e3:.0f}ms"): f"R2={v['r2']:.4f}" for k, v in metrics_te.items()},
+    )
 
 
 if __name__ == "__main__":

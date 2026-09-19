@@ -211,7 +211,9 @@ def build_inverter_chain(  # pylint: disable=too-many-arguments,too-many-positio
             ),
         )
     if c_load_f > 0.0:
-        devices_list.append(Capacitor(name="CL", positive_node=f"n{n_stages}", negative_node="0", capacitance_f=c_load_f))
+        devices_list.append(
+            Capacitor(name="CL", positive_node=f"n{n_stages}", negative_node="0", capacitance_f=c_load_f)
+        )
     v_supply = VoltageSource(name="VDD", positive_node="vdd", negative_node="0", dc_value=vdd)
     v_input = VoltageSource(name="Vin", positive_node="nin", negative_node="0", dc_value=vin_dc, tran_value=vin_tran)
     return Circuit(
@@ -323,7 +325,10 @@ def build_ota_5t(  # pylint: disable=too-many-arguments,too-many-positional-argu
     if c_load_f > 0.0:
         devices = devices + (Capacitor(name="CL", positive_node="n_out", negative_node="0", capacitance_f=c_load_f),)
     return Circuit(
-        name=(f"5T OTA (Wdiff={diff_w_um}/{diff_l_um} µm, Wmirror={mirror_w_um}/{mirror_l_um} µm," f" Wtail={tail_w_um}/{tail_l_um} µm)"),
+        name=(
+            f"5T OTA (Wdiff={diff_w_um}/{diff_l_um} µm, Wmirror={mirror_w_um}/{mirror_l_um} µm,"
+            f" Wtail={tail_w_um}/{tail_l_um} µm)"
+        ),
         devices=devices,
         sources=(v_supply, v_bias, v_inp, v_inn),
         lib_path=lib_path,

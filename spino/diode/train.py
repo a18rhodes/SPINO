@@ -214,7 +214,9 @@ def run_dimensionless_training(
             state = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
             model.load_state_dict(state)
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer, T_0=max(1, fine_tune_epochs), eta_min=1e-6
+        )
         loss_fn = _build_loss_fn(target_sobolev_weight)
         loss_history = deque(maxlen=early_stop_patience + 1)
         patience_counter = 0
@@ -344,7 +346,9 @@ def run_legacy_training(
     loader_iter = iter(train_loader)
     avg_loss = float("nan")
     for epoch in range(n_epochs):
-        avg_loss, loader_iter = _train_epoch_online(model, loader_iter, optimizer, mse_loss, steps_per_epoch, train_loader)
+        avg_loss, loader_iter = _train_epoch_online(
+            model, loader_iter, optimizer, mse_loss, steps_per_epoch, train_loader
+        )
         scheduler.step()
         writer.add_scalar("Loss/train", avg_loss, epoch)
         writer.add_scalar("Params/lr", optimizer.param_groups[0]["lr"], epoch)
@@ -377,7 +381,9 @@ def run_legacy_training(
 
 
 @click.command()
-@click.option("--dataset-path", default=None, type=click.Path(exists=True), help="HDF5 dataset for dimensionless training.")
+@click.option(
+    "--dataset-path", default=None, type=click.Path(exists=True), help="HDF5 dataset for dimensionless training."
+)
 @click.option("--experiment-name", default="diode_dimensionless", help="Base name for run identification.")
 @click.option("--n-epochs", default=250, show_default=True, help="Number of training epochs.")
 @click.option("--batch-size", default=64, show_default=True, help="Training batch size.")
@@ -424,7 +430,9 @@ def main(
         )
     else:
         if not dataset_path:
-            raise click.UsageError("--dataset-path is required for dimensionless training. Use --legacy for on-the-fly mode.")
+            raise click.UsageError(
+                "--dataset-path is required for dimensionless training. Use --legacy for on-the-fly mode."
+            )
         run_dimensionless_training(
             dataset_path=dataset_path,
             experiment_name=experiment_name,
