@@ -14,7 +14,6 @@ BSIM4 queries and evaluates the KCL residual at the fixed converged state.
 Power is tracked but not connected to the IFT gradient (see ``extract_metrics``).
 """
 
-
 from __future__ import annotations
 
 import dataclasses

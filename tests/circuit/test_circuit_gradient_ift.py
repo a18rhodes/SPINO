@@ -12,7 +12,6 @@ The test is integration-gated: it requires NGSpice, the sky130 PDK, and both
 production FNO checkpoints/datasets to be present.
 """
 
-
 from __future__ import annotations
 
 import os
@@ -523,9 +522,9 @@ def test_slew_grad_ift_and_surrogate_fidelity(name: str, theta_vec: tuple[float,
             f"See docs/sizing.md §'Gradient-verification bounds'."
         )
 
-    assert (
-        rel_a <= _M2_TOL_TEST_A
-    ), f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
-    assert (
-        rel_b <= _M2_TOL_TEST_B
-    ), f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"
+    assert rel_a <= _M2_TOL_TEST_A, (
+        f"Test A fail at {name}: rel L2 {rel_a:.4f} > {_M2_TOL_TEST_A}\nIFT={g_ift}\nFD-FNO={g_fd_fno}"
+    )
+    assert rel_b <= _M2_TOL_TEST_B, (
+        f"Test B fail at {name}: rel L2 {rel_b:.4f} > {_M2_TOL_TEST_B}\nFD-FNO={g_fd_fno}\nFD-SPICE={g_fd_spice}"
+    )

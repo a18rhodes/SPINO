@@ -177,9 +177,9 @@ def benchmark(model_path, n_trials=5):
     dummy_I = np.zeros(2048)
     run_fno_inference(model, dummy_I, 1000, 1e-6, 1e-3, 2048, device)
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"{'BENCHMARK: FNO vs NGSPICE vs MATH':^80}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     # Define Test Cases (Physical Units)
     test_cases = [
@@ -232,8 +232,8 @@ def benchmark(model_path, n_trials=5):
 
         print(f"  > R2 vs SPICE:         {r2_spice:.5f}")
         print(f"  > R2 vs MATH:          {r2_math:.5f}")
-        print(f"  > SPICE Time:          {time_spice*1000:.2f} ms")
-        print(f"  > FNO Time:            {time_fno*1000:.2f} ms")
+        print(f"  > SPICE Time:          {time_spice * 1000:.2f} ms")
+        print(f"  > FNO Time:            {time_fno * 1000:.2f} ms")
         print(f"  > SPEEDUP:             {speedup:.1f}x")
 
         # Plotting

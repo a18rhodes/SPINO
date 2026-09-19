@@ -259,7 +259,7 @@ def run_dimensionless_training(
                 fig_rect, m_val = evaluate_rectifier(model, dimensionless=True)
                 training_fig_dir = path_config.figure_dir / "training" / run_name
                 training_fig_dir.mkdir(parents=True, exist_ok=True)
-                fig_rect.savefig(training_fig_dir / f"rectifier_epoch_{epoch+1}.png")
+                fig_rect.savefig(training_fig_dir / f"rectifier_epoch_{epoch + 1}.png")
                 writer.add_figure("Validation/Rectifier", fig_rect, epoch)
                 writer.add_scalar("Validation/R2_Rectifier", m_val["r2"], epoch)
                 writer.add_scalar("Validation/MSE_Rectifier", m_val["mse"], epoch)
@@ -359,7 +359,7 @@ def run_legacy_training(
             logger.info("Epoch %03d/%d | Loss (MSE): %.6f", epoch, n_epochs, avg_loss)
         if (epoch + 1) % 10 == 0:
             fig_rect, _ = evaluate_rectifier(model, dimensionless=False)
-            fig_rect.savefig(path_config.figure_dir / f"{run_name}_rectifier_epoch_{epoch+1}.png")
+            fig_rect.savefig(path_config.figure_dir / f"{run_name}_rectifier_epoch_{epoch + 1}.png")
             writer.add_figure("Validation/Rectifier", fig_rect, epoch)
             plt.close(fig_rect)
     logger.info("Training Complete.")

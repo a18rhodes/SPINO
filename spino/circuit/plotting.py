@@ -269,7 +269,7 @@ def plot_step_response_ota(
     ax.set_xlabel(r"$t$ ($\mu$s)")
     ax.set_ylabel(r"$V_{out}$ (V)")
     ax.set_title(
-        f"OTA step response: $W_{{diff}} = {design.diff_w_um:g}$ µm," f" $W_{{mirror}} = {design.mirror_w_um:g}$ µm"
+        f"OTA step response: $W_{{diff}} = {design.diff_w_um:g}$ µm, $W_{{mirror}} = {design.mirror_w_um:g}$ µm"
     )
     ax.grid(True, alpha=0.3)
     ax.legend(loc="upper left")

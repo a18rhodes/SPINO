@@ -140,9 +140,7 @@ def _plot_theta_trajectory(traj: _Trajectory, problem: OtaSizingProblem, out_pat
     logger.info("Wrote %s", out_path)
 
 
-def _plot_fno_vs_spice(
-    traj: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:
+def _plot_fno_vs_spice(traj: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:
     """Bar chart of FNO-predicted vs SPICE-validated metrics at θ_final."""
     if traj.spice_summary is None:
         logger.warning("No spice_validation summary; skipping FNO-vs-SPICE plot.")

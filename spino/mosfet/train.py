@@ -279,7 +279,7 @@ def _run_periodic_evaluation(model, dataset, path_config, run_name, writer, epoc
     fig_iv, r2_iv = evaluate_sample_iv_curves(model, dataset, device="cuda")
     training_fig_dir = path_config.figure_dir / "training" / run_name
     training_fig_dir.mkdir(parents=True, exist_ok=True)
-    fig_iv.savefig(training_fig_dir / f"iv_epoch_{epoch+1}.png")
+    fig_iv.savefig(training_fig_dir / f"iv_epoch_{epoch + 1}.png")
     writer.add_figure("Validation/IV_Curves", fig_iv, epoch)
     writer.add_scalar("Validation/R2", r2_iv, epoch)
     plt.close(fig_iv)
@@ -531,7 +531,7 @@ def run_mosfet_training(
                     logger.warning("Training interrupted by user at epoch %d. Saving checkpoint...", epoch)
                     final_epoch = epoch
                     break
-                lap_epoch(alt_msg=f"Epoch {epoch+1} completed")
+                lap_epoch(alt_msg=f"Epoch {epoch + 1} completed")
         logger.info("Training Complete.")
         torch.save(model.state_dict(), path_config.model_dir / f"{run_name}.pt")
         final_r2_fast, final_metrics_spice, comprehensive_metrics = run_final_evaluations(

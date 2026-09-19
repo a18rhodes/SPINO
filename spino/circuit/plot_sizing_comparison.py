@@ -68,9 +68,7 @@ def _load(run_dir: Path, label: str) -> _Trajectory:
     return _Trajectory(label, steps, loss, slew, power_uw, theta, sims_total)
 
 
-def _plot_loss_slew(
-    traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:
+def _plot_loss_slew(traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:
     """Side-by-side overlay of loss (log) and slew vs Adam step."""
     palette = get_palette(dark=False)
     fig, (ax_loss, ax_slew) = plt.subplots(1, 2, figsize=(13, 4.0), constrained_layout=True)
@@ -109,9 +107,7 @@ def _plot_loss_slew(
     logger.info("Wrote %s", out_path)
 
 
-def _plot_theta(
-    traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path
-) -> None:
+def _plot_theta(traj_fno: _Trajectory, traj_fd: _Trajectory, problem: OtaSizingProblem, out_path: Path) -> None:
     """Overlay 7-panel θ trajectory."""
     bounds = [
         problem.w_diff_bounds,

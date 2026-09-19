@@ -384,7 +384,7 @@ def evaluate_ood_physics(model, device="cuda", dark: bool = True, display=False)
         ax_wave.plot(t_axis * 1000, v_true, "-", linewidth=2.5, color=p["gt"], label="True")
         ax_wave.plot(t_axis * 1000, v_pred, "--", linewidth=1.5, color=p["pred"], label="Pred")
 
-        ax_wave.set_title(f"{title}\nWindow: {T_end*1000:.1f}ms", loc="left")
+        ax_wave.set_title(f"{title}\nWindow: {T_end * 1000:.1f}ms", loc="left")
         ax_wave.set_ylabel("V (Volts)")
         ax_wave.legend(loc="upper right")
         ax_wave.grid(True, alpha=0.3)

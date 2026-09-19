@@ -603,8 +603,10 @@ def main(
     # Save raw traces for offline attribution analysis.
     _trace_root = trace_dir if trace_dir is not None else Path("scratch") / output_dir.name
     _trace_root.mkdir(parents=True, exist_ok=True)
+
     def _id(inst: str, dev: str) -> str:
         return f"i(@m.{inst}.{dev}[id])"
+
     np.savez_compressed(
         _trace_root / "spice_traces.npz",
         time_s=spice_tran.time,

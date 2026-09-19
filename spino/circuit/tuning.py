@@ -734,12 +734,8 @@ def _ota_differential_step_pwl_strings(
     :return: ``(vinp_pwl, vinn_pwl)`` SPICE PWL strings.
     """
     t_rise_end = t_step_start + rise_time_s
-    vinp_pwl = (
-        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v + step_amp_v} {t_end} {vcm_v + step_amp_v})"
-    )
-    vinn_pwl = (
-        f"PWL(0 {vcm_v} {t_step_start} {vcm_v} " f"{t_rise_end} {vcm_v - step_amp_v} {t_end} {vcm_v - step_amp_v})"
-    )
+    vinp_pwl = f"PWL(0 {vcm_v} {t_step_start} {vcm_v} {t_rise_end} {vcm_v + step_amp_v} {t_end} {vcm_v + step_amp_v})"
+    vinn_pwl = f"PWL(0 {vcm_v} {t_step_start} {vcm_v} {t_rise_end} {vcm_v - step_amp_v} {t_end} {vcm_v - step_amp_v})"
     return vinp_pwl, vinn_pwl
 
 

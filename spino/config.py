@@ -5,7 +5,6 @@ from spino.constants import FIGURES_ROOT, MODELS_ROOT, RUNS_ROOT
 
 @dataclass
 class PathConfig:
-
     experiment_type_name: str
 
     def __post_init__(self):
