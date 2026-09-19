@@ -20,8 +20,8 @@ confirmed numerically by the solver convergence test).
 
 from __future__ import annotations
 
-import torch
 import pytest
+import torch
 from torch import Tensor, nn
 
 from spino.circuit.devices import FnoMosfetDevice

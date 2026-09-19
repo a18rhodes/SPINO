@@ -20,7 +20,10 @@ from spino.circuit.chain_composition import (
     default_chain_dc_voltage_guess,
 )
 from spino.circuit.devices import FnoMosfetDevice
-from spino.circuit.partition_caps import TorchPartitionCapGrid, load_torch_partition_caps
+from spino.circuit.partition_caps import (
+    TorchPartitionCapGrid,
+    load_torch_partition_caps,
+)
 
 _VDD = 1.8
 _T_PROBE = 64

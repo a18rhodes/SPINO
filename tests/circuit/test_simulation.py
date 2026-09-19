@@ -13,7 +13,12 @@ pytestmark = [
     pytest.mark.skipif(not (_NGSPICE_AVAILABLE and _PDK_AVAILABLE), reason="ngspice or Sky130 PDK not available"),
 ]
 
-from spino.circuit import build_cs_amp_active_load, run_dc_sweep, run_operating_point, run_transient
+from spino.circuit import (
+    build_cs_amp_active_load,
+    run_dc_sweep,
+    run_operating_point,
+    run_transient,
+)
 
 
 @pytest.fixture()

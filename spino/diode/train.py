@@ -32,7 +32,11 @@ from torch.utils.tensorboard import SummaryWriter
 from spino.archive import backup_artifacts
 from spino.config import PathConfig
 from spino.diode.evaluate import evaluate_adversarial, evaluate_rectifier
-from spino.diode.gen_data import DimensionlessDiodeDataset, InfiniteSpiceDiodeDataset, PreGeneratedDiodeDataset
+from spino.diode.gen_data import (
+    DimensionlessDiodeDataset,
+    InfiniteSpiceDiodeDataset,
+    PreGeneratedDiodeDataset,
+)
 from spino.diode.model import get_model
 from spino.loss import GenericDimensionlessPhysicsLoss
 from spino.utils import generate_unique_id

@@ -28,21 +28,21 @@ from torch.utils.tensorboard import SummaryWriter
 from spino.config import PathConfig
 from spino.loss import (
     ArcSinhMSELoss,
+    Log10Loss,
     LpLoss,
     LpLossWithFloor,
-    Log10Loss,
     RegionAdaptiveLoss,
     SubthresholdWeightedLoss,
 )
 from spino.mosfet.evaluate import (
+    DEFAULT_TRIM_EVAL,
     evaluate_comprehensive,
     evaluate_sample_iv_curves,
     evaluate_spice_iv_sweeps,
     log_evaluation_summary,
-    DEFAULT_TRIM_EVAL,
 )
 from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
+from spino.mosfet.model import MosfetFiLMFNO, MosfetFNO, MosfetMLP, MosfetVCFiLMFNO
 from spino.utils import generate_unique_id, timeit
 
 # Configure Logging

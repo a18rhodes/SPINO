@@ -24,7 +24,11 @@ from rich.table import Table
 
 from spino.constants import ARCSINH_SCALE_MA
 from spino.mosfet.device_strategy import DeviceStrategy, EvalConfig
-from spino.mosfet.gen_data import GEOMETRY_BINS, InfiniteSpiceMosfetDataset, ParameterSchema
+from spino.mosfet.gen_data import (
+    GEOMETRY_BINS,
+    InfiniteSpiceMosfetDataset,
+    ParameterSchema,
+)
 from spino.plot_styles import DARK_PALETTE, LIGHT_PALETTE
 
 # Default number of initial timesteps to discard from evaluation.

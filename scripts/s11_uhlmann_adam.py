@@ -40,8 +40,8 @@ import click
 import torch
 import torch.nn.functional as F
 
-from spino.circuit.sizing import OtaSizingProblem, spice_validate
 from scripts.s11_train_uhlmann_surrogate import UhlmannSurrogate
+from spino.circuit.sizing import OtaSizingProblem, spice_validate
 
 logger = logging.getLogger(__name__)
 

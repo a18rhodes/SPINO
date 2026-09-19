@@ -15,7 +15,12 @@ import torch
 from torch import Tensor
 from torch.autograd.functional import jacobian
 
-from spino.circuit.composition import _backtrack, _cap_alpha, _inf_norm, ConvergenceReport
+from spino.circuit.composition import (
+    ConvergenceReport,
+    _backtrack,
+    _cap_alpha,
+    _inf_norm,
+)
 from spino.circuit.devices import FnoMosfetDevice
 from spino.circuit.partition_caps import TorchPartitionCapGrid
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL

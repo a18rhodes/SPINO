@@ -8,7 +8,11 @@ from pathlib import Path
 import click
 
 from spino.mosfet.device_strategy import DeviceStrategy
-from spino.mosfet.gen_data import GEOMETRY_BINS, generate_offline_dataset, merge_geometry_bins
+from spino.mosfet.gen_data import (
+    GEOMETRY_BINS,
+    generate_offline_dataset,
+    merge_geometry_bins,
+)
 
 logging.basicConfig(
     level=logging.INFO,

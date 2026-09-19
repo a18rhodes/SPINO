@@ -11,7 +11,10 @@ import pytest
 import torch
 
 from spino.circuit.composition import TransientSolver, transient_kcl_residual_waveform
-from spino.circuit.error_attribution import mosfet_id_key_for_instance, probe2_kcl_residual_bundle
+from spino.circuit.error_attribution import (
+    mosfet_id_key_for_instance,
+    probe2_kcl_residual_bundle,
+)
 
 
 @pytest.mark.parametrize(

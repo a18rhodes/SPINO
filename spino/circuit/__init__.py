@@ -7,7 +7,13 @@ multi-device analog circuits. Built on top of the core spice.py
 harness without modifying any single-device infrastructure.
 """
 
-from spino.circuit.netlist import Capacitor, Circuit, MosfetInstance, SpiceDevice, VoltageSource
+from spino.circuit.netlist import (
+    Capacitor,
+    Circuit,
+    MosfetInstance,
+    SpiceDevice,
+    VoltageSource,
+)
 from spino.circuit.simulation import (
     DCSweepResult,
     OperatingPoint,

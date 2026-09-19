@@ -8,9 +8,9 @@ to transient current responses.
 
 import torch
 import torch.nn as nn
-from neuralop.models import FNO
 from neuralop.layers.fno_block import FNOBlocks
 from neuralop.layers.spectral_convolution import SpectralConv
+from neuralop.models import FNO
 
 __all__ = [
     "DeviceEmbedding",

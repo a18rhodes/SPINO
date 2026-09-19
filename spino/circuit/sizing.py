@@ -34,12 +34,14 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from spino.circuit.composition_io import (
+    _read_curated_physics,  # internal — used for BSIM re-query in FD loop
+)
+from spino.circuit.composition_io import (
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_NFET_DATASET,
     DEFAULT_PFET_CHECKPOINT,
     DEFAULT_PFET_DATASET,
     load_ota_5t_devices,
-    _read_curated_physics,  # internal — used for BSIM re-query in FD loop
 )
 from spino.circuit.devices import FnoMosfetDevice
 from spino.circuit.ota_composition import (

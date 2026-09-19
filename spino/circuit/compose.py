@@ -19,8 +19,6 @@ Invocation::
 
 from __future__ import annotations
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
-
 import json
 import logging
 import time as time_module
@@ -29,6 +27,9 @@ from pathlib import Path
 
 import click
 import matplotlib
+
+# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
+
 
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402

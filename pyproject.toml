@@ -39,6 +39,8 @@ line-length = 120
 
 [tool.isort]
 profile = "black"
+known_first_party = ["spino"]
+extend_skip_glob = ["sky130_volare/*", ".venv/*"]
 
 [tool.pylint.format]
 max-line-length = 120

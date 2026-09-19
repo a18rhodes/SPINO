@@ -9,31 +9,43 @@ Invocation::
 
 from __future__ import annotations
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
-
 import json
-import math
 import logging
+import math
 import time as time_module
 from pathlib import Path
 
 import click
 import matplotlib
 
+# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
+
+
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from spino.circuit.chain_composition import ChainDcSolver, ChainTransientSolver  # noqa: E402
-from spino.circuit.chain_metrics import crossing_time_s, max_abs_delta_v, pearson_r  # noqa: E402
+from spino.circuit.chain_composition import (  # noqa: E402
+    ChainDcSolver,
+    ChainTransientSolver,
+)
+from spino.circuit.chain_metrics import (  # noqa: E402
+    crossing_time_s,
+    max_abs_delta_v,
+    pearson_r,
+)
 from spino.circuit.composition_io import (  # noqa: E402
     DEFAULT_NFET_CHECKPOINT,
     DEFAULT_PFET_CHECKPOINT,
     load_inverter_chain_devices,
 )
 from spino.circuit.partition_caps import load_torch_partition_caps  # noqa: E402
-from spino.circuit.simulation import TransientResult, run_operating_point, run_transient  # noqa: E402
+from spino.circuit.simulation import (  # noqa: E402
+    TransientResult,
+    run_operating_point,
+    run_transient,
+)
 from spino.circuit.topologies import build_inverter_chain  # noqa: E402
 
 _SPEEDUP_NOTES = (

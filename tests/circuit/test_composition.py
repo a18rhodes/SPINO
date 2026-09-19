@@ -25,16 +25,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from torch import Tensor, nn
-
 import torch.autograd.functional as AF
+from torch import Tensor, nn
 
 from spino.circuit.composition import (
     ConvergenceReport,
     DcOperatingPointSolver,
     DcSolution,
-    TransientSolver,
     TransientSolution,
+    TransientSolver,
     _backtrack,
     _build_nfet_probe,
     _build_nfet_trajectory,
@@ -43,7 +42,11 @@ from spino.circuit.composition import (
     _cap_alpha,
 )
 from spino.circuit.devices import FnoMosfetDevice
-from spino.circuit.simulation import TransientResult, _maybe_with_acct, _parse_iter_count
+from spino.circuit.simulation import (
+    TransientResult,
+    _maybe_with_acct,
+    _parse_iter_count,
+)
 from spino.circuit.tuning import extract_settling_time
 from spino.constants import ARCSINH_SCALE_MA
 

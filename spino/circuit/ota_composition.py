@@ -44,7 +44,12 @@ from torch import Tensor
 from torch.autograd.functional import jacobian
 from torch.autograd.functional import jvp as torch_jvp
 
-from spino.circuit.composition import ConvergenceReport, _backtrack, _cap_alpha, _inf_norm
+from spino.circuit.composition import (
+    ConvergenceReport,
+    _backtrack,
+    _cap_alpha,
+    _inf_norm,
+)
 from spino.circuit.devices import FnoMosfetDevice
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
 

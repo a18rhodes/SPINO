@@ -20,8 +20,6 @@ Invocation::
 
 from __future__ import annotations
 
-# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
-
 import json
 import logging
 import time as time_module
@@ -30,6 +28,9 @@ from pathlib import Path
 
 import click
 import matplotlib
+
+# pylint: disable=wrong-import-position,too-many-arguments,too-many-locals,too-many-positional-arguments
+
 
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
@@ -44,7 +45,11 @@ from spino.circuit.composition_io import (  # noqa: E402
     DEFAULT_PFET_DATASET,
     load_ota_5t_devices,
 )
-from spino.circuit.ota_composition import OtaDcSolution, OtaDcSolver, OtaTransientSolver  # noqa: E402
+from spino.circuit.ota_composition import (  # noqa: E402
+    OtaDcSolution,
+    OtaDcSolver,
+    OtaTransientSolver,
+)
 from spino.circuit.simulation import TransientResult, run_transient  # noqa: E402
 from spino.circuit.topologies import build_ota_5t  # noqa: E402
 from spino.circuit.tuning import (  # noqa: E402

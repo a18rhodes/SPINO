@@ -22,10 +22,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 from spino.config import PathConfig
-from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
-from spino.mosfet.model import MosfetFNO, MosfetFiLMFNO, MosfetVCFiLMFNO, MosfetMLP
-from spino.mosfet.train import run_final_evaluations
 from spino.mosfet.evaluate import DEFAULT_TRIM_EVAL
+from spino.mosfet.gen_data import ParameterSchema, PreGeneratedMosfetDataset
+from spino.mosfet.model import MosfetFiLMFNO, MosfetFNO, MosfetMLP, MosfetVCFiLMFNO
+from spino.mosfet.train import run_final_evaluations
 
 logging.basicConfig(
     level=logging.INFO,
