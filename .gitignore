@@ -29,9 +29,6 @@ venv/
 .cursor/
 .idea/
 
-# --- GitHub stuff ---
-.github/
-
 # --- Project Artifacts (Crucial) ---
 # Do not commit large binary models or logs
 # Note: `*/runs/` does NOT match repo-root `runs/`; use basename patterns.
@@ -66,3 +63,14 @@ spino/benchmarking/
 
 # Offline helper
 spino/mosfet/grid_search.py
+
+# Private AI instructions (Injected by Dotfiles)
+.claude/*
+
+# Private AI instructions (Injected by Dotfiles)
+.github/copilot-instructions.md
+
+# Private AI instructions (Injected by Dotfiles)
+.cursor/*
+
+.devcontainer/personal/*

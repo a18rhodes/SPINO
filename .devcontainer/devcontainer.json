@@ -1,37 +1,37 @@
 {
-  "name": "SPINO Env",
+  "name": "${localWorkspaceFolderBasename} Dev",
   "build": {
     "dockerfile": "../Dockerfile",
-    "context": ".."
+    "context": "..",
+    "target": "development",
+    "args": {
+      "WORKDIR": "/app"
+    }
   },
-  "mounts": [
-    "source=${localEnv:ONEDRIVE_PATH},target=/backup,type=bind"
-  ],
   "runArgs": [
     "--gpus", "all",
     "--shm-size", "8g"
   ],
-  "containerEnv": {
-    "SPINO_BACKUP_DIR": "/backup"
-  },
   "forwardPorts": [8888, 5000],
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
-  "workspaceFolder": "/app",
   "customizations": {
     "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "editor.formatOnSave": true
+      },
       "extensions": [
         "ms-python.python",
         "ms-toolsai.jupyter",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.pylint",
         "quarto.quarto",
         "ms-toolsai.tensorboard",
-        "tamasfe.even-better-toml",
-        "ms-python.pylint"
-      ],
-      "settings": {
-        "extensions.autoUpdate": false,
-        "extensions.ignoreRecommendations": true
-      }
+        "tamasfe.even-better-toml"
+      ]
     }
   },
-  "postCreateCommand": "code-server --install-extension ms-python.python --install-extension ms-toolsai.jupyter --install-extension quarto.quarto --install-extension ms-toolsai.tensorboard --install-extension tamasfe.even-better-toml --install-extension ms-python.pylint || true"
+  "remoteUser": "vscode",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+  "workspaceFolder": "/app"
 }
