@@ -26,10 +26,32 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+      # fetch-metadata derives update-type from the commit body; some
+      # security-update commits omit the "Bumps X from A to B" line, leaving
+      # it empty. Fall back to comparing major versions in the PR title.
+      - name: Classify update
+        id: classify
+        env:
+          UPDATE_TYPE: ${{ steps.dependabot-metadata.outputs.update-type }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          version_pattern='from v?([0-9]+)[^ ]* to v?([0-9]+)'
+          case "$UPDATE_TYPE" in
+            version-update:semver-patch|version-update:semver-minor) eligible=true ;;
+            version-update:semver-major) eligible=false ;;
+            *)
+              if [[ "$PR_TITLE" =~ $version_pattern ]] && [[ "${BASH_REMATCH[1]}" == "${BASH_REMATCH[2]}" ]]; then
+                eligible=true
+              else
+                eligible=false
+              fi
+              ;;
+          esac
+          echo "update-type='$UPDATE_TYPE' title='$PR_TITLE' eligible=$eligible"
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+
       - name: Enable auto-merge for patch and minor updates
-        if: |
-          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor'
+        if: steps.classify.outputs.eligible == 'true'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
